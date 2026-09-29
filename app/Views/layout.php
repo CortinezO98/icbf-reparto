@@ -27,7 +27,7 @@ use App\Config\App;
         label { display:block; font-weight:600; margin:12px 0 5px; }
         input, select { width:100%; padding:10px 11px; border:1px solid #cbd5e1; border-radius:8px; background:#fff; }
         table { width:100%; border-collapse:collapse; }
-        th, td { padding:10px; border-bottom:1px solid #e5e7eb; text-align:left; }
+        th, td { padding:10px; border-bottom:1px solid #e5e7eb; text-align:left; vertical-align:top; }
         th { background:#f8fafc; }
         .alert { padding:12px 14px; border-radius:9px; margin-bottom:14px; background:#fee2e2; color:#991b1b; }
         .muted { color:#64748b; }
@@ -36,13 +36,12 @@ use App\Config\App;
 </head>
 <body>
 <header>
-    <div>
-        <strong><?= htmlspecialchars(App::name(), ENT_QUOTES, 'UTF-8') ?></strong>
-    </div>
+    <div><strong><?= htmlspecialchars(App::name(), ENT_QUOTES, 'UTF-8') ?></strong></div>
     <?php if (Auth::check()): ?>
         <div>
             <nav style="display:inline-block">
                 <a href="/">Inicio</a>
+                <a href="/imports">Cargas</a>
                 <a href="/admin/users">Usuarios</a>
                 <a href="/admin/structures">Estructuras</a>
                 <a href="/admin/queues">Colas</a>
@@ -55,8 +54,6 @@ use App\Config\App;
         </div>
     <?php endif; ?>
 </header>
-<main>
-    <?php require $view; ?>
-</main>
+<main><?php require $view; ?></main>
 </body>
 </html>
