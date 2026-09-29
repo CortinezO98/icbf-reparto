@@ -1,0 +1,26 @@
+# Secrets / runtime
+.env
+.env.*
+!.env.example
+
+# Dependencies
+/vendor/
+
+# Runtime
+/storage/*
+!/storage/.gitkeep
+!/storage/imports/.gitkeep
+!/storage/attachments/.gitkeep
+!/storage/reports/.gitkeep
+!/storage/logs/.gitkeep
+!/storage/locks/.gitkeep
+
+# IDE / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Test output
+.phpunit.cache/
+coverage/
