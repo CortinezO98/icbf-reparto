@@ -1,3 +1,7 @@
+<?php
+/** @var array<string,mixed>|null $user */
+/** @var list<string> $roles */
+?>
 <div class="card">
     <h1 style="margin-top:0">Fase 1 - Fundación</h1>
     <p>La aplicación está operativa y autenticada.</p>

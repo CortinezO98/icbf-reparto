@@ -5,6 +5,7 @@ namespace App\Auth;
 
 final class PasswordPolicy
 {
+    /** @return list<string> */
     public static function validate(string $password): array
     {
         $errors = [];
@@ -32,10 +33,6 @@ final class PasswordPolicy
     {
         $algo = defined('PASSWORD_ARGON2ID') ? PASSWORD_ARGON2ID : PASSWORD_DEFAULT;
         $hash = password_hash($password, $algo);
-
-        if ($hash === false) {
-            throw new \RuntimeException('No fue posible generar el hash de contraseña.');
-        }
 
         return $hash;
     }

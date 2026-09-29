@@ -4,6 +4,8 @@ declare(strict_types=1);
 use App\Auth\Auth;
 use App\Auth\Csrf;
 use App\Config\App;
+
+/** @var string $view */
 ?>
 <!doctype html>
 <html lang="es">

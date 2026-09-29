@@ -11,35 +11,27 @@ final class UserRepository
     {
     }
 
+    /** @return array<string,mixed>|null */
     public function findForLogin(string $identifier): ?array
     {
         $identifier = trim($identifier);
 
         $st = $this->pdo->prepare(
-            'SELECT
-                id,
-                document_number,
-                username,
-                email,
-                full_name,
-                password_hash,
-                is_active
-            FROM users
-            WHERE username = :username_identifier
-                OR email = :email_identifier
-            LIMIT 1'
+            'SELECT id, document_number, username, email, full_name, password_hash, is_active
+             FROM users
+             WHERE username = :username_identifier OR email = :email_identifier
+             LIMIT 1'
         );
-
         $st->execute([
             ':username_identifier' => $identifier,
             ':email_identifier' => $identifier,
         ]);
-
         $row = $st->fetch();
 
         return $row ?: null;
     }
 
+    /** @return list<array<string,mixed>> */
     public function listAll(): array
     {
         $sql = <<<'SQL'
@@ -61,6 +53,7 @@ final class UserRepository
         return $this->pdo->query($sql)->fetchAll() ?: [];
     }
 
+    /** @return list<array<string,mixed>> */
     public function roles(): array
     {
         return $this->pdo->query(
@@ -68,6 +61,10 @@ final class UserRepository
         )->fetchAll() ?: [];
     }
 
+    /**
+     * @param array<string,mixed> $data
+     * @param list<int> $roleIds
+     */
     public function create(array $data, array $roleIds): int
     {
         $this->pdo->beginTransaction();

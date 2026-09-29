@@ -34,5 +34,6 @@
   "config": {
     "sort-packages": true,
     "optimize-autoloader": true
-  }
+  },
+  "license": "proprietary"
 }

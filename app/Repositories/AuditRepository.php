@@ -11,6 +11,7 @@ final class AuditRepository
     {
     }
 
+    /** @param array<string,mixed> $details */
     public function log(
         ?int $actorUserId,
         string $eventType,

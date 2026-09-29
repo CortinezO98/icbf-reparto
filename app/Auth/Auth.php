@@ -51,11 +51,13 @@ final class Auth
         return self::check() ? (int)$_SESSION['user']['id'] : null;
     }
 
+    /** @return array{id:int,username:string,full_name:string,email:string}|null */
     public static function user(): ?array
     {
         return $_SESSION['user'] ?? null;
     }
 
+    /** @param array<string,mixed> $user */
     public static function login(array $user): void
     {
         session_regenerate_id(true);
@@ -80,10 +82,10 @@ final class Auth
                 session_name(),
                 '',
                 time() - 42000,
-                $params['path'] ?? '/',
-                $params['domain'] ?? '',
-                (bool)($params['secure'] ?? false),
-                (bool)($params['httponly'] ?? true)
+                $params['path'],
+                $params['domain'],
+                $params['secure'],
+                $params['httponly']
             );
         }
 
