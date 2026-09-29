@@ -42,6 +42,8 @@ use App\Config\App;
             <nav style="display:inline-block">
                 <a href="/">Inicio</a>
                 <a href="/admin/users">Usuarios</a>
+                <a href="/admin/structures">Estructuras</a>
+                <a href="/admin/queues">Colas</a>
             </nav>
             <span class="muted"><?= htmlspecialchars((string)(Auth::user()['full_name'] ?? ''), ENT_QUOTES, 'UTF-8') ?></span>
             <form method="post" action="/logout" style="display:inline;margin-left:10px">

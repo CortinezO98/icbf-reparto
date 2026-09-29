@@ -13,13 +13,28 @@ final class UserRepository
 
     public function findForLogin(string $identifier): ?array
     {
+        $identifier = trim($identifier);
+
         $st = $this->pdo->prepare(
-            'SELECT id, document_number, username, email, full_name, password_hash, is_active
-             FROM users
-             WHERE username = :identifier OR email = :identifier
-             LIMIT 1'
+            'SELECT
+                id,
+                document_number,
+                username,
+                email,
+                full_name,
+                password_hash,
+                is_active
+            FROM users
+            WHERE username = :username_identifier
+                OR email = :email_identifier
+            LIMIT 1'
         );
-        $st->execute([':identifier' => trim($identifier)]);
+
+        $st->execute([
+            ':username_identifier' => $identifier,
+            ':email_identifier' => $identifier,
+        ]);
+
         $row = $st->fetch();
 
         return $row ?: null;
