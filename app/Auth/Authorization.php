@@ -42,6 +42,7 @@ final class Authorization
         }
     }
 
+    /** @return list<string> */
     public static function roles(PDO $pdo, int $userId): array
     {
         $st = $pdo->prepare(

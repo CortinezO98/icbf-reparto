@@ -1,3 +1,7 @@
+<?php
+/** @var list<array<string,mixed>> $roles */
+/** @var string|null $error */
+?>
 <div class="card" style="max-width:760px">
     <h1 style="margin-top:0">Crear usuario</h1>
 

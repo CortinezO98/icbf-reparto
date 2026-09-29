@@ -1,3 +1,6 @@
+<?php
+/** @var list<array<string,mixed>> $users */
+?>
 <div class="card">
     <div style="display:flex;justify-content:space-between;align-items:center;gap:12px">
         <div>
