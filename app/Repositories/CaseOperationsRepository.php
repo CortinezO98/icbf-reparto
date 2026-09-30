@@ -27,7 +27,9 @@ final class CaseOperationsRepository
         int $perPage,
         string $search = '',
         string $state = '',
-        ?int $queueId = null
+        ?int $queueId = null,
+        string $slaStatus = '',
+        bool $managed = false
     ): array {
         $page = max(1, $page);
         $perPage = max(1, min(100, $perPage));
@@ -61,6 +63,19 @@ final class CaseOperationsRepository
         if ($queueId !== null && $queueId > 0) {
             $where .= ' AND c.queue_id=:queue_id';
             $params[':queue_id'] = $queueId;
+        }
+
+        if ($slaStatus !== '') {
+            if ($slaStatus === 'RED_OR_BREACHED') {
+                $where .= " AND c.sla_status IN ('RED','BREACHED')";
+            } else {
+                $where .= ' AND c.sla_status=:sla_status';
+                $params[':sla_status'] = $slaStatus;
+            }
+        }
+
+        if ($managed) {
+            $where .= ' AND c.first_management_at IS NOT NULL';
         }
 
         $count = $this->pdo->prepare("SELECT COUNT(*) FROM cases c {$where}");
