@@ -10,6 +10,8 @@ use App\Repositories\AuditRepository;
 use App\Repositories\CaseOperationsRepository;
 use App\Services\Cases\CaseManagementRules;
 use App\Services\Cases\CaseSupportStorage;
+use App\Services\Sla\SlaService;
+use App\Repositories\SlaRepository;
 use PDO;
 
 final class CasesController
@@ -145,7 +147,7 @@ final class CasesController
             if ($type === 'CLOSED') {
                 try {
                     (new SlaService(new SlaRepository($this->pdo)))->evaluateCase($id);
-                } catch (Throwable $slaError) {
+                } catch (\Throwable $slaError) {
                     error_log('[CasesController::manage][SLA_CLOSE] ' . $slaError->getMessage());
                 }
             }
