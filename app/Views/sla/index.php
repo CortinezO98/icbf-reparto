@@ -9,6 +9,7 @@ $regions = $dashboard['regions'] ?? [];
 $channels = $dashboard['channels'] ?? [];
 $trend = $dashboard['trend'] ?? [];
 $alerts = $dashboard['alerts'] ?? [];
+$cases = $dashboard['cases'] ?? [];
 $imports = $dashboard['imports'] ?? [];
 $presence = $dashboard['presence'] ?? [];
 $period = $dashboard['period'] ?? ['key'=>'today','label'=>'Hoy'];
@@ -92,8 +93,7 @@ $presenceLabel = [
         <span class="badge text-bg-success-subtle border border-success text-success-emphasis px-3 py-2">
             <i class="bi bi-clock-history me-1"></i><?= htmlspecialchars((string)$period['label'], ENT_QUOTES, 'UTF-8') ?>
         </span>
-        <a href="/dashboard" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-clockwise me-1"></i>Actualizar</a>
-        <a href="/sla" class="btn btn-outline-brand btn-sm"><i class="bi bi-speedometer2 me-1"></i>Actualizar ANS</a>
+        <a href="/sla" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-clockwise me-1"></i>Actualizar</a>
     </div>
 </div>
 
@@ -413,6 +413,104 @@ $presenceLabel = [
 </div>
 
 <div class="row g-3 mt-1">
+    <div class="col-12">
+        <div class="dashboard-card">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-start gap-2 mb-2">
+                    <div>
+                        <div class="section-title">Casos activos</div>
+                        <div class="section-subtitle">Consulta directamente la gestión, trazabilidad y estado ANS de cada caso.</div>
+                    </div>
+                    <a href="/cases" class="btn btn-sm btn-outline-secondary">
+                        <i class="bi bi-inboxes me-1"></i>Ver todos
+                    </a>
+                </div>
+
+                <?php if ($cases !== []): ?>
+                    <div class="dashboard-scroll mt-3">
+                        <table class="dashboard-table">
+                            <thead>
+                            <tr>
+                                <th>Caso</th>
+                                <th>Estado</th>
+                                <th>ANS</th>
+                                <th>Cola</th>
+                                <th>Agente</th>
+                                <th>Última gestión</th>
+                                <th>Vence</th>
+                                <th></th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            <?php foreach ($cases as $case): ?>
+                                <?php
+                                $sla = (string)($case['sla_status'] ?? '');
+                                $slaClass = match ($sla) {
+                                    'GREEN' => 'status-green',
+                                    'YELLOW' => 'status-yellow',
+                                    'RED', 'BREACHED' => 'status-red',
+                                    default => 'status-gray',
+                                };
+                                $state = (string)($case['current_state'] ?? '');
+                                $stateLabel = match ($state) {
+                                    'PENDING_ASSIGNMENT' => 'Pendiente de asignación',
+                                    'ASSIGNED' => 'Asignado',
+                                    'CLOSED' => 'Cerrado',
+                                    default => $state !== '' ? $state : 'Sin estado',
+                                };
+                                ?>
+                                <tr>
+                                    <td>
+                                        <a class="fw-bold text-decoration-none" href="/cases/<?= (int)$case['id'] ?>">
+                                            <?= htmlspecialchars((string)$case['case_number'], ENT_QUOTES, 'UTF-8') ?>
+                                        </a>
+                                        <div class="text-muted small">
+                                            <?= htmlspecialchars((string)$case['external_key'], ENT_QUOTES, 'UTF-8') ?>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <span class="status-badge status-blue">
+                                            <?= htmlspecialchars($stateLabel, ENT_QUOTES, 'UTF-8') ?>
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <span class="status-badge <?= $slaClass ?>">
+                                            <?= htmlspecialchars($sla !== '' ? $sla : 'PENDIENTE', ENT_QUOTES, 'UTF-8') ?>
+                                        </span>
+                                        <div class="text-muted small">
+                                            <?= $hours($case['sla_elapsed_minutes'] ?? null) ?> hábiles
+                                        </div>
+                                    </td>
+                                    <td><?= htmlspecialchars((string)($case['queue_code'] ?: 'Sin cola'), ENT_QUOTES, 'UTF-8') ?></td>
+                                    <td><?= htmlspecialchars((string)($case['assigned_user_name'] ?: 'Sin asignar'), ENT_QUOTES, 'UTF-8') ?></td>
+                                    <td><?= htmlspecialchars((string)($case['current_management_type_code'] ?: 'Sin gestión'), ENT_QUOTES, 'UTF-8') ?></td>
+                                    <td class="small"><?= htmlspecialchars((string)($case['sla_due_at'] ?: '—'), ENT_QUOTES, 'UTF-8') ?></td>
+                                    <td class="text-end">
+                                        <a href="/cases/<?= (int)$case['id'] ?>" class="btn btn-sm btn-outline-primary" title="Ver gestión del caso">
+                                            <i class="bi bi-eye me-1"></i>Ver
+                                        </a>
+                                    </td>
+                                </tr>
+                            <?php endforeach; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="small text-muted mt-2">
+                        <i class="bi bi-info-circle me-1"></i>
+                        Se muestran los casos activos priorizados por estado ANS. El detalle conserva las validaciones de acceso del usuario.
+                    </div>
+                <?php else: ?>
+                    <div class="empty-state">
+                        <i class="bi bi-check-circle text-success fs-4 d-block mb-2"></i>
+                        No hay casos activos con los filtros seleccionados.
+                    </div>
+                <?php endif; ?>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row g-3 mt-1">
     <div class="col-xl-7">
         <div class="dashboard-card">
             <div class="card-body">
@@ -432,6 +530,11 @@ $presenceLabel = [
                             · <?= htmlspecialchars((string)($alert['assigned_user_name'] ?: 'Sin asignar'), ENT_QUOTES, 'UTF-8') ?>
                         </div>
                         <div class="small mt-1"><?= htmlspecialchars((string)$alert['message'], ENT_QUOTES, 'UTF-8') ?></div>
+                        <div class="mt-2">
+                            <a href="/cases/<?= (int)$alert['case_id'] ?>" class="btn btn-sm btn-outline-primary">
+                                <i class="bi bi-eye me-1"></i>Ver gestión
+                            </a>
+                        </div>
                     </div>
                 <?php endforeach; ?>
                 <?php if ($alerts === []): ?><div class="empty-state"><i class="bi bi-check-circle me-1"></i>No hay alertas operativas abiertas.</div><?php endif; ?>
