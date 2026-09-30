@@ -13,7 +13,7 @@ $queueId = (string)($_GET['queue_id'] ?? '');
 </style>
 
 <div class="cases-head">
-    <div><h1>▣ <?= htmlspecialchars($scopeLabel, ENT_QUOTES, 'UTF-8') ?></h1><div class="muted">Consulta y gestión de casos del módulo de reparto.</div></div>
+    <div><h1><i class="bi bi-inbox text-brand me-2"></i><?= htmlspecialchars($scopeLabel, ENT_QUOTES, 'UTF-8') ?></h1><div class="muted">Consulta y gestión de casos del módulo de reparto.</div></div>
 </div>
 
 <div class="case-panel">

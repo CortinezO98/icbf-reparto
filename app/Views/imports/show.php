@@ -42,7 +42,7 @@
                 </form>
             <?php endif; ?>
 
-            <a class="btn btn-light" href="/imports">Volver</a>
+            <a class="btn btn-light" href="/imports"><i class="bi bi-arrow-left me-1"></i>Volver</a>
         </div>
     </div>
 
@@ -66,7 +66,7 @@
 </div>
 
 <div class="card" style="margin-top:18px">
-    <h2 style="margin-top:0">Previsualización</h2>
+    <h2 style="margin-top:0"><i class="bi bi-table me-2"></i>Previsualización</h2>
     <p class="muted">Se muestran hasta 300 filas.</p>
 
     <div style="overflow:auto">

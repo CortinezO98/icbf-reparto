@@ -3,84 +3,211 @@
 /** @var list<array<string,mixed>> $roles */
 /** @var list<array<string,mixed>> $queues */
 /** @var string|null $error */
-$selectedRoles = array_map('intval', (array)$editUser['role_ids']);
-$selectedQueues = array_map('intval', (array)$editUser['queue_ids']);
+
+$selectedRoles = array_map('intval', (array)($editUser['role_ids'] ?? []));
+$selectedQueues = array_map('intval', (array)($editUser['queue_ids'] ?? []));
+$activeQueueIds = array_map(
+    static fn(array $queue): int => (int)$queue['id'],
+    $queues
+);
+$allQueuesSelected = $activeQueueIds !== []
+    && count(array_diff($activeQueueIds, $selectedQueues)) === 0;
 ?>
 <style>
-.ue-wrap{max-width:900px;margin:0 auto}.ue-head{display:flex;justify-content:space-between;gap:15px;flex-wrap:wrap}.ue-head h1{margin:0}.ue-card{background:#fff;border:1px solid #dfe3e8;border-radius:11px;box-shadow:0 4px 13px rgba(15,23,42,.06);margin-top:20px;overflow:hidden}.ue-card-head{padding:10px 16px;background:#fafbfc;border-bottom:1px solid #dfe3e8;font-weight:750}.ue-body{padding:18px}.ue-grid{display:grid;grid-template-columns:1fr 1fr;gap:15px 18px}.ue-section{font-weight:750;border-bottom:1px solid #d6dde5;padding-bottom:8px;margin:20px 0 12px}.ue-choice-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:9px}.ue-choice{display:flex!important;gap:8px;border:1px solid #dfe3e8;border-radius:8px;padding:10px;margin:0!important}.ue-choice input{width:auto}.ue-choice span{display:flex;flex-direction:column}.ue-choice small{color:#64748b;font-weight:400}.ue-toggle{display:flex!important;gap:8px;align-items:center}.ue-toggle input{width:auto}.ue-actions{display:flex;justify-content:space-between;border-top:1px solid #e5e7eb;padding-top:14px;margin-top:18px}.ue-outline{background:#fff;border:1px solid #94a3b8;color:#475569;border-radius:7px;padding:9px 12px;text-decoration:none}.ue-green{background:#198f4c;border:1px solid #198f4c;color:#fff;border-radius:7px;padding:9px 14px;font-weight:700}.ue-alert{background:#fee2e2;color:#991b1b;padding:12px;border-radius:8px;margin-top:15px}@media(max-width:700px){.ue-grid,.ue-choice-grid{grid-template-columns:1fr}}
+.admin-user-form{max-width:760px;margin:0 auto}
+.form-section-title{font-weight:600;border-bottom:1px solid #dee2e6;padding-bottom:.5rem;margin-bottom:1rem}
+.roles-select,.queues-select{min-height:112px}
 </style>
 
-<div class="ue-wrap">
-    <div class="ue-head">
-        <div><h1>✎ Editar Usuario</h1><div class="muted">Editando: <strong><?= htmlspecialchars((string)$editUser['full_name'], ENT_QUOTES, 'UTF-8') ?></strong> · ID <?= (int)$editUser['id'] ?></div></div>
-        <a class="ue-outline" href="/admin/users">← Volver a la lista</a>
+<div class="container-fluid py-3">
+    <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+        <div>
+            <h1 class="h3 mb-1">
+                <i class="bi bi-pencil-square text-primary me-2"></i>Editar Usuario
+            </h1>
+            <p class="text-muted mb-0">
+                Editando: <strong><?= htmlspecialchars((string)$editUser['full_name'], ENT_QUOTES, 'UTF-8') ?></strong>
+            </p>
+        </div>
+
+        <a href="/admin/users" class="btn btn-outline-secondary">
+            <i class="bi bi-arrow-left me-1"></i>Volver a la lista
+        </a>
     </div>
 
-    <?php if ($error): ?><div class="ue-alert"><?= htmlspecialchars($error, ENT_QUOTES, 'UTF-8') ?></div><?php endif; ?>
+    <?php if ($error): ?>
+        <div class="alert alert-danger admin-user-form">
+            <?= htmlspecialchars($error, ENT_QUOTES, 'UTF-8') ?>
+        </div>
+    <?php endif; ?>
 
-    <form method="post" action="/admin/users/<?= (int)$editUser['id'] ?>/edit">
-        <input type="hidden" name="_csrf" value="<?= htmlspecialchars(\App\Auth\Csrf::token(), ENT_QUOTES, 'UTF-8') ?>">
+    <div class="admin-user-form">
+        <div class="card shadow-sm">
+            <div class="card-header bg-light">
+                <h6 class="mb-0"><i class="bi bi-person-gear me-2"></i>Actualizar Información</h6>
+            </div>
 
-        <div class="ue-card">
-            <div class="ue-card-head">⚙ Actualizar Información</div>
-            <div class="ue-body">
-                <div class="ue-grid">
-                    <div><label>Documento *</label><input name="document_number" required value="<?= htmlspecialchars((string)$editUser['document_number'], ENT_QUOTES, 'UTF-8') ?>"></div>
-                    <div><label>Usuario *</label><input name="username" required value="<?= htmlspecialchars((string)$editUser['username'], ENT_QUOTES, 'UTF-8') ?>"></div>
-                    <div><label>Correo *</label><input type="email" name="email" required value="<?= htmlspecialchars((string)$editUser['email'], ENT_QUOTES, 'UTF-8') ?>"></div>
-                    <div><label>Nombre completo *</label><input name="full_name" required value="<?= htmlspecialchars((string)$editUser['full_name'], ENT_QUOTES, 'UTF-8') ?>"></div>
-                    <div><label>Nueva contraseña</label><input type="password" name="password" autocomplete="new-password"><small class="muted">Vacía para conservar la actual.</small></div>
-                    <div>
-                        <label>Estado y reparto</label>
-                        <label class="ue-toggle"><input type="checkbox" name="is_active" value="1" <?= (int)$editUser['is_active'] === 1 ? 'checked' : '' ?>> Activo</label>
-                        <label class="ue-toggle" id="assignToggle"><input type="checkbox" name="assign_enabled" value="1" <?= (int)$editUser['assign_enabled'] === 1 ? 'checked' : '' ?>> Habilitado para asignación</label>
+            <div class="card-body">
+                <form method="post" action="/admin/users/<?= (int)$editUser['id'] ?>/edit" id="editForm">
+                    <input type="hidden" name="_csrf"
+                           value="<?= htmlspecialchars(\App\Auth\Csrf::token(), ENT_QUOTES, 'UTF-8') ?>">
+
+                    <h6 class="form-section-title">
+                        <i class="bi bi-info-circle me-2"></i>Información Básica
+                    </h6>
+
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Documento *</label>
+                            <input class="form-control" name="document_number" maxlength="50" required
+                                   value="<?= htmlspecialchars((string)$editUser['document_number'], ENT_QUOTES, 'UTF-8') ?>">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Nombre de Usuario *</label>
+                            <input class="form-control" name="username" maxlength="100" required
+                                   value="<?= htmlspecialchars((string)$editUser['username'], ENT_QUOTES, 'UTF-8') ?>">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Correo Electrónico *</label>
+                            <input class="form-control" type="email" name="email" maxlength="180" required
+                                   value="<?= htmlspecialchars((string)$editUser['email'], ENT_QUOTES, 'UTF-8') ?>">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Nombre Completo *</label>
+                            <input class="form-control" name="full_name" maxlength="180" required
+                                   value="<?= htmlspecialchars((string)$editUser['full_name'], ENT_QUOTES, 'UTF-8') ?>">
+                        </div>
                     </div>
-                </div>
 
-                <div class="ue-section">Roles y permisos</div>
-                <div class="ue-choice-grid">
-                    <?php foreach ($roles as $role): ?>
-                        <label class="ue-choice">
-                            <input type="checkbox" name="role_ids[]" value="<?= (int)$role['id'] ?>" data-role-code="<?= htmlspecialchars((string)$role['code'], ENT_QUOTES, 'UTF-8') ?>" <?= in_array((int)$role['id'], $selectedRoles, true) ? 'checked' : '' ?>>
-                            <span><strong><?= htmlspecialchars((string)$role['code'], ENT_QUOTES, 'UTF-8') ?> — <?= htmlspecialchars((string)$role['name'], ENT_QUOTES, 'UTF-8') ?></strong><small><?= htmlspecialchars((string)$role['description'], ENT_QUOTES, 'UTF-8') ?></small></span>
-                        </label>
-                    <?php endforeach; ?>
-                </div>
+                    <h6 class="form-section-title mt-4">
+                        <i class="bi bi-shield-lock me-2"></i>Configuración de Acceso
+                    </h6>
 
-                <div id="queueSection">
-                    <div class="ue-section">Colas del agente</div>
-                    <div class="ue-choice-grid">
-                        <?php foreach ($queues as $queue): ?>
-                            <label class="ue-choice">
-                                <input type="checkbox" name="queue_ids[]" value="<?= (int)$queue['id'] ?>" <?= in_array((int)$queue['id'], $selectedQueues, true) ? 'checked' : '' ?>>
-                                <span><strong><?= htmlspecialchars((string)$queue['name'], ENT_QUOTES, 'UTF-8') ?></strong><small><?= htmlspecialchars((string)$queue['code'], ENT_QUOTES, 'UTF-8') ?> · capacidad <?= (int)$queue['default_capacity'] ?></small></span>
-                            </label>
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Nueva Contraseña</label>
+                            <input class="form-control" type="password" name="password"
+                                   maxlength="128" autocomplete="new-password"
+                                   placeholder="Vacía para conservar la actual">
+                            <div class="form-text">Déjala vacía si no deseas cambiarla.</div>
+                        </div>
+
+                        <div class="col-md-6">
+                            <div class="form-check form-switch mb-3">
+                                <input class="form-check-input" type="checkbox"
+                                       id="is_active" name="is_active" value="1"
+                                       <?= (int)$editUser['is_active'] === 1 ? 'checked' : '' ?>>
+                                <label class="form-check-label" for="is_active">Usuario activo</label>
+                            </div>
+
+                            <div class="form-check form-switch" id="assignBlock">
+                                <input class="form-check-input" type="checkbox"
+                                       id="assign_enabled" name="assign_enabled" value="1"
+                                       <?= (int)$editUser['assign_enabled'] === 1 ? 'checked' : '' ?>>
+                                <label class="form-check-label" for="assign_enabled">Habilitar para asignación</label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <h6 class="form-section-title mt-4">
+                        <i class="bi bi-person-badge me-2"></i>Roles y Permisos
+                    </h6>
+
+                    <select class="form-select roles-select" id="rolesSelect" name="role_ids[]" multiple required>
+                        <?php foreach ($roles as $role): ?>
+                            <option value="<?= (int)$role['id'] ?>"
+                                    data-role-code="<?= htmlspecialchars((string)$role['code'], ENT_QUOTES, 'UTF-8') ?>"
+                                    <?= in_array((int)$role['id'], $selectedRoles, true) ? 'selected' : '' ?>>
+                                <?= htmlspecialchars((string)$role['code'], ENT_QUOTES, 'UTF-8') ?>
+                                — <?= htmlspecialchars((string)$role['name'], ENT_QUOTES, 'UTF-8') ?>
+                            </option>
                         <?php endforeach; ?>
-                    </div>
-                </div>
+                    </select>
 
-                <div class="ue-actions">
-                    <a class="ue-outline" href="/admin/users">Cancelar</a>
-                    <button class="ue-green" type="submit">✓ Guardar cambios</button>
-                </div>
+                    <div id="queueSection" class="mt-4">
+                        <h6 class="form-section-title">
+                            <i class="bi bi-diagram-2 me-2"></i>Colas del Agente
+                        </h6>
+
+                        <div class="d-flex justify-content-end gap-2 mb-2">
+                            <button type="button" class="btn btn-sm btn-outline-secondary" id="queuesSelectAll">Todas</button>
+                            <button type="button" class="btn btn-sm btn-outline-secondary" id="queuesClear">Limpiar</button>
+                        </div>
+
+                        <select class="form-select queues-select" id="queuesSelect" name="queue_ids[]" multiple>
+                            <?php foreach ($queues as $queue): ?>
+                                <option value="<?= (int)$queue['id'] ?>"
+                                        <?= in_array((int)$queue['id'], $selectedQueues, true) ? 'selected' : '' ?>>
+                                    <?= htmlspecialchars((string)$queue['code'], ENT_QUOTES, 'UTF-8') ?>
+                                    — <?= htmlspecialchars((string)$queue['name'], ENT_QUOTES, 'UTF-8') ?>
+                                    (cap. <?= (int)$queue['default_capacity'] ?>)
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
+
+                        <input type="hidden"
+                               name="all_queues"
+                               id="allQueuesHidden"
+                               value="<?= $allQueuesSelected ? '1' : '0' ?>">
+                    </div>
+
+                    <div class="d-flex justify-content-between gap-2 mt-4">
+                        <a href="/admin/users" class="btn btn-outline-secondary">Cancelar</a>
+                        <button type="submit" class="btn btn-success">
+                            <i class="bi bi-check-circle me-1"></i>Guardar cambios
+                        </button>
+                    </div>
+                </form>
             </div>
         </div>
-    </form>
+    </div>
 </div>
 
 <script>
 (() => {
-    const queueSection=document.getElementById('queueSection');
-    const assignToggle=document.getElementById('assignToggle');
-    const roles=[...document.querySelectorAll('[data-role-code]')];
-    const refresh=()=>{
-        const isAgent=roles.some(i=>i.checked&&i.dataset.roleCode==='AGENTE');
-        queueSection.style.display=isAgent?'':'none';
-        assignToggle.style.display=isAgent?'flex':'none';
-        queueSection.querySelectorAll('input').forEach(i=>i.disabled=!isAgent);
-        if(!isAgent) document.querySelector('input[name="assign_enabled"]').checked=false;
+    const rolesSelect = document.getElementById('rolesSelect');
+    const queueSection = document.getElementById('queueSection');
+    const queuesSelect = document.getElementById('queuesSelect');
+    const queuesSelectAll = document.getElementById('queuesSelectAll');
+    const queuesClear = document.getElementById('queuesClear');
+    const allQueuesHidden = document.getElementById('allQueuesHidden');
+    const assignBlock = document.getElementById('assignBlock');
+    const assignEnabled = document.getElementById('assign_enabled');
+
+    const selectedRoleCodes = () =>
+        [...rolesSelect.selectedOptions].map(o => o.dataset.roleCode || '');
+
+    const refresh = () => {
+        const agent = selectedRoleCodes().includes('AGENTE');
+        queueSection.style.display = agent ? '' : 'none';
+        assignBlock.style.display = agent ? '' : 'none';
+        queuesSelect.disabled = !agent;
+        assignEnabled.disabled = !agent;
+
+        if (!agent) assignEnabled.checked = false;
     };
-    roles.forEach(i=>i.addEventListener('change',refresh));
+
+    const syncAll = () => {
+        const selected = [...queuesSelect.options].filter(o => o.selected).length;
+        allQueuesHidden.value =
+            selected > 0 && selected === queuesSelect.options.length ? '1' : '0';
+    };
+
+    rolesSelect.addEventListener('change', refresh);
+
+    queuesSelectAll.addEventListener('click', () => {
+        [...queuesSelect.options].forEach(o => o.selected = true);
+        syncAll();
+    });
+
+    queuesClear.addEventListener('click', () => {
+        [...queuesSelect.options].forEach(o => o.selected = false);
+        syncAll();
+    });
+
+    queuesSelect.addEventListener('change', syncAll);
+
     refresh();
+    syncAll();
 })();
 </script>

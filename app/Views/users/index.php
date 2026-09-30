@@ -29,13 +29,13 @@ $query = static function(int $page) use ($search,$active,$roleId,$queueId): stri
 <div class="users-wrap">
     <div class="users-head">
         <div>
-            <h1>👥 Gestión de Usuarios</h1>
+            <h1><i class="bi bi-people-fill text-primary me-2"></i>Gestión de Usuarios</h1>
             <div class="muted">Administra usuarios, perfiles, colas y habilitación para reparto.</div>
         </div>
         <div class="users-actions">
-            <a class="u-btn green" href="/admin/users/create">⊕ Nuevo Usuario</a>
-            <a class="u-btn blue" href="/admin/users/import">⇧ Importar</a>
-            <a class="u-btn" href="/admin/users/export">⇩ Exportar</a>
+            <a class="u-btn green" href="/admin/users/create"><i class="bi bi-person-plus me-1"></i>Nuevo Usuario</a>
+            <a class="u-btn blue" href="/admin/users/import"><i class="bi bi-upload me-1"></i>Importar</a>
+            <a class="u-btn" href="/admin/users/export"><i class="bi bi-download me-1"></i>Exportar</a>
         </div>
     </div>
 
@@ -50,7 +50,7 @@ $query = static function(int $page) use ($search,$active,$roleId,$queueId): stri
     </div>
 
     <div class="panel">
-        <div class="panel-title">▽ Filtrar Usuarios</div>
+        <div class="panel-title"><i class="bi bi-funnel me-2"></i>Filtrar Usuarios</div>
         <form class="filter-grid" method="get" action="/admin/users">
             <div>
                 <label>Buscar</label>
@@ -86,12 +86,12 @@ $query = static function(int $page) use ($search,$active,$roleId,$queueId): stri
                     <?php endforeach; ?>
                 </select>
             </div>
-            <div class="filter-submit"><button class="u-btn blue" type="submit">⌕ Filtrar</button></div>
+            <div class="filter-submit"><button class="u-btn blue" type="submit"><i class="bi bi-search me-1"></i>Filtrar</button></div>
         </form>
     </div>
 
     <div class="panel">
-        <div class="panel-title">▦ Lista de Usuarios <span class="badge off"><?= (int)$pagination['total'] ?></span></div>
+        <div class="panel-title"><i class="bi bi-table me-2"></i>Lista de Usuarios <span class="badge off"><?= (int)$pagination['total'] ?></span></div>
         <div class="table-box">
             <table class="users-table">
                 <thead>
@@ -115,11 +115,11 @@ $query = static function(int $page) use ($search,$active,$roleId,$queueId): stri
                         <td><?= (int)$u['is_active'] === 1 ? '<span class="badge ok">Activo</span>' : '<span class="badge off">Inactivo</span>' ?></td>
                         <td>
                             <div class="actions">
-                                <a class="mini" href="/admin/users/<?= (int)$u['id'] ?>/edit" title="Editar">✎</a>
+                                <a class="mini" href="/admin/users/<?= (int)$u['id'] ?>/edit" title="Editar"><i class="bi bi-pencil-square"></i></a>
                                 <form method="post" action="/admin/users/<?= (int)$u['id'] ?>/toggle-active">
                                     <input type="hidden" name="_csrf" value="<?= htmlspecialchars(\App\Auth\Csrf::token(), ENT_QUOTES, 'UTF-8') ?>">
                                     <button class="mini" type="submit" title="<?= (int)$u['is_active'] === 1 ? 'Desactivar' : 'Activar' ?>">
-                                        <?= (int)$u['is_active'] === 1 ? 'Ⅱ' : '▶' ?>
+                                        <?= (int)$u['is_active'] === 1 ? '<i class="bi bi-pause-fill"></i>' : '<i class="bi bi-play-fill"></i>' ?>
                                     </button>
                                 </form>
                             </div>
@@ -137,10 +137,10 @@ $query = static function(int $page) use ($search,$active,$roleId,$queueId): stri
             <span class="muted">Página <?= (int)$pagination['page'] ?> de <?= (int)$pagination['total_pages'] ?></span>
             <div class="pagination-links">
                 <?php if ((int)$pagination['page'] > 1): ?>
-                    <a href="/admin/users?<?= htmlspecialchars($query((int)$pagination['page'] - 1), ENT_QUOTES, 'UTF-8') ?>">← Anterior</a>
+                    <a href="/admin/users?<?= htmlspecialchars($query((int)$pagination['page'] - 1), ENT_QUOTES, 'UTF-8') ?>"><i class="bi bi-chevron-left me-1"></i>Anterior</a>
                 <?php endif; ?>
                 <?php if ((int)$pagination['page'] < (int)$pagination['total_pages']): ?>
-                    <a href="/admin/users?<?= htmlspecialchars($query((int)$pagination['page'] + 1), ENT_QUOTES, 'UTF-8') ?>">Siguiente →</a>
+                    <a href="/admin/users?<?= htmlspecialchars($query((int)$pagination['page'] + 1), ENT_QUOTES, 'UTF-8') ?>">Siguiente <i class="bi bi-chevron-right ms-1"></i></a>
                 <?php endif; ?>
             </div>
         </div>

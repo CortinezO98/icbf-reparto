@@ -211,6 +211,20 @@ final class UserRepository
         )->fetchAll() ?: [];
     }
 
+    /** @return list<int> */
+    public function activeQueueIds(): array
+    {
+        return array_map(
+            'intval',
+            $this->pdo->query(
+                'SELECT id
+                 FROM work_queues
+                 WHERE is_active=1
+                 ORDER BY priority,code'
+            )->fetchAll(PDO::FETCH_COLUMN) ?: []
+        );
+    }
+
     /**
      * @param list<int> $roleIds
      * @return list<string>

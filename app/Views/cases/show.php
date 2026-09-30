@@ -18,7 +18,7 @@ $source = is_array($source) ? $source : [];
 
 <div class="case-head">
     <div><h1><?= htmlspecialchars((string)$case['case_number'], ENT_QUOTES, 'UTF-8') ?></h1><div class="muted">Radicado/SIM: <?= htmlspecialchars((string)$case['external_key'], ENT_QUOTES, 'UTF-8') ?></div></div>
-    <a class="btn btn-light" href="/cases">← Volver a casos</a>
+    <a class="btn btn-light" href="/cases"><i class="bi bi-arrow-left me-1"></i>Volver a casos</a>
 </div>
 
 <?php if ($success): ?><div class="flash-ok"><?= htmlspecialchars($success, ENT_QUOTES, 'UTF-8') ?></div><?php endif; ?>
@@ -101,7 +101,7 @@ $source = is_array($source) ? $source : [];
                     <input type="file" name="support" accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png">
                     <small class="muted">Máximo 10 MB.</small>
 
-                    <button class="btn btn-primary" type="submit" style="margin-top:14px">Guardar gestión</button>
+                    <button class="btn btn-primary" type="submit" style="margin-top:14px"><i class="bi bi-check-circle me-1"></i>Guardar gestión</button>
                 </form>
             </div>
         <?php endif; ?>

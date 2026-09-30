@@ -5,6 +5,7 @@ namespace App\Services\Users;
 
 use App\Auth\PasswordPolicy;
 use App\Repositories\UserRepository;
+use App\Services\Users\QueueSelection;
 use PhpOffice\PhpSpreadsheet\IOFactory;
 use PDO;
 
@@ -142,16 +143,22 @@ final class UserImportService
                 }
 
                 $isAgent = in_array('AGENTE', $roleCodes, true);
-                $queueCodes = self::splitCodes($queuesRaw);
-                $queueIds = $this->users->queueIdsFromCodes($queueCodes);
 
-                if ($isAgent && $queueCodes === []) {
+                if ($isAgent && QueueSelection::meansAll($queuesRaw)) {
+                    $queueCodes = [];
+                    $queueIds = $this->users->activeQueueIds();
+                } else {
+                    $queueCodes = self::splitCodes($queuesRaw);
+                    $queueIds = $this->users->queueIdsFromCodes($queueCodes);
+                }
+
+                if ($isAgent && $queueIds === []) {
                     $invalid++;
-                    $errors[] = "Fila {$sourceRow}: un AGENTE debe tener al menos una cola.";
+                    $errors[] = "Fila {$sourceRow}: un AGENTE debe tener al menos una cola activa.";
                     continue;
                 }
 
-                if (count($queueIds) !== count($queueCodes)) {
+                if ($queueCodes !== [] && count($queueIds) !== count($queueCodes)) {
                     $invalid++;
                     $errors[] = "Fila {$sourceRow}: contiene colas inexistentes.";
                     continue;

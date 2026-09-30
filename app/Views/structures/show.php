@@ -27,7 +27,7 @@
 </div>
 
 <div class="card" style="margin-top:18px">
-    <h2>Crear versión</h2>
+    <h2><i class="bi bi-plus-circle me-2"></i>Crear versión</h2>
 
     <form method="post" action="/admin/structures/<?= (int)$structure['id'] ?>/versions/create">
 
@@ -209,7 +209,7 @@
 
         <?php if($v['status'] === 'DRAFT'): ?>
 
-            <h3>Agregar campo</h3>
+            <h3><i class="bi bi-plus-square me-2"></i>Agregar campo</h3>
 
             <form
                 method="post"

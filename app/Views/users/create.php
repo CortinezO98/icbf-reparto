@@ -3,126 +3,523 @@
 /** @var list<array<string,mixed>> $queues */
 /** @var string|null $error */
 /** @var array<string,mixed> $old */
+
 $old = is_array($old ?? null) ? $old : [];
 $oldRoles = array_map('intval', (array)($old['role_ids'] ?? []));
 $oldQueues = array_map('intval', (array)($old['queue_ids'] ?? []));
+$oldAllQueues = (int)($old['all_queues'] ?? 0) === 1;
+$oldActive = !array_key_exists('is_active', $old) || (int)($old['is_active'] ?? 0) === 1;
+$oldAssign = (int)($old['assign_enabled'] ?? 0) === 1;
 ?>
 <style>
-.uc-wrap{max-width:900px;margin:0 auto}.uc-head{display:flex;justify-content:space-between;align-items:flex-start;gap:15px;flex-wrap:wrap}.uc-head h1{margin:0}.uc-card{background:#fff;border:1px solid #dfe3e8;border-radius:11px;box-shadow:0 4px 13px rgba(15,23,42,.06);margin-top:20px;overflow:hidden}.uc-card-head{padding:10px 16px;background:#fafbfc;border-bottom:1px solid #dfe3e8;font-weight:750}.uc-body{padding:18px}.uc-section{font-weight:750;border-bottom:1px solid #d6dde5;padding-bottom:8px;margin:0 0 14px}.uc-grid{display:grid;grid-template-columns:1fr 1fr;gap:15px 18px}.uc-field small{display:block;color:#64748b;margin-top:5px}.uc-input-row{display:flex;gap:7px}.uc-input-row input{flex:1}.uc-outline{background:#fff;border:1px solid #94a3b8;color:#475569;border-radius:7px;padding:9px 12px;text-decoration:none;cursor:pointer}.uc-green{background:#198f4c;border:1px solid #198f4c;color:#fff;border-radius:7px;padding:9px 14px;font-weight:700;cursor:pointer}.uc-toggle{display:flex;align-items:center;gap:10px;margin-top:8px}.uc-toggle input{width:auto}.uc-role-grid,.uc-queue-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:9px}.uc-choice{display:flex!important;align-items:flex-start;gap:8px;border:1px solid #dfe3e8;border-radius:8px;padding:10px;margin:0!important;cursor:pointer}.uc-choice:hover{border-color:#5ab064;background:#f6fbf7}.uc-choice input{width:auto;margin-top:3px}.uc-choice span{display:flex;flex-direction:column}.uc-choice small{font-weight:400;color:#64748b}.uc-actions{display:flex;justify-content:space-between;gap:10px;margin-top:18px;padding-top:14px;border-top:1px solid #e5e7eb}.uc-alert{background:#fee2e2;color:#991b1b;padding:12px;border-radius:8px;margin-top:15px}.uc-info{background:#dff7ff;color:#0f5f70;padding:14px;border-radius:8px;margin-top:18px}@media(max-width:700px){.uc-grid,.uc-role-grid,.uc-queue-grid{grid-template-columns:1fr}}
+.admin-user-form{max-width:760px;margin:0 auto}
+.admin-sticky-actions{
+    position:sticky;
+    bottom:0;
+    background:#fff;
+    z-index:50;
+    padding-top:12px;
+    margin-top:16px;
+    box-shadow:0 -10px 20px rgba(0,0,0,.05)
+}
+.admin-sticky-actions::before{
+    content:'';
+    position:absolute;
+    left:0;right:0;top:-12px;height:12px;
+    background:linear-gradient(180deg,rgba(255,255,255,0),#fff);
+    pointer-events:none
+}
+.form-section-title{
+    font-weight:600;
+    border-bottom:1px solid #dee2e6;
+    padding-bottom:.5rem;
+    margin-bottom:1rem
+}
+.compact-help{font-size:.82rem;color:#6c757d}
+.roles-select,.queues-select{min-height:112px}
+.info-box{background:#cff4fc;border:1px solid #9eeaf9;border-radius:.5rem}
+@media(max-width:767.98px){
+    .admin-user-form{max-width:100%}
+}
 </style>
 
-<div class="uc-wrap">
-    <div class="uc-head">
-        <div><h1>⊕ Crear Nuevo Usuario</h1><div class="muted">Completa el formulario para registrar un nuevo usuario en el sistema.</div></div>
-        <a class="uc-outline" href="/admin/users">← Volver a la lista</a>
+<div class="container-fluid py-3">
+    <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+        <div>
+            <h1 class="h3 mb-1">
+                <i class="bi bi-person-plus text-primary me-2"></i>Crear Nuevo Usuario
+            </h1>
+            <p class="text-muted mb-0">Completa el formulario para registrar un nuevo usuario en el sistema</p>
+        </div>
+
+        <a href="/admin/users" class="btn btn-outline-secondary">
+            <i class="bi bi-arrow-left me-1"></i>Volver a la lista
+        </a>
     </div>
 
-    <?php if ($error): ?><div class="uc-alert"><?= htmlspecialchars($error, ENT_QUOTES, 'UTF-8') ?></div><?php endif; ?>
+    <?php if ($error): ?>
+        <div class="alert alert-danger admin-user-form">
+            <i class="bi bi-exclamation-triangle me-1"></i>
+            <?= htmlspecialchars($error, ENT_QUOTES, 'UTF-8') ?>
+        </div>
+    <?php endif; ?>
 
-    <form method="post" action="/admin/users/create" autocomplete="off" id="createUserForm">
-        <input type="hidden" name="_csrf" value="<?= htmlspecialchars(\App\Auth\Csrf::token(), ENT_QUOTES, 'UTF-8') ?>">
+    <div class="admin-user-form">
+        <div class="card shadow-sm">
+            <div class="card-header bg-light">
+                <h6 class="mb-0">
+                    <i class="bi bi-person-fill-add me-2"></i>Datos del Usuario
+                </h6>
+            </div>
 
-        <div class="uc-card">
-            <div class="uc-card-head">♣ Datos del Usuario</div>
-            <div class="uc-body">
-                <div class="uc-section">ⓘ Información Básica</div>
-                <div class="uc-grid">
-                    <div class="uc-field"><label>Documento (Cédula) *</label><input name="document_number" required value="<?= htmlspecialchars((string)($old['document_number'] ?? ''), ENT_QUOTES, 'UTF-8') ?>"><small>Número de identificación único.</small></div>
-                    <div class="uc-field"><label>Nombre de Usuario *</label><input name="username" required value="<?= htmlspecialchars((string)($old['username'] ?? ''), ENT_QUOTES, 'UTF-8') ?>"><small>Será usado para iniciar sesión.</small></div>
-                    <div class="uc-field"><label>Correo Electrónico *</label><input type="email" name="email" required value="<?= htmlspecialchars((string)($old['email'] ?? ''), ENT_QUOTES, 'UTF-8') ?>"><small>Debe ser único en el sistema.</small></div>
-                    <div class="uc-field"><label>Nombre Completo *</label><input name="full_name" required value="<?= htmlspecialchars((string)($old['full_name'] ?? ''), ENT_QUOTES, 'UTF-8') ?>"></div>
-                </div>
+            <div class="card-body">
+                <form method="post"
+                      action="/admin/users/create"
+                      id="userForm"
+                      autocomplete="off"
+                      novalidate>
+                    <input type="hidden"
+                           name="_csrf"
+                           value="<?= htmlspecialchars(\App\Auth\Csrf::token(), ENT_QUOTES, 'UTF-8') ?>">
 
-                <div class="uc-section" style="margin-top:22px">⚿ Configuración de Acceso</div>
-                <div class="uc-grid">
-                    <div class="uc-field">
-                        <label>Contraseña (Opcional)</label>
-                        <div class="uc-input-row">
-                            <input id="passwordField" type="password" name="password" autocomplete="new-password" placeholder="Vacía = se genera automáticamente">
-                            <button class="uc-outline" type="button" id="togglePassword">◉</button>
-                        </div>
-                        <small>Mínimo 12 caracteres con mayúscula, minúscula, número y símbolo.</small>
-                        <button class="uc-outline" type="button" id="generatePassword" style="margin-top:7px">⤨ Generar contraseña segura</button>
-                    </div>
+                    <h6 class="form-section-title">
+                        <i class="bi bi-info-circle me-2"></i>Información Básica
+                    </h6>
 
-                    <div>
-                        <label>Estado del Usuario</label>
-                        <label class="uc-toggle"><input type="checkbox" name="is_active" value="1" checked> <strong>Activo</strong></label>
-                        <small class="muted">Los usuarios inactivos no pueden iniciar sesión.</small>
-
-                        <label class="uc-toggle" id="assignToggle"><input type="checkbox" name="assign_enabled" value="1" checked> <strong>Habilitar para asignación</strong></label>
-                        <small class="muted">Solo aplica a usuarios con rol AGENTE.</small>
-                    </div>
-                </div>
-
-                <div class="uc-section" style="margin-top:22px">▣ Roles y Permisos</div>
-                <div class="uc-role-grid">
-                    <?php foreach ($roles as $role): ?>
-                        <label class="uc-choice">
-                            <input type="checkbox" name="role_ids[]" value="<?= (int)$role['id'] ?>"
-                                   data-role-code="<?= htmlspecialchars((string)$role['code'], ENT_QUOTES, 'UTF-8') ?>"
-                                   <?= in_array((int)$role['id'], $oldRoles, true) ? 'checked' : '' ?>>
-                            <span><strong><?= htmlspecialchars((string)$role['code'], ENT_QUOTES, 'UTF-8') ?> — <?= htmlspecialchars((string)$role['name'], ENT_QUOTES, 'UTF-8') ?></strong><small><?= htmlspecialchars((string)$role['description'], ENT_QUOTES, 'UTF-8') ?></small></span>
-                        </label>
-                    <?php endforeach; ?>
-                </div>
-
-                <div id="queueSection">
-                    <div class="uc-section" style="margin-top:22px">⇄ Colas del Agente</div>
-                    <div class="uc-queue-grid">
-                        <?php foreach ($queues as $queue): ?>
-                            <label class="uc-choice">
-                                <input type="checkbox" name="queue_ids[]" value="<?= (int)$queue['id'] ?>" <?= in_array((int)$queue['id'], $oldQueues, true) ? 'checked' : '' ?>>
-                                <span><strong><?= htmlspecialchars((string)$queue['name'], ENT_QUOTES, 'UTF-8') ?></strong><small><?= htmlspecialchars((string)$queue['code'], ENT_QUOTES, 'UTF-8') ?> · Capacidad <?= (int)$queue['default_capacity'] ?></small></span>
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label for="document_number" class="form-label">
+                                <i class="bi bi-card-text me-1"></i>Documento (Cédula) *
                             </label>
+                            <input type="text"
+                                   class="form-control"
+                                   id="document_number"
+                                   name="document_number"
+                                   maxlength="50"
+                                   inputmode="numeric"
+                                   autocomplete="off"
+                                   placeholder="Ej: 1012345678"
+                                   value="<?= htmlspecialchars((string)($old['document_number'] ?? ''), ENT_QUOTES, 'UTF-8') ?>"
+                                   required>
+                            <div class="form-text">Número de identificación único</div>
+                            <div class="invalid-feedback">El documento es obligatorio.</div>
+                        </div>
+
+                        <div class="col-md-6">
+                            <label for="username" class="form-label">
+                                <i class="bi bi-person-badge me-1"></i>Nombre de Usuario *
+                            </label>
+                            <input type="text"
+                                   class="form-control"
+                                   id="username"
+                                   name="username"
+                                   minlength="3"
+                                   maxlength="100"
+                                   pattern="[A-Za-z0-9._-]{3,100}"
+                                   autocomplete="off"
+                                   placeholder="Ej: jperez"
+                                   value="<?= htmlspecialchars((string)($old['username'] ?? ''), ENT_QUOTES, 'UTF-8') ?>"
+                                   required>
+                            <div class="form-text">Será usado para iniciar sesión en el sistema</div>
+                            <div class="invalid-feedback">Ingresa un usuario válido.</div>
+                        </div>
+                    </div>
+
+                    <div class="row g-3 mt-1">
+                        <div class="col-md-6">
+                            <label for="email" class="form-label">
+                                <i class="bi bi-envelope me-1"></i>Correo Electrónico *
+                            </label>
+                            <input type="email"
+                                   class="form-control"
+                                   id="email"
+                                   name="email"
+                                   maxlength="180"
+                                   autocomplete="email"
+                                   placeholder="usuario@ejemplo.com"
+                                   value="<?= htmlspecialchars((string)($old['email'] ?? ''), ENT_QUOTES, 'UTF-8') ?>"
+                                   required>
+                            <div class="form-text">Para identificación y contacto del usuario</div>
+                            <div class="invalid-feedback">Ingresa un correo electrónico válido.</div>
+                        </div>
+
+                        <div class="col-md-6">
+                            <label for="full_name" class="form-label">
+                                <i class="bi bi-person-vcard me-1"></i>Nombre Completo *
+                            </label>
+                            <input type="text"
+                                   class="form-control"
+                                   id="full_name"
+                                   name="full_name"
+                                   maxlength="180"
+                                   autocomplete="name"
+                                   placeholder="Ej: Juan Pérez"
+                                   value="<?= htmlspecialchars((string)($old['full_name'] ?? ''), ENT_QUOTES, 'UTF-8') ?>"
+                                   required>
+                            <div class="invalid-feedback">El nombre completo es obligatorio.</div>
+                        </div>
+                    </div>
+
+                    <h6 class="form-section-title mt-4">
+                        <i class="bi bi-shield-lock me-2"></i>Configuración de Acceso
+                    </h6>
+
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label for="passwordField" class="form-label">
+                                <i class="bi bi-key me-1"></i>Contraseña (Opcional)
+                            </label>
+
+                            <div class="input-group">
+                                <input type="password"
+                                       class="form-control"
+                                       id="passwordField"
+                                       name="password"
+                                       minlength="12"
+                                       maxlength="128"
+                                       autocomplete="new-password"
+                                       placeholder="Vacía = se genera automáticamente">
+                                <button class="btn btn-outline-secondary"
+                                        type="button"
+                                        id="togglePassword"
+                                        title="Mostrar/ocultar contraseña">
+                                    <i class="bi bi-eye"></i>
+                                </button>
+                            </div>
+
+                            <div class="form-text">
+                                Si la defines manualmente, usa al menos 12 caracteres con mayúscula, minúscula, número y símbolo.
+                            </div>
+
+                            <button class="btn btn-sm btn-outline-primary mt-2"
+                                    type="button"
+                                    id="generatePassword">
+                                <i class="bi bi-shuffle me-1"></i>Generar contraseña segura
+                            </button>
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label">
+                                <i class="bi bi-toggle-on me-1"></i>Estado del Usuario
+                            </label>
+
+                            <div class="d-flex align-items-center gap-3 mb-2">
+                                <div class="form-check">
+                                    <input class="form-check-input"
+                                           type="radio"
+                                           name="is_active_radio"
+                                           id="activeYes"
+                                           value="1"
+                                           <?= $oldActive ? 'checked' : '' ?>>
+                                    <label class="form-check-label" for="activeYes">
+                                        <span class="badge bg-success">Activo</span>
+                                    </label>
+                                </div>
+
+                                <div class="form-check">
+                                    <input class="form-check-input"
+                                           type="radio"
+                                           name="is_active_radio"
+                                           id="activeNo"
+                                           value="0"
+                                           <?= !$oldActive ? 'checked' : '' ?>>
+                                    <label class="form-check-label" for="activeNo">
+                                        <span class="badge bg-secondary">Inactivo</span>
+                                    </label>
+                                </div>
+                            </div>
+
+                            <input type="hidden"
+                                   name="is_active"
+                                   id="is_active_hidden"
+                                   value="<?= $oldActive ? '1' : '0' ?>">
+
+                            <div class="form-text mb-3">
+                                Los usuarios inactivos no pueden iniciar sesión.
+                            </div>
+
+                            <div class="form-check form-switch" id="assignBlock">
+                                <input class="form-check-input"
+                                       type="checkbox"
+                                       role="switch"
+                                       id="assign_enabled"
+                                       name="assign_enabled"
+                                       value="1"
+                                       <?= $oldAssign ? 'checked' : '' ?>>
+                                <label class="form-check-label" for="assign_enabled">
+                                    <i class="bi bi-person-check me-1"></i>Habilitar para asignación
+                                </label>
+                            </div>
+                            <div class="form-text">Permite asignarle casos automáticamente cuando esté Disponible.</div>
+                        </div>
+                    </div>
+
+                    <h6 class="form-section-title mt-4">
+                        <i class="bi bi-person-badge me-2"></i>Roles y Permisos
+                    </h6>
+
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <label for="rolesSelect" class="form-label mb-0">
+                            <i class="bi bi-tags me-1"></i>Roles Asignados *
+                        </label>
+                        <div class="btn-group btn-group-sm" role="group">
+                            <button type="button" class="btn btn-outline-secondary" id="rolesSelectAll">Seleccionar todos</button>
+                            <button type="button" class="btn btn-outline-secondary" id="rolesClear">Limpiar</button>
+                        </div>
+                    </div>
+
+                    <select class="form-select roles-select"
+                            id="rolesSelect"
+                            name="role_ids[]"
+                            multiple
+                            required>
+                        <?php foreach ($roles as $role): ?>
+                            <option value="<?= (int)$role['id'] ?>"
+                                    data-role-code="<?= htmlspecialchars((string)$role['code'], ENT_QUOTES, 'UTF-8') ?>"
+                                    <?= in_array((int)$role['id'], $oldRoles, true) ? 'selected' : '' ?>>
+                                <?= htmlspecialchars((string)$role['code'], ENT_QUOTES, 'UTF-8') ?>
+                                — <?= htmlspecialchars((string)$role['name'], ENT_QUOTES, 'UTF-8') ?>
+                            </option>
+                        <?php endforeach; ?>
+                    </select>
+
+                    <div class="form-text">
+                        Ctrl (Cmd en Mac) para seleccionar múltiples.
+                    </div>
+
+                    <div class="mt-2 d-flex flex-wrap gap-2">
+                        <?php foreach ($roles as $role): ?>
+                            <?php
+                            $roleCode = (string)$role['code'];
+                            $badgeClass = match ($roleCode) {
+                                'ADMIN' => 'text-bg-danger',
+                                'AGENTE' => 'text-bg-primary',
+                                'SUPERVISOR' => 'text-bg-warning',
+                                default => 'text-bg-secondary',
+                            };
+                            ?>
+                            <span class="badge <?= $badgeClass ?>">
+                                <?= htmlspecialchars($roleCode, ENT_QUOTES, 'UTF-8') ?>
+                            </span>
                         <?php endforeach; ?>
                     </div>
-                    <small class="muted">Las habilidades obligatorias se asignan automáticamente según las colas seleccionadas.</small>
-                </div>
 
-                <div class="uc-actions">
-                    <a class="uc-outline" href="/admin/users">⊗ Cancelar</a>
-                    <button class="uc-green" type="submit">✓ Crear Usuario</button>
-                </div>
+                    <div id="queueSection" class="mt-4">
+                        <h6 class="form-section-title">
+                            <i class="bi bi-diagram-2 me-2"></i>Colas del Agente
+                        </h6>
+
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <label for="queuesSelect" class="form-label mb-0">
+                                <i class="bi bi-inboxes me-1"></i>Colas Asignadas *
+                            </label>
+                            <div class="btn-group btn-group-sm" role="group">
+                                <button type="button" class="btn btn-outline-secondary" id="queuesSelectAll">
+                                    Todas
+                                </button>
+                                <button type="button" class="btn btn-outline-secondary" id="queuesClear">
+                                    Limpiar
+                                </button>
+                            </div>
+                        </div>
+
+                        <select class="form-select queues-select"
+                                id="queuesSelect"
+                                name="queue_ids[]"
+                                multiple>
+                            <?php foreach ($queues as $queue): ?>
+                                <option value="<?= (int)$queue['id'] ?>"
+                                        <?= in_array((int)$queue['id'], $oldQueues, true) || $oldAllQueues ? 'selected' : '' ?>>
+                                    <?= htmlspecialchars((string)$queue['code'], ENT_QUOTES, 'UTF-8') ?>
+                                    — <?= htmlspecialchars((string)$queue['name'], ENT_QUOTES, 'UTF-8') ?>
+                                    (cap. <?= (int)$queue['default_capacity'] ?>)
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
+
+                        <input type="hidden"
+                               name="all_queues"
+                               id="allQueuesHidden"
+                               value="<?= $oldAllQueues ? '1' : '0' ?>">
+
+                        <div class="form-text">
+                            Las habilidades obligatorias se asignan automáticamente según las colas seleccionadas.
+                        </div>
+                    </div>
+
+                    <div class="admin-sticky-actions">
+                        <div class="d-flex justify-content-between gap-2 pb-2">
+                            <a href="/admin/users" class="btn btn-outline-secondary">
+                                <i class="bi bi-x-circle me-1"></i>Cancelar
+                            </a>
+
+                            <button type="submit" class="btn btn-success" id="submitBtn">
+                                <i class="bi bi-check-circle me-1"></i>Crear Usuario
+                            </button>
+                        </div>
+                    </div>
+                </form>
             </div>
         </div>
 
-        <div class="uc-info"><strong>ⓘ Información importante</strong><br>Documento, usuario y correo deben ser únicos. Si no especificas contraseña, el sistema generará una temporal. Los agentes deben tener al menos una cola y solo reciben casos cuando estén en estado Disponible.</div>
-    </form>
+        <div class="info-box p-3 mt-3">
+            <div class="fw-semibold mb-2">
+                <i class="bi bi-info-circle-fill me-2"></i>Información importante
+            </div>
+            <ul class="mb-0 small">
+                <li>El sistema validará que usuario, email y documento sean únicos.</li>
+                <li>Si no especificas contraseña, se generará una temporal automáticamente.</li>
+                <li>Los agentes deben tener al menos una cola asignada.</li>
+                <li>La habilitación para reparto no reemplaza el estado Disponible del agente.</li>
+            </ul>
+        </div>
+    </div>
 </div>
 
 <script>
 (() => {
-    const pass = document.getElementById('passwordField');
-    const toggle = document.getElementById('togglePassword');
-    const generate = document.getElementById('generatePassword');
+    const form = document.getElementById('userForm');
+    const passwordInput = document.getElementById('passwordField');
+    const togglePasswordBtn = document.getElementById('togglePassword');
+    const generatePasswordBtn = document.getElementById('generatePassword');
+    const rolesSelect = document.getElementById('rolesSelect');
+    const rolesSelectAll = document.getElementById('rolesSelectAll');
+    const rolesClear = document.getElementById('rolesClear');
     const queueSection = document.getElementById('queueSection');
-    const assignToggle = document.getElementById('assignToggle');
-    const roleInputs = [...document.querySelectorAll('[data-role-code]')];
+    const queuesSelect = document.getElementById('queuesSelect');
+    const queuesSelectAll = document.getElementById('queuesSelectAll');
+    const queuesClear = document.getElementById('queuesClear');
+    const allQueuesHidden = document.getElementById('allQueuesHidden');
+    const assignBlock = document.getElementById('assignBlock');
+    const assignEnabled = document.getElementById('assign_enabled');
+    const activeYes = document.getElementById('activeYes');
+    const activeNo = document.getElementById('activeNo');
+    const activeHidden = document.getElementById('is_active_hidden');
+    const submitBtn = document.getElementById('submitBtn');
 
-    toggle?.addEventListener('click', () => {
-        pass.type = pass.type === 'password' ? 'text' : 'password';
-    });
+    const selectedRoleCodes = () =>
+        [...rolesSelect.selectedOptions].map(o => o.dataset.roleCode || '');
 
-    generate?.addEventListener('click', () => {
-        const lower='abcdefghijkmnopqrstuvwxyz', upper='ABCDEFGHJKLMNPQRSTUVWXYZ', digits='23456789', symbols='!@#$%&*?';
-        const all=lower+upper+digits+symbols;
-        const pick=s=>s[crypto.getRandomValues(new Uint32Array(1))[0]%s.length];
-        let chars=[pick(lower),pick(upper),pick(digits),pick(symbols)];
-        while(chars.length<16) chars.push(pick(all));
-        for(let i=chars.length-1;i>0;i--){const j=crypto.getRandomValues(new Uint32Array(1))[0]%(i+1);[chars[i],chars[j]]=[chars[j],chars[i]];}
-        pass.value=chars.join('');
-        pass.type='text';
-    });
+    const isAgent = () => selectedRoleCodes().includes('AGENTE');
 
-    const refresh = () => {
-        const isAgent = roleInputs.some(i => i.checked && i.dataset.roleCode === 'AGENTE');
-        queueSection.style.display = isAgent ? '' : 'none';
-        assignToggle.style.display = isAgent ? 'flex' : 'none';
-        queueSection.querySelectorAll('input').forEach(i => i.disabled = !isAgent);
-        if (!isAgent) document.querySelector('input[name="assign_enabled"]').checked = false;
+    const refreshAgentFields = () => {
+        const agent = isAgent();
+        queueSection.style.display = agent ? '' : 'none';
+        assignBlock.style.display = agent ? '' : 'none';
+        queuesSelect.disabled = !agent;
+        assignEnabled.disabled = !agent;
+
+        if (!agent) {
+            assignEnabled.checked = false;
+        }
     };
-    roleInputs.forEach(i => i.addEventListener('change', refresh));
-    refresh();
+
+    const syncAllQueuesFlag = () => {
+        const selected = [...queuesSelect.options].filter(o => o.selected).length;
+        allQueuesHidden.value =
+            selected > 0 && selected === queuesSelect.options.length ? '1' : '0';
+    };
+
+    togglePasswordBtn?.addEventListener('click', () => {
+        const visible = passwordInput.type === 'text';
+        passwordInput.type = visible ? 'password' : 'text';
+        togglePasswordBtn.innerHTML = visible
+            ? '<i class="bi bi-eye"></i>'
+            : '<i class="bi bi-eye-slash"></i>';
+    });
+
+    generatePasswordBtn?.addEventListener('click', () => {
+        const lower = 'abcdefghijkmnopqrstuvwxyz';
+        const upper = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
+        const digits = '23456789';
+        const symbols = '!@#$%&*?';
+        const all = lower + upper + digits + symbols;
+
+        const pick = chars => {
+            const data = new Uint32Array(1);
+            crypto.getRandomValues(data);
+            return chars[data[0] % chars.length];
+        };
+
+        const chars = [pick(lower), pick(upper), pick(digits), pick(symbols)];
+
+        while (chars.length < 16) chars.push(pick(all));
+
+        for (let i = chars.length - 1; i > 0; i--) {
+            const data = new Uint32Array(1);
+            crypto.getRandomValues(data);
+            const j = data[0] % (i + 1);
+            [chars[i], chars[j]] = [chars[j], chars[i]];
+        }
+
+        passwordInput.value = chars.join('');
+        passwordInput.type = 'text';
+        togglePasswordBtn.innerHTML = '<i class="bi bi-eye-slash"></i>';
+    });
+
+    rolesSelectAll?.addEventListener('click', () => {
+        [...rolesSelect.options].forEach(o => o.selected = true);
+        refreshAgentFields();
+    });
+
+    rolesClear?.addEventListener('click', () => {
+        [...rolesSelect.options].forEach(o => o.selected = false);
+        refreshAgentFields();
+    });
+
+    rolesSelect?.addEventListener('change', refreshAgentFields);
+
+    queuesSelectAll?.addEventListener('click', () => {
+        [...queuesSelect.options].forEach(o => o.selected = true);
+        syncAllQueuesFlag();
+    });
+
+    queuesClear?.addEventListener('click', () => {
+        [...queuesSelect.options].forEach(o => o.selected = false);
+        syncAllQueuesFlag();
+    });
+
+    queuesSelect?.addEventListener('change', syncAllQueuesFlag);
+
+    activeYes?.addEventListener('change', () => {
+        if (activeYes.checked) activeHidden.value = '1';
+    });
+
+    activeNo?.addEventListener('change', () => {
+        if (activeNo.checked) activeHidden.value = '0';
+    });
+
+    form?.addEventListener('submit', event => {
+        refreshAgentFields();
+        syncAllQueuesFlag();
+
+        if (rolesSelect.selectedOptions.length === 0) {
+            event.preventDefault();
+            rolesSelect.setCustomValidity('Selecciona al menos un rol.');
+        } else {
+            rolesSelect.setCustomValidity('');
+        }
+
+        if (isAgent() && queuesSelect.selectedOptions.length === 0) {
+            event.preventDefault();
+            queuesSelect.setCustomValidity('Selecciona al menos una cola.');
+        } else {
+            queuesSelect.setCustomValidity('');
+        }
+
+        if (!form.checkValidity()) {
+            event.preventDefault();
+            event.stopPropagation();
+            form.classList.add('was-validated');
+            form.querySelector(':invalid')?.scrollIntoView({behavior:'smooth', block:'center'});
+            return;
+        }
+
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<i class="bi bi-hourglass-split me-1"></i>Creando usuario...';
+    });
+
+    refreshAgentFields();
+    syncAllQueuesFlag();
 })();
 </script>

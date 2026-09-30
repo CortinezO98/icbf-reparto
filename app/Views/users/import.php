@@ -8,35 +8,41 @@
 
 <div class="ui-wrap">
     <div class="ui-head">
-        <div><h1>⇧ Importar Usuarios</h1><div class="muted">Importa múltiples usuarios desde un archivo Excel o CSV.</div></div>
-        <a class="ui-outline" href="/admin/users">← Volver</a>
+        <div><h1><i class="bi bi-upload text-primary me-2"></i>Importar Usuarios</h1><div class="muted">Importa múltiples usuarios desde un archivo Excel o CSV.</div></div>
+        <a class="ui-outline" href="/admin/users"><i class="bi bi-arrow-left me-1"></i>Volver</a>
     </div>
 
     <?php if ($error): ?><div class="alert"><?= htmlspecialchars($error, ENT_QUOTES, 'UTF-8') ?></div><?php endif; ?>
 
+    <div class="alert alert-info">
+        <i class="bi bi-info-circle me-1"></i>
+        En la columna <strong>Colas</strong> puedes usar códigos concretos separados por coma
+        o escribir <code>TODAS</code> para asociar el agente a todas las colas activas.
+    </div>
+
     <div class="ui-card">
-        <div class="ui-card-head">☷ Pasos para Importar</div>
+        <div class="ui-card-head"><i class="bi bi-list-check me-2"></i>Pasos para Importar</div>
         <div class="ui-body">
             <div class="steps">
-                <div><div class="step-icon">⇩</div><strong>1. Descargar Plantilla</strong><div class="muted">Usa el formato correcto</div></div>
-                <div><div class="step-icon">✎</div><strong>2. Llenar Datos</strong><div class="muted">Completa la información</div></div>
-                <div><div class="step-icon">⇧</div><strong>3. Subir Archivo</strong><div class="muted">Valida los datos</div></div>
-                <div><div class="step-icon">✓</div><strong>4. Revisar Resultado</strong><div class="muted">Confirma el proceso</div></div>
+                <div><div class="step-icon"><i class="bi bi-download"></i></div><strong>1. Descargar Plantilla</strong><div class="muted">Usa el formato correcto</div></div>
+                <div><div class="step-icon"><i class="bi bi-pencil-square"></i></div><strong>2. Llenar Datos</strong><div class="muted">Completa la información</div></div>
+                <div><div class="step-icon"><i class="bi bi-upload"></i></div><strong>3. Subir Archivo</strong><div class="muted">Valida los datos</div></div>
+                <div><div class="step-icon"><i class="bi bi-check-lg"></i></div><strong>4. Revisar Resultado</strong><div class="muted">Confirma el proceso</div></div>
             </div>
         </div>
     </div>
 
     <div class="ui-card">
         <div class="ui-body">
-            <h2 style="margin-top:0">▣ Plantilla</h2>
+            <h2 style="margin-top:0"><i class="bi bi-file-earmark-spreadsheet me-2"></i>Plantilla</h2>
             <div class="ui-info">
                 <strong>Formato requerido</strong><br>
                 Columnas obligatorias: <strong>Usuario, Correo, Nombre Completo, Roles</strong>.<br>
                 Para AGENTE: <strong>Colas</strong> es obligatoria. Roles y colas múltiples se separan por coma.
             </div>
-            <p><a class="ui-green" href="/admin/users/template">⇩ Descargar Plantilla</a></p>
+            <p><a class="ui-green" href="/admin/users/template"><i class="bi bi-download me-1"></i>Descargar Plantilla</a></p>
 
-            <h2>⇧ Subir Archivo</h2>
+            <h2><i class="bi bi-upload me-2"></i>Subir Archivo</h2>
             <form method="post" action="/admin/users/import" enctype="multipart/form-data">
                 <input type="hidden" name="_csrf" value="<?= htmlspecialchars(\App\Auth\Csrf::token(), ENT_QUOTES, 'UTF-8') ?>">
                 <label>Archivo Excel/CSV</label>
@@ -48,10 +54,10 @@
                     Omitir usuarios duplicados
                 </label>
 
-                <button class="ui-blue" type="submit" style="margin-top:16px">⇧ Iniciar Importación</button>
+                <button class="ui-blue" type="submit" style="margin-top:16px"><i class="bi bi-cloud-arrow-up me-1"></i>Iniciar Importación</button>
             </form>
 
-            <div class="ui-warning" style="margin-top:18px"><strong>⚠ Validación previa</strong><br>El sistema valida correo, roles, colas, duplicados y política de contraseña antes de crear cada usuario. Las skills se asignan automáticamente según las colas.</div>
+            <div class="ui-warning" style="margin-top:18px"><strong><i class="bi bi-exclamation-triangle me-1"></i>Validación previa</strong><br>El sistema valida correo, roles, colas, duplicados y política de contraseña antes de crear cada usuario. Las skills se asignan automáticamente según las colas.</div>
         </div>
     </div>
 

@@ -6,7 +6,7 @@
 ?>
 <div class="grid">
     <div class="card">
-        <h1 style="margin-top:0">Nueva importación</h1>
+        <h1 style="margin-top:0"><i class="bi bi-cloud-arrow-up text-brand me-2"></i>Nueva importación</h1>
         <p class="muted">
             Carga XLSX o CSV contra una estructura activa.
             La cola se resolverá automáticamente cuando la estructura tenga una sola asociada.
@@ -50,7 +50,7 @@
     </div>
 
     <div class="card">
-        <h2 style="margin-top:0">Controles aplicados</h2>
+        <h2 style="margin-top:0"><i class="bi bi-shield-lock me-2"></i>Controles aplicados</h2>
         <p class="muted">
             Máximo 20 MB, MIME validado, SHA-256, nombre físico aleatorio,
             almacenamiento fuera de public, validación de encabezados,
@@ -60,7 +60,7 @@
 </div>
 
 <div class="card" style="margin-top:18px">
-    <h2 style="margin-top:0">Lotes recientes</h2>
+    <h2 style="margin-top:0"><i class="bi bi-clock-history me-2"></i>Lotes recientes</h2>
 
     <div style="overflow:auto">
         <table>
@@ -89,7 +89,7 @@
                     <td><?= (int)$b['valid_rows'] ?></td>
                     <td><?= (int)$b['invalid_rows'] ?></td>
                     <td><?= (int)$b['duplicate_rows'] ?></td>
-                    <td><a class="btn btn-light" href="/imports/<?= (int)$b['id'] ?>">Ver</a></td>
+                    <td><a class="btn btn-light" href="/imports/<?= (int)$b['id'] ?>"><i class="bi bi-eye me-1"></i>Ver</a></td>
                 </tr>
             <?php endforeach; ?>
             </tbody>

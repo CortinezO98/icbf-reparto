@@ -10,8 +10,13 @@ final class PasswordPolicy
     {
         $errors = [];
 
-        if (mb_strlen($password) < 12) {
+        $length = mb_strlen($password);
+
+        if ($length < 12) {
             $errors[] = 'La contraseña debe tener al menos 12 caracteres.';
+        }
+        if ($length > 128) {
+            $errors[] = 'La contraseña no puede tener más de 128 caracteres.';
         }
         if (!preg_match('/[a-z]/', $password)) {
             $errors[] = 'Debe incluir al menos una letra minúscula.';

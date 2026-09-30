@@ -79,11 +79,13 @@ final class UsersController
         $data = $this->commonData();
         $roleIds = $this->intArray($_POST['role_ids'] ?? []);
         $queueIds = $this->intArray($_POST['queue_ids'] ?? []);
+        $allQueues = isset($_POST['all_queues']);
 
         $_SESSION['_old_user_form'] = [
             ...$data,
             'role_ids'=>$roleIds,
             'queue_ids'=>$queueIds,
+            'all_queues'=>$allQueues ? 1 : 0,
         ];
 
         if ($roleIds === []) {
@@ -96,6 +98,11 @@ final class UsersController
         }
 
         $isAgent = in_array('AGENTE', $roleCodes, true);
+
+        if ($isAgent && $allQueues) {
+            $queueIds = $repo->activeQueueIds();
+        }
+
         if ($isAgent && $queueIds === []) {
             $this->fail('Los agentes deben tener al menos una cola asignada.', '/admin/users/create');
         }
@@ -197,6 +204,7 @@ final class UsersController
         $data = $this->commonData();
         $roleIds = $this->intArray($_POST['role_ids'] ?? []);
         $queueIds = $this->intArray($_POST['queue_ids'] ?? []);
+        $allQueues = isset($_POST['all_queues']);
 
         if ($roleIds === []) {
             $this->fail('Debes seleccionar al menos un rol.', "/admin/users/{$id}/edit");
@@ -204,6 +212,10 @@ final class UsersController
 
         $roleCodes = $repo->selectedRoleCodes($roleIds);
         $isAgent = in_array('AGENTE', $roleCodes, true);
+
+        if ($isAgent && $allQueues) {
+            $queueIds = $repo->activeQueueIds();
+        }
 
         if ($isAgent && $queueIds === []) {
             $this->fail('Los agentes deben tener al menos una cola asignada.', "/admin/users/{$id}/edit");
@@ -372,7 +384,7 @@ final class UsersController
             'agente.prueba@local.test',
             'Agente Prueba ICBF',
             'AGENTE',
-            'PETICIONES',
+            'TODAS',
             '1',
             '1',
             '',
@@ -441,10 +453,10 @@ final class UsersController
     private function commonData(): array
     {
         $data = [
-            'document_number'=>trim((string)($_POST['document_number'] ?? '')),
+            'document_number'=>$this->singleLine((string)($_POST['document_number'] ?? '')),
             'username'=>trim((string)($_POST['username'] ?? '')),
             'email'=>mb_strtolower(trim((string)($_POST['email'] ?? ''))),
-            'full_name'=>trim((string)($_POST['full_name'] ?? '')),
+            'full_name'=>$this->singleLine((string)($_POST['full_name'] ?? '')),
             'is_active'=>isset($_POST['is_active']) ? 1 : 0,
             'assign_enabled'=>isset($_POST['assign_enabled']) ? 1 : 0,
         ];
@@ -461,7 +473,34 @@ final class UsersController
             );
         }
 
+        if (
+            mb_strlen((string)$data['document_number']) > 50
+            || mb_strlen((string)$data['username']) > 100
+            || mb_strlen((string)$data['email']) > 180
+            || mb_strlen((string)$data['full_name']) > 180
+        ) {
+            $this->fail(
+                'Uno de los campos supera la longitud máxima permitida.',
+                $_SERVER['HTTP_REFERER'] ?? '/admin/users'
+            );
+        }
+
+        if (!preg_match('/^[A-Za-z0-9._-]{3,100}$/', (string)$data['username'])) {
+            $this->fail(
+                'El nombre de usuario debe tener entre 3 y 100 caracteres y solo puede contener letras, números, punto, guion o guion bajo.',
+                $_SERVER['HTTP_REFERER'] ?? '/admin/users'
+            );
+        }
+
         return $data;
+    }
+
+    private function singleLine(string $value): string
+    {
+        $value = preg_replace('/[\x00-\x1F\x7F]/u', ' ', $value) ?? '';
+        $value = preg_replace('/\s+/u', ' ', $value) ?? '';
+
+        return trim($value);
     }
 
     /** @return list<int> */
