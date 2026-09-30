@@ -1,7 +1,6 @@
 <?php
 declare(strict_types=1);
 use App\Controllers\AuthController;
-use App\Controllers\DashboardController;
 use App\Controllers\UsersController;
 use App\Controllers\ImportStructuresController;
 use App\Controllers\QueuesController;
@@ -13,8 +12,8 @@ use App\Controllers\SlaController;
 use App\Http\Router;
 
 return static function(Router $router,PDO $pdo): void {
- $router->get('/',fn()=>(new DashboardController($pdo))->index());
- $router->get('/dashboard',fn()=>(new DashboardController($pdo))->index());
+ $router->get('/',fn()=>(new SlaController($pdo))->index());
+ $router->get('/dashboard',fn()=>(new SlaController($pdo))->index());
  $router->get('/login',fn()=>(new AuthController($pdo))->showLogin());
  $router->post('/login',fn()=>(new AuthController($pdo))->login());
  $router->post('/logout',fn()=>(new AuthController($pdo))->logout());
