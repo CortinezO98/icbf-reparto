@@ -64,6 +64,7 @@ final class SlaService
         ];
     }
 
+    /** @return array{processed:int,alerts_touched:int} */
     public function evaluateOpenCases(): array
     {
         $processed = 0;
