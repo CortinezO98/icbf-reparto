@@ -103,7 +103,8 @@ final class AuthController
             (string)$uid
         );
 
-        header('Location: /');
+        $roles = Authorization::roles($this->pdo, $uid);
+        header('Location: ' . (in_array('AGENTE', $roles, true) ? '/cases' : '/'));
         exit;
     }
 
