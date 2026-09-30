@@ -116,6 +116,14 @@ $rolesLabel = $currentUserRoles !== [] ? implode(', ', $currentUserRoles) : '';
                     </li>
                 <?php endif; ?>
 
+                <?php if (Authorization::hasPermission(Database::connection(), (int)Auth::id(), 'SLA_VIEW')): ?>
+                    <li class="nav-item">
+                        <a class="nav-link <?= $isActive('/sla') ? 'active' : '' ?>" href="/sla">
+                            <i class="bi bi-speedometer2 me-1" aria-hidden="true"></i>Tablero ANS
+                        </a>
+                    </li>
+                <?php endif; ?>
+
                 <?php if ($canViewUsers || $canViewStructures || $canViewQueues): ?>
                     <li class="nav-item dropdown">
                         <a class="nav-link dropdown-toggle <?= $isActive('/admin') ? 'active' : '' ?>"
