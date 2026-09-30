@@ -70,7 +70,7 @@ $rolesLabel = $currentUserRoles !== [] ? implode(', ', $currentUserRoles) : '';
      aria-label="Navegación principal">
     <div class="container-fluid">
         <a class="navbar-brand fw-semibold d-flex align-items-center gap-2"
-           href="/"
+           href="/dashboard"
            aria-label="ICBF Reparto - Tablero de Control">
             <i class="bi bi-diagram-3" aria-hidden="true"></i>
             <span>ICBF Reparto</span>
@@ -89,7 +89,7 @@ $rolesLabel = $currentUserRoles !== [] ? implode(', ', $currentUserRoles) : '';
         <div class="collapse navbar-collapse" id="mainNavbar">
             <ul class="navbar-nav me-auto mb-2 mb-lg-0">
                 <li class="nav-item">
-                    <a class="nav-link <?= $path === '/' ? 'active' : '' ?>" href="/">
+                    <a class="nav-link <?= ($path === '/' || $path === '/dashboard') ? 'active' : '' ?>" href="/dashboard">
                         <i class="bi bi-speedometer2 me-1" aria-hidden="true"></i>Tablero de Control
                     </a>
                 </li>
