@@ -104,7 +104,8 @@ final class DashboardRepository
             $closedParams
         );
 
-        $agents = $this->agentSummary();
+        $agentSummary = $this->agentSummary();
+        $agents = $this->agentRows();
         $queues = $this->queueSummary($from, $to);
         $managementTypes = $this->managementSummary($from, $to, $queueId, $agentId);
         $regions = $this->dimensionSummary('regional', $from, $to, $queueId, $agentId);
@@ -126,6 +127,7 @@ final class DashboardRepository
 
         return [
             'summary' => array_map('intval', array_filter($current, static fn($v) => $v !== null)),
+            'agent_summary' => $agentSummary,
             'agents' => $agents,
             'queues' => $queues,
             'management_types' => $managementTypes,
@@ -235,6 +237,73 @@ final class DashboardRepository
         $row['available_agents'] = (int)($row['available_agents'] ?? 0);
 
         return $row;
+    }
+
+    /** @return list<array<string,mixed>> */
+    private function agentRows(): array
+    {
+        $staleSeconds = max(30, (int)($_ENV['AGENT_PRESENCE_STALE_SECONDS'] ?? 90));
+
+        return $this->rows(
+            "SELECT
+                u.id,u.full_name,u.username,u.assign_enabled,
+                COALESCE(ap.status_code,'OFFLINE') status_code,
+                COALESCE(ci.label,'Desconectado') status_label,
+                ap.last_heartbeat_at,
+                COALESCE(cap.configured_capacity,0) configured_capacity,
+                COALESCE(loads.open_cases,0) open_cases,
+                GREATEST(0,COALESCE(cap.configured_capacity,0)-COALESCE(loads.open_cases,0)) free_capacity,
+                COALESCE(throughput.closed_period,0) closed_period,
+                GROUP_CONCAT(DISTINCT q.code ORDER BY q.code SEPARATOR ', ') queue_codes
+             FROM users u
+             JOIN user_roles ur ON ur.user_id=u.id
+             JOIN roles r ON r.id=ur.role_id AND r.code='AGENTE' AND r.is_active=1
+             LEFT JOIN agent_presence ap
+               ON ap.id=(
+                    SELECT ap2.id
+                    FROM agent_presence ap2
+                    WHERE ap2.user_id=u.id AND ap2.ended_at IS NULL
+                    ORDER BY ap2.id DESC LIMIT 1
+               )
+             LEFT JOIN catalog_items ci
+               ON ci.code=COALESCE(ap.status_code,'OFFLINE')
+              AND ci.catalog_id=(
+                    SELECT c.id FROM catalogs c
+                    WHERE c.code='AGENT_PRESENCE_STATUS' AND c.is_active=1
+                    LIMIT 1
+               )
+             LEFT JOIN queue_agents qa
+               ON qa.user_id=u.id AND qa.is_enabled=1 AND qa.removed_at IS NULL
+             LEFT JOIN work_queues q
+               ON q.id=qa.queue_id AND q.is_active=1
+             LEFT JOIN (
+                SELECT qa2.user_id,
+                       SUM(COALESCE(qa2.capacity_override,q2.default_capacity)) configured_capacity
+                FROM queue_agents qa2
+                JOIN work_queues q2 ON q2.id=qa2.queue_id AND q2.is_active=1
+                WHERE qa2.is_enabled=1 AND qa2.removed_at IS NULL
+                GROUP BY qa2.user_id
+             ) cap ON cap.user_id=u.id
+             LEFT JOIN (
+                SELECT assigned_user_id,COUNT(*) open_cases
+                FROM cases
+                WHERE closed_at IS NULL AND current_state <> 'CLOSED'
+                GROUP BY assigned_user_id
+             ) loads ON loads.assigned_user_id=u.id
+             LEFT JOIN (
+                SELECT assigned_user_id,COUNT(*) closed_period
+                FROM cases
+                WHERE closed_at IS NOT NULL
+                  AND closed_at >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)
+                GROUP BY assigned_user_id
+             ) throughput ON throughput.assigned_user_id=u.id
+             WHERE u.is_active=1
+             GROUP BY
+                u.id,u.full_name,u.username,u.assign_enabled,
+                ap.status_code,ap.last_heartbeat_at,ci.label,
+                cap.configured_capacity,loads.open_cases,throughput.closed_period
+             ORDER BY open_cases DESC,u.full_name",
+        );
     }
 
     /** @return list<array<string,mixed>> */
