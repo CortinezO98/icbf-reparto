@@ -91,4 +91,24 @@ final class BusinessTimeCalculatorTest extends TestCase
 
         self::assertSame(360, $minutes);
     }
+    public function testSkipsWeekendAndConfiguredHoliday(): void
+    {
+        $calc = new BusinessTimeCalculator(
+            '08:00:00',
+            '17:00:00',
+            'America/Bogota',
+            ['2026-10-12']
+        );
+
+        $due = $calc->addBusinessMinutes(
+            new DateTimeImmutable('2026-10-09 16:00:00'),
+            120
+        );
+
+        self::assertSame(
+            '2026-10-13 10:00:00',
+            $due->format('Y-m-d H:i:s')
+        );
+    }
+
 }
