@@ -233,8 +233,8 @@ $presenceLabel = [
         <a class="ans-action" style="color:#f0a800" href="/cases?sla_status=YELLOW">Ver detalle</a>
     </div>
     <div class="ans-status-card red">
-        <div class="ans-status-head"><div class="ans-status-icon"><i class="bi bi-exclamation-octagon-fill"></i></div><div><div class="ans-status-name">Rojo</div><div class="ans-status-value"><?= $fmt($redTotal) ?></div><div class="ans-status-threshold">&gt; 4 horas hábiles / vencidos</div></div></div>
-        <div class="ans-status-note"><i class="bi bi-exclamation-octagon me-1"></i>Atención inmediata. Riesgo/incumplimiento de ANS.</div>
+        <div class="ans-status-head"><div class="ans-status-icon"><i class="bi bi-exclamation-octagon-fill"></i></div><div><div class="ans-status-name">Rojo</div><div class="ans-status-value"><?= $fmt($redTotal) ?></div><div class="ans-status-threshold">5 a &lt; 6 horas hábiles · vencido desde 6 h</div></div></div>
+        <div class="ans-status-note"><i class="bi bi-exclamation-octagon me-1"></i>Atención inmediata. Riesgo alto de incumplimiento. El vencimiento ocurre al alcanzar 6 h hábiles.</div>
         <a class="ans-action" style="color:#dc3545" href="/cases?sla_status=RED_OR_BREACHED">Ver detalle</a>
     </div>
 </div>
