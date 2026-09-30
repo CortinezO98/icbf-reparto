@@ -318,14 +318,20 @@ final class DashboardRepository
     private function queueSummary(?string $from, ?string $to): array
     {
         $params = [];
-        $period = '';
+        $periodCreated = '1=1';
+        $periodClosed = '1=1';
+
         if ($from !== null) {
-            $period .= ' AND c.created_at >= :q_from';
+            $periodCreated .= ' AND c.created_at >= :q_from';
+            $periodClosed .= ' AND c.closed_at >= :q_closed_from';
             $params[':q_from'] = $from;
+            $params[':q_closed_from'] = $from;
         }
         if ($to !== null) {
-            $period .= ' AND c.created_at < :q_to';
+            $periodCreated .= ' AND c.created_at < :q_to';
+            $periodClosed .= ' AND c.closed_at < :q_closed_to';
             $params[':q_to'] = $to;
+            $params[':q_closed_to'] = $to;
         }
 
         $sql = "SELECT
@@ -333,9 +339,10 @@ final class DashboardRepository
                     COUNT(CASE WHEN c.closed_at IS NULL AND c.current_state <> 'CLOSED' THEN 1 END) open_cases,
                     COUNT(CASE WHEN c.closed_at IS NULL AND c.current_state='PENDING_ASSIGNMENT' THEN 1 END) pending_assignment,
                     COUNT(CASE WHEN c.closed_at IS NULL AND c.assigned_user_id IS NOT NULL AND c.current_state <> 'CLOSED' THEN 1 END) assigned_cases,
-                    COUNT(CASE WHEN c.closed_at IS NOT NULL THEN 1 END) closed_cases
+                    COUNT(CASE WHEN {$periodCreated} THEN 1 END) received_period,
+                    COUNT(CASE WHEN c.closed_at IS NOT NULL AND {$periodClosed} THEN 1 END) closed_period
                 FROM work_queues q
-                LEFT JOIN cases c ON c.queue_id=q.id {$period}
+                LEFT JOIN cases c ON c.queue_id=q.id
                 WHERE q.is_active=1
                 GROUP BY q.id,q.code,q.name
                 ORDER BY open_cases DESC,q.priority,q.code";
