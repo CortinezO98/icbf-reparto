@@ -12,6 +12,7 @@ $alerts = $dashboard['alerts'] ?? [];
 $imports = $dashboard['imports'] ?? [];
 $presence = $dashboard['presence'] ?? [];
 $period = $dashboard['period'] ?? ['key'=>'today','label'=>'Hoy'];
+$policy = $policy ?? [];
 
 $fmt = static fn(mixed $value): string => number_format((float)$value, 0, ',', '.');
 $hours = static function(mixed $minutes): string {
@@ -79,13 +80,20 @@ $presenceLabel = [
     <div>
         <h1><i class="bi bi-speedometer2 text-brand me-2"></i>Tablero de Control • ICBF Reparto</h1>
         <p>Visión consolidada de casos, reparto, operación, ANS, agentes, cargas y actividad.</p>
+        <?php if ($policy !== []): ?>
+            <div class="small text-muted mt-1">
+                Política ANS: <strong><?= htmlspecialchars((string)($policy['name'] ?? 'Vigente'), ENT_QUOTES, 'UTF-8') ?></strong>
+                · Jornada <?= htmlspecialchars(substr((string)($policy['business_start'] ?? ''), 0, 5), ENT_QUOTES, 'UTF-8') ?>
+                a <?= htmlspecialchars(substr((string)($policy['business_end'] ?? ''), 0, 5), ENT_QUOTES, 'UTF-8') ?>
+            </div>
+        <?php endif; ?>
     </div>
     <div class="dashboard-actions">
         <span class="badge text-bg-success-subtle border border-success text-success-emphasis px-3 py-2">
             <i class="bi bi-clock-history me-1"></i><?= htmlspecialchars((string)$period['label'], ENT_QUOTES, 'UTF-8') ?>
         </span>
         <a href="/dashboard" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-clockwise me-1"></i>Actualizar</a>
-        <a href="/sla" class="btn btn-outline-brand btn-sm"><i class="bi bi-speedometer2 me-1"></i>Detalle ANS</a>
+        <a href="/sla" class="btn btn-outline-brand btn-sm"><i class="bi bi-speedometer2 me-1"></i>Actualizar ANS</a>
     </div>
 </div>
 
