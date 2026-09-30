@@ -9,11 +9,22 @@ use App\Controllers\AgentPresenceController;
 use App\Controllers\AgentStatusController;
 use App\Controllers\CasesController;
 use App\Controllers\SlaController;
+use App\Auth\Auth;
+use App\Auth\Authorization;
 use App\Http\Router;
 
 return static function(Router $router,PDO $pdo): void {
- $router->get('/',fn()=>(new SlaController($pdo))->index());
- $router->get('/dashboard',fn()=>(new SlaController($pdo))->index());
+ $landing = static function() use ($pdo): void {
+  Auth::requireLogin();
+  $uid = (int)(Auth::id() ?? 0);
+  if (Authorization::hasPermission($pdo, $uid, 'SLA_VIEW')) {
+   (new SlaController($pdo))->index();
+   return;
+  }
+  (new CasesController($pdo))->index();
+ };
+ $router->get('/', $landing);
+ $router->get('/dashboard', $landing);
  $router->get('/login',fn()=>(new AuthController($pdo))->showLogin());
  $router->post('/login',fn()=>(new AuthController($pdo))->login());
  $router->post('/logout',fn()=>(new AuthController($pdo))->logout());
