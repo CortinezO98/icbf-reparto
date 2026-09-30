@@ -195,6 +195,8 @@ final class DashboardRepository
     /** @return array<string,mixed> */
     private function agentSummary(): array
     {
+        $staleSeconds = max(30, (int)($_ENV['AGENT_PRESENCE_STALE_SECONDS'] ?? 90));
+
         $row = $this->singleRow(
             "SELECT
                 COUNT(DISTINCT u.id) total_agents,
@@ -202,7 +204,7 @@ final class DashboardRepository
                 COUNT(DISTINCT CASE
                     WHEN u.is_active=1 AND u.assign_enabled=1
                     AND ap.status_code='AVAILABLE'
-                    AND ap.last_heartbeat_at >= DATE_SUB(NOW(6), INTERVAL 90 SECOND)
+                    AND ap.last_heartbeat_at >= DATE_SUB(NOW(6), INTERVAL {$staleSeconds} SECOND)
                     THEN u.id END) available_agents
              FROM users u
              JOIN user_roles ur ON ur.user_id=u.id
@@ -255,8 +257,26 @@ final class DashboardRepository
         return $this->rows(
             "SELECT
                 u.id,u.full_name,u.username,u.assign_enabled,
-                COALESCE(ap.status_code,'OFFLINE') status_code,
-                COALESCE(ci.label,'Desconectado') status_label,
+                CASE
+                    WHEN ap.status_code='AVAILABLE'
+                     AND ap.last_heartbeat_at >= DATE_SUB(NOW(6), INTERVAL {$staleSeconds} SECOND)
+                    THEN 'AVAILABLE'
+                    WHEN ap.status_code IS NULL
+                      OR ap.last_heartbeat_at IS NULL
+                      OR ap.last_heartbeat_at < DATE_SUB(NOW(6), INTERVAL {$staleSeconds} SECOND)
+                    THEN 'OFFLINE'
+                    ELSE ap.status_code
+                END status_code,
+                CASE
+                    WHEN ap.status_code='AVAILABLE'
+                     AND ap.last_heartbeat_at >= DATE_SUB(NOW(6), INTERVAL {$staleSeconds} SECOND)
+                    THEN 'Disponible'
+                    WHEN ap.status_code IS NULL
+                      OR ap.last_heartbeat_at IS NULL
+                      OR ap.last_heartbeat_at < DATE_SUB(NOW(6), INTERVAL {$staleSeconds} SECOND)
+                    THEN 'Desconectado'
+                    ELSE COALESCE(ci.label,ap.status_code)
+                END status_label,
                 ap.last_heartbeat_at,
                 COALESCE(cap.configured_capacity,0) configured_capacity,
                 COALESCE(loads.open_cases,0) open_cases,
@@ -424,14 +444,25 @@ final class DashboardRepository
     private function dailyTrend(int $days): array
     {
         $days = max(1, min(31, $days));
+        $interval = $days - 1;
+
         return $this->rows(
-            "SELECT
-                DATE(c.created_at) day,
-                COUNT(*) received,
-                SUM(c.closed_at IS NOT NULL) closed
-             FROM cases c
-             WHERE c.created_at >= DATE_SUB(CURDATE(), INTERVAL " . ($days - 1) . " DAY)
-             GROUP BY DATE(c.created_at)
+            "SELECT day,SUM(received) received,SUM(closed) closed
+             FROM (
+                SELECT DATE(c.created_at) day,COUNT(*) received,0 closed
+                FROM cases c
+                WHERE c.created_at >= DATE_SUB(CURDATE(), INTERVAL {$interval} DAY)
+                GROUP BY DATE(c.created_at)
+
+                UNION ALL
+
+                SELECT DATE(c.closed_at) day,0 received,COUNT(*) closed
+                FROM cases c
+                WHERE c.closed_at IS NOT NULL
+                  AND c.closed_at >= DATE_SUB(CURDATE(), INTERVAL {$interval} DAY)
+                GROUP BY DATE(c.closed_at)
+             ) t
+             GROUP BY day
              ORDER BY day"
         );
     }
