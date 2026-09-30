@@ -519,19 +519,43 @@ final class DashboardRepository
     /** @return array<string,int> */
     private function presenceSummary(): array
     {
+        $staleSeconds = max(30, (int)($_ENV['AGENT_PRESENCE_STALE_SECONDS'] ?? 90));
+
         $rows = $this->rows(
-            "SELECT COALESCE(ap.status_code,'OFFLINE') status_code, COUNT(DISTINCT u.id) total
+            "SELECT
+                CASE
+                    WHEN ap.status_code='AVAILABLE'
+                     AND ap.last_heartbeat_at >= DATE_SUB(NOW(6), INTERVAL {$staleSeconds} SECOND)
+                    THEN 'AVAILABLE'
+                    WHEN ap.status_code IS NULL
+                      OR ap.last_heartbeat_at IS NULL
+                      OR ap.last_heartbeat_at < DATE_SUB(NOW(6), INTERVAL {$staleSeconds} SECOND)
+                    THEN 'OFFLINE'
+                    ELSE ap.status_code
+                END status_code,
+                COUNT(DISTINCT u.id) total
              FROM users u
              JOIN user_roles ur ON ur.user_id=u.id
              JOIN roles r ON r.id=ur.role_id AND r.code='AGENTE' AND r.is_active=1
              LEFT JOIN agent_presence ap
                ON ap.id=(
-                    SELECT ap2.id FROM agent_presence ap2
+                    SELECT ap2.id
+                    FROM agent_presence ap2
                     WHERE ap2.user_id=u.id AND ap2.ended_at IS NULL
                     ORDER BY ap2.id DESC LIMIT 1
                )
              WHERE u.is_active=1
-             GROUP BY COALESCE(ap.status_code,'OFFLINE')
+             GROUP BY
+                CASE
+                    WHEN ap.status_code='AVAILABLE'
+                     AND ap.last_heartbeat_at >= DATE_SUB(NOW(6), INTERVAL {$staleSeconds} SECOND)
+                    THEN 'AVAILABLE'
+                    WHEN ap.status_code IS NULL
+                      OR ap.last_heartbeat_at IS NULL
+                      OR ap.last_heartbeat_at < DATE_SUB(NOW(6), INTERVAL {$staleSeconds} SECOND)
+                    THEN 'OFFLINE'
+                    ELSE ap.status_code
+                END
              ORDER BY total DESC"
         );
 
