@@ -70,8 +70,8 @@ $rolesLabel = $currentUserRoles !== [] ? implode(', ', $currentUserRoles) : '';
      aria-label="Navegación principal">
     <div class="container-fluid">
         <a class="navbar-brand fw-semibold d-flex align-items-center gap-2"
-           href="/dashboard"
-           aria-label="ICBF Reparto - Tablero de Control">
+           href="/sla"
+           aria-label="ICBF Reparto - Tablero ANS">
             <i class="bi bi-diagram-3" aria-hidden="true"></i>
             <span>ICBF Reparto</span>
         </a>
@@ -89,8 +89,8 @@ $rolesLabel = $currentUserRoles !== [] ? implode(', ', $currentUserRoles) : '';
         <div class="collapse navbar-collapse" id="mainNavbar">
             <ul class="navbar-nav me-auto mb-2 mb-lg-0">
                 <li class="nav-item">
-                    <a class="nav-link <?= ($path === '/' || $path === '/dashboard') ? 'active' : '' ?>" href="/dashboard">
-                        <i class="bi bi-speedometer2 me-1" aria-hidden="true"></i>Tablero de Control
+                    <a class="nav-link <?= $isActive('/sla') || $path === '/' || $path === '/dashboard' ? 'active' : '' ?>" href="/sla">
+                        <i class="bi bi-speedometer2 me-1" aria-hidden="true"></i>Tablero ANS
                     </a>
                 </li>
 
@@ -112,14 +112,6 @@ $rolesLabel = $currentUserRoles !== [] ? implode(', ', $currentUserRoles) : '';
                     <li class="nav-item">
                         <a class="nav-link <?= $isActive('/supervisor/agents') ? 'active' : '' ?>" href="/supervisor/agents">
                             <i class="bi bi-person-workspace me-1" aria-hidden="true"></i>Estado agentes
-                        </a>
-                    </li>
-                <?php endif; ?>
-
-                <?php if (Authorization::hasPermission(Database::connection(), (int)Auth::id(), 'SLA_VIEW')): ?>
-                    <li class="nav-item">
-                        <a class="nav-link <?= $isActive('/sla') ? 'active' : '' ?>" href="/sla">
-                            <i class="bi bi-speedometer2 me-1" aria-hidden="true"></i>Tablero ANS
                         </a>
                     </li>
                 <?php endif; ?>
