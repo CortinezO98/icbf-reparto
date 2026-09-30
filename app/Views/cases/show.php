@@ -11,14 +11,44 @@
 
 $source = json_decode((string)($case['source_normalized_json'] ?? ''), true);
 $source = is_array($source) ? $source : [];
+
+$slaStatus = (string)($case['sla_status'] ?? '');
+$slaClass = match ($slaStatus) {
+    'GREEN' => 'text-bg-success',
+    'YELLOW' => 'text-bg-warning',
+    'RED', 'BREACHED' => 'text-bg-danger',
+    default => 'text-bg-secondary',
+};
+$stateLabel = match ((string)($case['current_state'] ?? '')) {
+    'PENDING_ASSIGNMENT' => 'Pendiente de asignación',
+    'ASSIGNED' => 'Asignado',
+    'CLOSED' => 'Cerrado',
+    default => (string)($case['current_state'] ?? 'Sin estado'),
+};
+$elapsedMinutes = $case['sla_elapsed_minutes'] ?? null;
+$elapsedLabel = $elapsedMinutes === null || $elapsedMinutes === ''
+    ? '—'
+    : ((float)$elapsedMinutes < 60
+        ? number_format((float)$elapsedMinutes, 0, ',', '.') . ' min'
+        : number_format((float)$elapsedMinutes / 60, 1, ',', '.') . ' h');
 ?>
 <style>
-.case-head{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap}.case-head h1{margin:0}.case-grid{display:grid;grid-template-columns:1.1fr .9fr;gap:18px;margin-top:18px}.case-card{background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:18px;box-shadow:0 4px 14px rgba(15,23,42,.04)}.data-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}.datum{background:#f8fafc;border-radius:8px;padding:10px}.datum small{display:block;color:#64748b}.datum strong{display:block;margin-top:3px}.timeline{display:grid;gap:10px}.timeline-item{border-left:3px solid #4CAF50;padding:7px 0 7px 12px}.manage-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}.flash-ok{padding:12px;background:#dcfce7;color:#166534;border-radius:8px;margin:14px 0}.flash-err{padding:12px;background:#fee2e2;color:#991b1b;border-radius:8px;margin:14px 0}@media(max-width:850px){.case-grid,.data-grid,.manage-grid{grid-template-columns:1fr}}
+.case-head{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:flex-start}.case-head h1{margin:0;font-weight:800}.case-grid{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(300px,.75fr);gap:18px;margin-top:18px}.case-card{background:#fff;border:1px solid rgba(33,37,41,.12);border-radius:16px;padding:18px;box-shadow:0 2px 5px rgba(0,0,0,.035)}.case-card h2{font-size:1rem;font-weight:800;margin-bottom:14px}.data-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.datum{background:#f8f9fa;border:1px solid #edf0f2;border-radius:10px;padding:11px}.datum small{display:block;color:#6c757d;font-size:.75rem}.datum strong{display:block;margin-top:3px}.timeline{display:grid;gap:10px}.timeline-item{border-left:3px solid var(--color-primary);padding:10px 0 10px 13px;background:#fbfcfd;border-radius:0 8px 8px 0}.flash-ok{padding:12px;background:#d1e7dd;color:#0f5132;border:1px solid #badbcc;border-radius:10px;margin:14px 0}.flash-err{padding:12px;background:#f8d7da;color:#842029;border:1px solid #f5c2c7;border-radius:10px;margin:14px 0}.case-status-card{background:#f8f9fa;border:1px solid #edf0f2;border-radius:12px;padding:14px}.case-status-card .label{font-size:.75rem;color:#6c757d}.case-status-card .value{font-weight:800;font-size:1.1rem;margin-top:2px}.management-form .form-label{font-weight:700;font-size:.85rem}@media(max-width:850px){.case-grid,.data-grid{grid-template-columns:1fr}}
 </style>
 
 <div class="case-head">
-    <div><h1><?= htmlspecialchars((string)$case['case_number'], ENT_QUOTES, 'UTF-8') ?></h1><div class="muted">Radicado/SIM: <?= htmlspecialchars((string)$case['external_key'], ENT_QUOTES, 'UTF-8') ?></div></div>
-    <a class="btn btn-light" href="/cases"><i class="bi bi-arrow-left me-1"></i>Volver a casos</a>
+    <div>
+        <div class="d-flex align-items-center gap-2 flex-wrap">
+            <h1><?= htmlspecialchars((string)$case['case_number'], ENT_QUOTES, 'UTF-8') ?></h1>
+            <span class="badge <?= $slaClass ?>"><?= htmlspecialchars($slaStatus !== '' ? $slaStatus : 'ANS pendiente', ENT_QUOTES, 'UTF-8') ?></span>
+            <span class="badge text-bg-light border"><?= htmlspecialchars($stateLabel, ENT_QUOTES, 'UTF-8') ?></span>
+        </div>
+        <div class="muted mt-1">Radicado/SIM: <?= htmlspecialchars((string)$case['external_key'], ENT_QUOTES, 'UTF-8') ?></div>
+    </div>
+    <div class="d-flex gap-2">
+        <a class="btn btn-outline-secondary" href="/sla"><i class="bi bi-speedometer2 me-1"></i>Tablero ANS</a>
+        <a class="btn btn-light" href="/cases"><i class="bi bi-arrow-left me-1"></i>Volver a casos</a>
+    </div>
 </div>
 
 <?php if ($success): ?><div class="flash-ok"><?= htmlspecialchars($success, ENT_QUOTES, 'UTF-8') ?></div><?php endif; ?>
@@ -27,7 +57,12 @@ $source = is_array($source) ? $source : [];
 <div class="case-grid">
     <div>
         <div class="case-card">
-            <h2 style="margin-top:0">Información del caso</h2>
+            <h2>Información del caso</h2>
+            <div class="row g-2 mb-3">
+                <div class="col-md-4"><div class="case-status-card"><div class="label">Tiempo ANS consumido</div><div class="value"><?= htmlspecialchars($elapsedLabel, ENT_QUOTES, 'UTF-8') ?></div></div></div>
+                <div class="col-md-4"><div class="case-status-card"><div class="label">Vencimiento ANS</div><div class="value small"><?= htmlspecialchars((string)($case['sla_due_at'] ?: '—'), ENT_QUOTES, 'UTF-8') ?></div></div></div>
+                <div class="col-md-4"><div class="case-status-card"><div class="label">Primera gestión</div><div class="value small"><?= htmlspecialchars((string)($case['first_management_at'] ?: 'Pendiente'), ENT_QUOTES, 'UTF-8') ?></div></div></div>
+            </div>
             <div class="data-grid">
                 <div class="datum"><small>Estado</small><strong><?= htmlspecialchars((string)$case['current_state'], ENT_QUOTES, 'UTF-8') ?></strong></div>
                 <div class="datum"><small>Cola</small><strong><?= htmlspecialchars((string)($case['queue_name'] ?: '—'), ENT_QUOTES, 'UTF-8') ?></strong></div>
@@ -69,7 +104,7 @@ $source = is_array($source) ? $source : [];
         <?php if ($canManage): ?>
             <div class="case-card">
                 <h2 style="margin-top:0">Registrar gestión</h2>
-                <form method="post" action="/cases/<?= (int)$case['id'] ?>/manage" enctype="multipart/form-data" id="managementForm">
+                <form class="management-form" method="post" action="/cases/<?= (int)$case['id'] ?>/manage" enctype="multipart/form-data" id="managementForm">
                     <input type="hidden" name="_csrf" value="<?= htmlspecialchars(\App\Auth\Csrf::token(), ENT_QUOTES, 'UTF-8') ?>">
 
                     <label>Tipo de gestión *</label>
