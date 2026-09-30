@@ -27,6 +27,20 @@ $percent = static function(mixed $value, mixed $total): string {
     if ($total <= 0) return '0%';
     return number_format(((float)$value / $total) * 100, 1, ',', '.') . '%';
 };
+
+$openCases = (int)($summary['open_cases'] ?? 0);
+$pendingAssignment = (int)($summary['pending_assignment'] ?? 0);
+$assignedCases = (int)($summary['assigned_cases'] ?? 0);
+$managedOpen = (int)($summary['managed_open'] ?? 0);
+$closedCases = (int)($summary['closed_cases'] ?? 0);
+$managedPeriod = (int)($summary['managed_period'] ?? 0);
+$green = (int)($summary['sla_green'] ?? 0);
+$yellow = (int)($summary['sla_yellow'] ?? 0);
+$red = (int)($summary['sla_red'] ?? 0);
+$breached = (int)($summary['sla_breached'] ?? 0);
+$redTotal = $red + $breached;
+$activeSla = $green + $yellow + $redTotal;
+$responseRate = $openCases > 0 ? ($managedOpen / $openCases) * 100 : 0;
 $max = static function(array $rows): int {
     $max = 0;
     foreach ($rows as $row) $max = max($max, (int)($row['total'] ?? $row['received'] ?? 0));
@@ -74,6 +88,17 @@ $presenceLabel = [
 .mini-stat{padding:11px 13px;border:1px solid #edf0f2;border-radius:10px;background:#fbfcfd}.mini-stat span{display:block;font-size:.75rem;color:#6c757d}.mini-stat strong{display:block;font-size:1.15rem;margin-top:3px}
 .alert-count{font-size:.72rem;padding:4px 7px;border-radius:999px;background:#f8d7da;color:#b02a37;font-weight:800}
 .empty-state{padding:22px;text-align:center;color:#6c757d;font-size:.85rem}
+
+/* Resumen ANS: referencia visual solicitada; el resto del tablero conserva su diseño. */
+.ans-summary-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px}
+.ans-summary-card{position:relative;min-height:205px;background:#fff;border:1px solid #e1e5ea;border-radius:16px;padding:16px;box-shadow:0 2px 6px rgba(15,23,42,.05);overflow:hidden}
+.ans-summary-card .ans-label{font-size:.78rem;color:#5f6b7a}.ans-summary-card .ans-value{font-size:2rem;line-height:1.05;font-weight:800;margin:5px 0}.ans-summary-card .ans-subtitle{font-size:.78rem;color:#667085;line-height:1.45}.ans-summary-card .ans-icon{position:absolute;right:16px;top:16px;width:58px;height:58px;border-radius:50%;display:grid;place-items:center;font-size:1.35rem}.ans-summary-card .ans-divider{height:1px;background:#e6e9ed;margin:15px 0 11px}.ans-summary-card .ans-stat{display:flex;justify-content:space-between;gap:10px;font-size:.78rem;color:#667085;margin-top:6px}.ans-summary-card .ans-stat strong{color:#1f2937}.ans-summary-card.danger{border:3px solid #dc3545;padding:14px}.ans-summary-card.danger .ans-value{color:#dc3545}.ans-summary-card.danger .ans-icon{background:#fdecef;color:#dc3545}.ans-summary-card.open .ans-icon{background:#eaf2ff;color:#0d6efd}.ans-summary-card.response .ans-icon{background:#e7f5ef;color:#198754}.ans-summary-card.semaphore .ans-icon{background:#fff7df;color:#f0ad00}
+.ans-action{display:block;width:100%;margin-top:13px;text-align:center;padding:7px 10px;border:1px solid currentColor;border-radius:5px;background:#fff;text-decoration:none;font-size:.78rem}.ans-action:hover{filter:brightness(.96)}
+.ans-semaphore-line{display:grid;grid-template-columns:55px 1fr 40px;align-items:center;gap:7px;margin-top:8px}.ans-semaphore-pill{font-size:.68rem;font-weight:800;color:#fff;border-radius:5px;padding:3px 7px;text-align:center}.ans-semaphore-track{height:6px;background:#e9ecef;border-radius:999px;overflow:hidden}.ans-semaphore-fill{height:100%;border-radius:999px}
+.ans-summary-secondary{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin-top:14px}.ans-secondary-card{background:#fff;border:3px solid #adb5bd;border-radius:16px;padding:16px;min-height:194px;box-shadow:0 2px 6px rgba(15,23,42,.04)}.ans-secondary-card.process{border-color:#12bfe8}.ans-secondary-card.managed{border-color:#ff7417}.ans-secondary-card.closed{border-color:#737d87}.ans-secondary-head{display:flex;justify-content:space-between;align-items:center;gap:10px}.ans-secondary-title{font-size:.78rem;color:#536070}.ans-secondary-value{font-size:2rem;font-weight:800;line-height:1.05;margin-top:5px}.ans-secondary-card.process .ans-secondary-value{color:#08afd8}.ans-secondary-card.managed .ans-secondary-value{color:#f26f21}.ans-secondary-card.closed .ans-secondary-value{color:#65707c}.ans-secondary-icon{width:56px;height:56px;border-radius:50%;display:grid;place-items:center;font-size:1.3rem}.process .ans-secondary-icon{background:#e5f9fd;color:#08afd8}.managed .ans-secondary-icon{background:#fff0e5;color:#f26f21}.closed .ans-secondary-icon{background:#f0f1f3;color:#65707c}.ans-secondary-divider{height:1px;background:#dfe3e7;margin:14px 0 10px}.ans-secondary-desc{font-size:.78rem;color:#667085}.ans-secondary-card .ans-action{margin-top:12px}
+.ans-status-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin-top:14px}.ans-status-card{background:#fff;border:3px solid;border-radius:16px;padding:16px;min-height:226px;box-shadow:0 2px 6px rgba(15,23,42,.04)}.ans-status-card.green{border-color:#198754}.ans-status-card.yellow{border-color:#ffb400}.ans-status-card.red{border-color:#dc3545}.ans-status-head{display:flex;align-items:center;gap:14px}.ans-status-icon{width:64px;height:64px;border-radius:50%;display:grid;place-items:center;font-size:1.35rem}.green .ans-status-icon{background:#e7f5ef;color:#198754}.yellow .ans-status-icon{background:#fff6dc;color:#ffb400}.red .ans-status-icon{background:#fdecef;color:#dc3545}.ans-status-name{font-size:.78rem;text-transform:uppercase;color:#495057;font-weight:700}.ans-status-value{font-size:2rem;line-height:1.05;margin-top:3px}.green .ans-status-value{color:#198754}.yellow .ans-status-value{color:#f0a800}.red .ans-status-value{color:#dc3545}.ans-status-threshold{font-size:.78rem;color:#667085;margin-top:3px}.ans-status-note{font-size:.72rem;line-height:1.35;border-radius:6px;padding:9px 10px;margin-top:16px}.green .ans-status-note{background:#dff2e8;border:1px solid #a8d7bf;color:#195c3d}.yellow .ans-status-note{background:#fff3d0;border:1px solid #ffd46b;color:#725500}.red .ans-status-note{background:#fde1e5;border:1px solid #f2a9b5;color:#8f1d2c}.ans-status-card .ans-action{margin-top:14px}
+@media(max-width:1100px){.ans-summary-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.ans-summary-secondary,.ans-status-grid{grid-template-columns:1fr}}
+@media(max-width:600px){.ans-summary-grid{grid-template-columns:1fr}.ans-summary-secondary,.ans-status-grid{grid-template-columns:1fr}.ans-summary-card,.ans-secondary-card,.ans-status-card{min-height:auto}}
 @media(max-width:900px){.dashboard-table{min-width:760px}.dashboard-scroll{overflow:auto}.bar-row{grid-template-columns:105px 1fr 45px}}
 </style>
 
@@ -140,111 +165,77 @@ $presenceLabel = [
     </div>
 </form>
 
-<div class="row g-3">
-    <div class="col-xl-3 col-md-6">
-        <div class="dashboard-card kpi-card">
-            <div class="card-body">
-                <div class="kpi-icon bg-primary-subtle text-primary"><i class="bi bi-inbox"></i></div>
-                <div class="kpi-label">Casos abiertos</div>
-                <div class="kpi-value"><?= $fmt($summary['open_cases'] ?? 0) ?></div>
-                <div class="kpi-detail">Pendientes de asignación: <strong><?= $fmt($summary['pending_assignment'] ?? 0) ?></strong></div>
-                <div class="kpi-detail">Asignados: <strong><?= $fmt($summary['assigned_cases'] ?? 0) ?></strong></div>
-            </div>
-        </div>
+<div class="ans-summary-grid">
+    <div class="ans-summary-card open">
+        <div class="ans-label">Casos abiertos</div>
+        <div class="ans-value"><?= $fmt($openCases) ?></div>
+        <div class="ans-subtitle">Casos actualmente abiertos en el tablero</div>
+        <div class="ans-icon"><i class="bi bi-folder2-open"></i></div>
+        <div class="ans-divider"></div>
+        <div class="ans-stat"><span>Nuevos</span><strong><?= $fmt($pendingAssignment) ?></strong></div>
+        <div class="ans-stat"><span>Asignados</span><strong><?= $fmt($assignedCases) ?></strong></div>
     </div>
-    <div class="col-xl-3 col-md-6">
-        <div class="dashboard-card kpi-card">
-            <div class="card-body">
-                <div class="kpi-icon bg-success-subtle text-success"><i class="bi bi-check2-circle"></i></div>
-                <div class="kpi-label">Actividad del periodo</div>
-                <div class="kpi-value"><?= $fmt($summary['received'] ?? 0) ?></div>
-                <div class="kpi-detail">Casos recibidos</div>
-                <div class="kpi-detail">Cerrados: <strong><?= $fmt($summary['closed_period'] ?? 0) ?></strong> · Gestionados: <strong><?= $fmt($summary['managed_period'] ?? 0) ?></strong></div>
-            </div>
-        </div>
+    <div class="ans-summary-card response">
+        <div class="ans-label">Tasa de primera gestión</div>
+        <div class="ans-value text-success"><?= number_format($responseRate, 1, ',', '.') ?>%</div>
+        <div class="ans-subtitle">Sobre los casos abiertos del tablero</div>
+        <div class="ans-icon"><i class="bi bi-check2-circle"></i></div>
+        <div class="ans-divider"></div>
+        <div class="ans-stat"><span>Promedio 1ª gestión</span><strong><?= $hours($summary['avg_first_management_minutes'] ?? null) ?></strong></div>
+        <div class="ans-stat"><span>Casos con gestión</span><strong><?= $fmt($managedOpen) ?></strong></div>
     </div>
-    <div class="col-xl-3 col-md-6">
-        <div class="dashboard-card kpi-card">
-            <div class="card-body">
-                <div class="kpi-icon bg-warning-subtle text-warning-emphasis"><i class="bi bi-stopwatch"></i></div>
-                <div class="kpi-label">Tiempos promedio</div>
-                <div class="kpi-value"><?= $hours($summary['avg_first_management_minutes'] ?? null) ?></div>
-                <div class="kpi-detail">Hasta primera gestión</div>
-                <div class="kpi-detail">Resolución: <strong><?= $hours($summary['avg_resolution_minutes'] ?? null) ?></strong></div>
-            </div>
-        </div>
+    <div class="ans-summary-card danger">
+        <div class="ans-label">Incumplidos ANS</div>
+        <div class="ans-value"><?= $fmt($breached) ?></div>
+        <div class="ans-subtitle">Casos vencidos según la política ANS</div>
+        <div class="ans-icon"><i class="bi bi-exclamation-triangle"></i></div>
+        <div class="ans-divider"></div>
+        <a class="ans-action text-danger" href="/cases?sla_status=BREACHED"><i class="bi bi-lightning-charge me-1"></i>Atender vencidos</a>
     </div>
-    <div class="col-xl-3 col-md-6">
-        <div class="dashboard-card kpi-card">
-            <div class="card-body">
-                <div class="kpi-icon bg-danger-subtle text-danger"><i class="bi bi-exclamation-triangle"></i></div>
-                <div class="kpi-label">Incumplidos ANS</div>
-                <div class="kpi-value text-danger"><?= $fmt($summary['sla_breached'] ?? 0) ?></div>
-                <div class="kpi-detail">Rojo: <strong><?= $fmt($summary['sla_red'] ?? 0) ?></strong> · Amarillo: <strong><?= $fmt($summary['sla_yellow'] ?? 0) ?></strong></div>
-                <div class="kpi-detail">Alertas abiertas: <strong><?= $fmt(count($alerts)) ?></strong></div>
-            </div>
-        </div>
+    <div class="ans-summary-card semaphore">
+        <div class="ans-label">Semáforo (activos)</div>
+        <div class="ans-value" style="font-size:1.55rem"><?= $fmt($green) ?>/<?= $fmt($yellow) ?>/<?= $fmt($redTotal) ?></div>
+        <div class="ans-subtitle">Verde / Amarillo / Rojo y vencidos</div>
+        <div class="ans-icon"><i class="bi bi-speedometer2"></i></div>
+        <div class="ans-semaphore-line"><span class="ans-semaphore-pill" style="background:#198754">Verde</span><div class="ans-semaphore-track"><div class="ans-semaphore-fill" style="width:<?= $percent($green,$activeSla) ?>;background:#198754"></div></div><span class="small text-muted"><?= $percent($green,$activeSla) ?></span></div>
+        <div class="ans-semaphore-line"><span class="ans-semaphore-pill" style="background:#ffb400">Amarillo</span><div class="ans-semaphore-track"><div class="ans-semaphore-fill" style="width:<?= $percent($yellow,$activeSla) ?>;background:#ffb400"></div></div><span class="small text-muted"><?= $percent($yellow,$activeSla) ?></span></div>
+        <div class="ans-semaphore-line"><span class="ans-semaphore-pill" style="background:#dc3545">Rojo</span><div class="ans-semaphore-track"><div class="ans-semaphore-fill" style="width:<?= $percent($redTotal,$activeSla) ?>;background:#dc3545"></div></div><span class="small text-muted"><?= $percent($redTotal,$activeSla) ?></span></div>
     </div>
 </div>
 
-<div class="row g-3 mt-1">
-    <div class="col-xl-8">
-        <div class="dashboard-card">
-            <div class="card-body">
-                <div class="d-flex justify-content-between align-items-start mb-2">
-                    <div><div class="section-title">Semáforo ANS de casos activos</div><div class="section-subtitle">Estado calculado con la política ANS vigente.</div></div>
-                    <a href="/sla" class="btn btn-sm btn-outline-brand">Ver detalle</a>
-                </div>
-                <?php $activeSla = (int)($summary['sla_green'] ?? 0)+(int)($summary['sla_yellow'] ?? 0)+(int)($summary['sla_red'] ?? 0)+(int)($summary['sla_breached'] ?? 0); ?>
-                <div class="row g-2 mt-2">
-                    <?php foreach ([
-                        ['label'=>'Verde','value'=>$summary['sla_green'] ?? 0,'class'=>'status-green','icon'=>'bi-check-circle'],
-                        ['label'=>'Amarillo','value'=>$summary['sla_yellow'] ?? 0,'class'=>'status-yellow','icon'=>'bi-exclamation-triangle'],
-                        ['label'=>'Rojo','value'=>$summary['sla_red'] ?? 0,'class'=>'status-red','icon'=>'bi-exclamation-octagon'],
-                        ['label'=>'Vencido','value'=>$summary['sla_breached'] ?? 0,'class'=>'status-red','icon'=>'bi-x-octagon']
-                    ] as $item): ?>
-                        <div class="col-md-3">
-                            <div class="mini-stat">
-                                <span><span class="status-badge <?= $item['class'] ?>"><i class="bi <?= $item['icon'] ?> me-1"></i><?= $item['label'] ?></span></span>
-                                <strong><?= $fmt($item['value']) ?></strong>
-                                <span><?= $percent($item['value'],$activeSla) ?> de activos evaluados</span>
-                            </div>
-                        </div>
-                    <?php endforeach; ?>
-                </div>
-                <div class="mt-3">
-                    <div class="kpi-progress"><span style="width:<?= $percent($summary['sla_green'] ?? 0,$activeSla) ?>;background:#198754"></span></div>
-                    <div class="d-flex justify-content-between mt-1 small text-muted">
-                        <span>Verde <?= $percent($summary['sla_green'] ?? 0,$activeSla) ?></span>
-                        <span>Amarillo <?= $percent($summary['sla_yellow'] ?? 0,$activeSla) ?></span>
-                        <span>Rojo/Vencido <?= $percent((int)($summary['sla_red'] ?? 0)+(int)($summary['sla_breached'] ?? 0),$activeSla) ?></span>
-                    </div>
-                </div>
-            </div>
-        </div>
+<div class="ans-summary-secondary">
+    <div class="ans-secondary-card process">
+        <div class="ans-secondary-head"><div><div class="ans-secondary-title">En proceso</div><div class="ans-secondary-value"><?= $fmt($managedOpen) ?></div><div class="ans-secondary-desc">Casos abiertos con primera gestión</div></div><div class="ans-secondary-icon"><i class="bi bi-gear"></i></div></div>
+        <div class="ans-secondary-divider"></div>
+        <a class="ans-action" style="color:#08afd8" href="/cases?state=ASSIGNED&managed=1"><i class="bi bi-eye me-1"></i>Ver en proceso</a>
     </div>
-    <div class="col-xl-4">
-        <div class="dashboard-card">
-            <div class="card-body">
-                <div class="section-title">Estado de agentes</div>
-                <div class="section-subtitle">Presencia operacional actual.</div>
-                <div class="row g-2 mt-2">
-                    <div class="col-6"><div class="mini-stat"><span>Total agentes</span><strong><?= $fmt($agentSummary['total_agents'] ?? 0) ?></strong></div></div>
-                    <div class="col-6"><div class="mini-stat"><span>Disponibles</span><strong><?= $fmt($agentSummary['available_agents'] ?? 0) ?></strong></div></div>
-                    <div class="col-6"><div class="mini-stat"><span>Carga activa</span><strong><?= $fmt($agentSummary['active_load'] ?? 0) ?></strong></div></div>
-                    <div class="col-6"><div class="mini-stat"><span>Capacidad libre</span><strong><?= $fmt($agentSummary['free_capacity'] ?? 0) ?></strong></div></div>
-                </div>
-                <div class="mt-3">
-                    <?php foreach ($presence as $code=>$count): ?>
-                        <div class="d-flex justify-content-between align-items-center py-1 small">
-                            <span><?= htmlspecialchars($presenceLabel[$code] ?? $code, ENT_QUOTES, 'UTF-8') ?></span>
-                            <strong><?= $fmt($count) ?></strong>
-                        </div>
-                    <?php endforeach; ?>
-                    <?php if ($presence === []): ?><div class="empty-state">Sin información de presencia.</div><?php endif; ?>
-                </div>
-            </div>
-        </div>
+    <div class="ans-secondary-card managed">
+        <div class="ans-secondary-head"><div><div class="ans-secondary-title">Gestionados</div><div class="ans-secondary-value"><?= $fmt($managedPeriod) ?></div><div class="ans-secondary-desc">Casos con primera gestión en el periodo</div></div><div class="ans-secondary-icon"><i class="bi bi-chat-left-text"></i></div></div>
+        <div class="ans-secondary-divider"></div>
+        <a class="ans-action" style="color:#f26f21" href="/cases?managed=1"><i class="bi bi-eye me-1"></i>Ver gestionados</a>
+    </div>
+    <div class="ans-secondary-card closed">
+        <div class="ans-secondary-head"><div><div class="ans-secondary-title">Cerrados</div><div class="ans-secondary-value"><?= $fmt($closedCases) ?></div><div class="ans-secondary-desc">Casos finalizados históricamente</div></div><div class="ans-secondary-icon"><i class="bi bi-check2-all"></i></div></div>
+        <div class="ans-secondary-divider"></div>
+        <a class="ans-action" style="color:#65707c" href="/cases?state=CLOSED"><i class="bi bi-archive me-1"></i>Ver cerrados</a>
+    </div>
+</div>
+
+<div class="ans-status-grid">
+    <div class="ans-status-card green">
+        <div class="ans-status-head"><div class="ans-status-icon"><i class="bi bi-check-lg"></i></div><div><div class="ans-status-name">Verde</div><div class="ans-status-value"><?= $fmt($green) ?></div><div class="ans-status-threshold">0 a &lt; 2 horas hábiles</div></div></div>
+        <div class="ans-status-note"><i class="bi bi-info-circle me-1"></i>Atención normal. Mantener flujo y priorización.</div>
+        <a class="ans-action" style="color:#198754" href="/cases?sla_status=GREEN">Ver detalle</a>
+    </div>
+    <div class="ans-status-card yellow">
+        <div class="ans-status-head"><div class="ans-status-icon"><i class="bi bi-exclamation-triangle-fill"></i></div><div><div class="ans-status-name">Amarillo</div><div class="ans-status-value"><?= $fmt($yellow) ?></div><div class="ans-status-threshold">2 a 4 horas hábiles</div></div></div>
+        <div class="ans-status-note"><i class="bi bi-exclamation-triangle me-1"></i>Atención prioritaria. Evitar que pasen a ROJO.</div>
+        <a class="ans-action" style="color:#f0a800" href="/cases?sla_status=YELLOW">Ver detalle</a>
+    </div>
+    <div class="ans-status-card red">
+        <div class="ans-status-head"><div class="ans-status-icon"><i class="bi bi-exclamation-octagon-fill"></i></div><div><div class="ans-status-name">Rojo</div><div class="ans-status-value"><?= $fmt($redTotal) ?></div><div class="ans-status-threshold">&gt; 4 horas hábiles / vencidos</div></div></div>
+        <div class="ans-status-note"><i class="bi bi-exclamation-octagon me-1"></i>Atención inmediata. Riesgo/incumplimiento de ANS.</div>
+        <a class="ans-action" style="color:#dc3545" href="/cases?sla_status=RED_OR_BREACHED">Ver detalle</a>
     </div>
 </div>
 
