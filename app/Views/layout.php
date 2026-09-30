@@ -88,11 +88,13 @@ $rolesLabel = $currentUserRoles !== [] ? implode(', ', $currentUserRoles) : '';
 
         <div class="collapse navbar-collapse" id="mainNavbar">
             <ul class="navbar-nav me-auto mb-2 mb-lg-0">
-                <li class="nav-item">
-                    <a class="nav-link <?= $isActive('/sla') || $path === '/' || $path === '/dashboard' ? 'active' : '' ?>" href="/sla">
-                        <i class="bi bi-speedometer2 me-1" aria-hidden="true"></i>Tablero ANS
-                    </a>
-                </li>
+                <?php if (Authorization::hasPermission(Database::connection(), (int)Auth::id(), 'SLA_VIEW')): ?>
+                    <li class="nav-item">
+                        <a class="nav-link <?= $isActive('/sla') || $path === '/' || $path === '/dashboard' ? 'active' : '' ?>" href="/sla">
+                            <i class="bi bi-speedometer2 me-1" aria-hidden="true"></i>Tablero ANS
+                        </a>
+                    </li>
+                <?php endif; ?>
 
                 <li class="nav-item">
                     <a class="nav-link <?= $isActive('/cases') ? 'active' : '' ?>" href="/cases">
