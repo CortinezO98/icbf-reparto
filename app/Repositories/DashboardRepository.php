@@ -152,7 +152,7 @@ final class DashboardRepository
         ];
     }
 
-    /** @return array<string,mixed> */
+    /** @param array<string,mixed> $params @return array<string,mixed> */
     private function singleRow(string $sql, array $params = []): array
     {
         $st = $this->pdo->prepare($sql);
@@ -160,6 +160,7 @@ final class DashboardRepository
         return $st->fetch() ?: [];
     }
 
+    /** @param array<string,mixed> $params */
     private function scalar(string $sql, array $params = []): mixed
     {
         $st = $this->pdo->prepare($sql);
@@ -591,6 +592,7 @@ final class DashboardRepository
     }
 
     /** @return list<array<string,mixed>> */
+    /** @param array<string,mixed> $params @return list<array<string,mixed>> */
     private function rows(string $sql, array $params = []): array
     {
         $st = $this->pdo->prepare($sql);
