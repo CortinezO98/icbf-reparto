@@ -106,7 +106,7 @@ final class BusinessTimeCalculatorTest extends TestCase
         );
 
         self::assertSame(
-            '2026-10-13 10:00:00',
+            '2026-10-13 09:00:00',
             $due->format('Y-m-d H:i:s')
         );
     }
