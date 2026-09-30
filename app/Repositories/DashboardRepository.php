@@ -125,8 +125,16 @@ final class DashboardRepository
             ? (float)$period['avg_resolution_minutes']
             : null;
 
+        foreach ([
+            'total_cases','open_cases','pending_assignment','assigned_cases',
+            'managed_open','closed_cases','sla_green','sla_yellow','sla_red',
+            'sla_breached','sla_pending','received','closed_period','managed_period'
+        ] as $key) {
+            $current[$key] = (int)($current[$key] ?? 0);
+        }
+
         return [
-            'summary' => array_map('intval', array_filter($current, static fn($v) => $v !== null)),
+            'summary' => $current,
             'agent_summary' => $agentSummary,
             'agents' => $agents,
             'queues' => $queues,
