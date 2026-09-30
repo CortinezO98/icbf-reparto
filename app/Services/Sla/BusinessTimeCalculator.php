@@ -25,8 +25,8 @@ final class BusinessTimeCalculator
         DateTimeImmutable $end
     ): int {
         $tz = new DateTimeZone($this->timezone);
-        $start = $start->setTimezone($tz);
-        $end = $end->setTimezone($tz);
+        $start = $this->asBusinessLocalTime($start, $tz);
+        $end = $this->asBusinessLocalTime($end, $tz);
 
         if ($end <= $start) {
             return 0;
@@ -61,7 +61,7 @@ final class BusinessTimeCalculator
     ): DateTimeImmutable {
         $minutes = max(0, $minutes);
         $tz = new DateTimeZone($this->timezone);
-        $cursor = $start->setTimezone($tz);
+        $cursor = $this->asBusinessLocalTime($start, $tz);
 
         if ($minutes === 0) {
             return $cursor;
@@ -96,6 +96,23 @@ final class BusinessTimeCalculator
         }
 
         return $cursor;
+    }
+
+    private function asBusinessLocalTime(
+        DateTimeImmutable $value,
+        DateTimeZone $timezone
+    ): DateTimeImmutable {
+        $local = DateTimeImmutable::createFromFormat(
+            'Y-m-d H:i:s',
+            $value->format('Y-m-d H:i:s'),
+            $timezone
+        );
+
+        if ($local === false) {
+            throw new \RuntimeException('No fue posible normalizar la fecha de negocio.');
+        }
+
+        return $local;
     }
 
     private function normalizeToBusinessWindow(
