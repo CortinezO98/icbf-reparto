@@ -33,6 +33,12 @@ final class CasesController
         $queueId = isset($_GET['queue_id']) && $_GET['queue_id'] !== ''
             ? (int)$_GET['queue_id']
             : null;
+        $slaStatus = strtoupper(trim((string)($_GET['sla_status'] ?? '')));
+        $allowedSla = ['GREEN','YELLOW','RED','BREACHED','RED_OR_BREACHED'];
+        if (!in_array($slaStatus, $allowedSla, true)) {
+            $slaStatus = '';
+        }
+        $managed = (string)($_GET['managed'] ?? '') === '1';
 
         $repo = new CaseOperationsRepository($this->pdo);
         $result = $repo->paginate(
@@ -42,7 +48,9 @@ final class CasesController
             25,
             $search,
             $state,
-            $queueId
+            $queueId,
+            $slaStatus,
+            $managed
         );
 
         $cases = $result['rows'];
