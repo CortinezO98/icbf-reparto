@@ -6,9 +6,11 @@ namespace App\Controllers;
 use App\Auth\Auth;
 use App\Auth\Authorization;
 use App\Auth\Csrf;
+use App\Repositories\AssignmentRepository;
 use App\Repositories\AuditRepository;
 use App\Repositories\CaseRepository;
 use App\Repositories\ImportBatchRepository;
+use App\Services\Assignment\AssignmentEngine;
 use App\Services\Import\ConfirmImportService;
 use App\Services\Import\ImportStagingService;
 use PDO;
@@ -115,12 +117,34 @@ final class ImportsController
                 new CaseRepository($this->pdo)
             ))->confirm($id, (int)Auth::id());
 
+            // El lote ya quedó confirmado. El motor se ejecuta después del
+            // commit para repartir inmediatamente los casos que tengan agentes
+            // elegibles disponibles. Si no hay agentes, los casos permanecen
+            // pendientes y podrán ser tomados por una ejecución posterior.
+            $assignment = [
+                'assigned'=>0,
+                'no_agent'=>0,
+                'iterations'=>0,
+            ];
+
+            try {
+                $assignment = (new AssignmentEngine(
+                    $this->pdo,
+                    new AssignmentRepository($this->pdo)
+                ))->run(null, 500);
+            } catch (\Throwable $assignmentError) {
+                error_log('[ImportsController::confirm][ASSIGNMENT] ' . $assignmentError->getMessage());
+            }
+
             (new AuditRepository($this->pdo))->log(
                 Auth::id(),
                 'IMPORT_BATCH_CONFIRMED',
                 'IMPORT_BATCH',
                 (string)$id,
-                $result
+                $result + [
+                    'assigned_after_import'=>$assignment['assigned'],
+                    'pending_without_agent'=>$assignment['no_agent'],
+                ]
             );
 
             $_SESSION['_flash_success'] =
@@ -128,6 +152,8 @@ final class ImportsController
                 . $result['created']
                 . '. Duplicados omitidos: '
                 . $result['duplicates']
+                . '. Casos asignados automáticamente: '
+                . $assignment['assigned']
                 . '.';
         } catch (\Throwable $e) {
             error_log('[ImportsController::confirm] ' . $e->getMessage());
