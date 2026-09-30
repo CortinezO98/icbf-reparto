@@ -254,7 +254,6 @@ final class ImportBatchRepository
         $st = $this->pdo->prepare(
             "UPDATE import_batches
              SET status='COMPLETED',
-                 valid_rows=:created_cases,
                  duplicate_rows=:duplicates,
                  confirmed_by=:uid,
                  confirmed_at=NOW(6),
@@ -263,7 +262,6 @@ final class ImportBatchRepository
         );
         $st->execute([
             ':id'=>$batchId,
-            ':created_cases'=>$createdCases,
             ':duplicates'=>$duplicateRows,
             ':uid'=>$confirmedBy,
         ]);

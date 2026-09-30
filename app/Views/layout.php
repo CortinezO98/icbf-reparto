@@ -147,6 +147,7 @@ if (Auth::check() && Auth::id() !== null) {
         <div class="header-right">
             <nav>
                 <a href="/">Inicio</a>
+                <a href="/cases">Casos</a>
                 <a href="/imports">Cargas</a>
                 <a href="/admin/users">Usuarios</a>
                 <a href="/admin/structures">Estructuras</a>

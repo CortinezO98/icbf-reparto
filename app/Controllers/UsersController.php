@@ -338,7 +338,7 @@ final class UsersController
             $_SESSION['_user_import_result'] = $result;
         } catch (\Throwable $e) {
             error_log('[UsersController::importUsers] ' . $e->getMessage());
-            $_SESSION['_flash_error'] = 'No fue posible importar usuarios: ' . $e->getMessage();
+            $_SESSION['_flash_error'] = 'No fue posible importar los usuarios. Revisa el archivo y vuelve a intentarlo.';
         }
 
         header('Location: /admin/users/import');

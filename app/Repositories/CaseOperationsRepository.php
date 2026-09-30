@@ -122,7 +122,7 @@ final class CaseOperationsRepository
                 q.name queue_name,
                 u.full_name assigned_user_name,
                 b.batch_number source_batch_number,
-                br.normalized_data_json source_normalized_json
+                br.normalized_json source_normalized_json
              FROM cases c
              LEFT JOIN work_queues q ON q.id=c.queue_id
              LEFT JOIN users u ON u.id=c.assigned_user_id

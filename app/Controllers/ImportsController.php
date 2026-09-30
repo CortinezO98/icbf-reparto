@@ -70,7 +70,7 @@ final class ImportsController
             exit;
         } catch (\Throwable $e) {
             error_log('[ImportsController::upload] ' . $e->getMessage());
-            $_SESSION['_flash_error'] = $e->getMessage();
+            $_SESSION['_flash_error'] = 'No fue posible procesar la operación solicitada. Revisa los datos e inténtalo nuevamente.';
             header('Location: /imports');
             exit;
         }
@@ -131,7 +131,7 @@ final class ImportsController
                 . '.';
         } catch (\Throwable $e) {
             error_log('[ImportsController::confirm] ' . $e->getMessage());
-            $_SESSION['_flash_error'] = $e->getMessage();
+            $_SESSION['_flash_error'] = 'No fue posible procesar la operación solicitada. Revisa los datos e inténtalo nuevamente.';
         }
 
         header('Location: /imports/' . $id);

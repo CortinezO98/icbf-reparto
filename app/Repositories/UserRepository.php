@@ -64,7 +64,6 @@ final class UserRepository
                 u.full_name,
                 u.is_active,
                 u.assign_enabled,
-                u.last_login_at,
                 u.last_assigned_at,
                 GROUP_CONCAT(DISTINCT r.code ORDER BY r.code SEPARATOR ', ') AS roles,
                 GROUP_CONCAT(DISTINCT q.code ORDER BY q.code SEPARATOR ', ') AS queues,
@@ -94,7 +93,7 @@ final class UserRepository
             {$where}
             GROUP BY
                 u.id,u.document_number,u.username,u.email,u.full_name,
-                u.is_active,u.assign_enabled,u.last_login_at,u.last_assigned_at,
+                u.is_active,u.assign_enabled,u.last_assigned_at,
                 ap.status_code,ci.label
             ORDER BY u.full_name,u.id
             LIMIT :limit OFFSET :offset
@@ -163,7 +162,7 @@ final class UserRepository
     public function findById(int $id): ?array
     {
         $st = $this->pdo->prepare(
-            'SELECT id,document_number,username,email,full_name,is_active,assign_enabled,last_login_at,last_assigned_at
+            'SELECT id,document_number,username,email,full_name,is_active,assign_enabled,last_assigned_at
              FROM users WHERE id=:id LIMIT 1'
         );
         $st->execute([':id'=>$id]);

@@ -8,6 +8,7 @@ use App\Controllers\QueuesController;
 use App\Controllers\ImportsController;
 use App\Controllers\AgentPresenceController;
 use App\Controllers\AgentStatusController;
+use App\Controllers\CasesController;
 use App\Http\Router;
 
 return static function(Router $router,PDO $pdo): void {
@@ -26,6 +27,10 @@ return static function(Router $router,PDO $pdo): void {
  $router->post('/admin/users/import',fn()=>(new UsersController($pdo))->importUsers());
  $router->get('/admin/users/template',fn()=>(new UsersController($pdo))->exportTemplate());
  $router->get('/admin/users/export',fn()=>(new UsersController($pdo))->exportUsers());
+
+ $router->get('/cases',fn()=>(new CasesController($pdo))->index());
+ $router->get('/cases/{id}',fn(int $id)=>(new CasesController($pdo))->show($id));
+ $router->post('/cases/{id}/manage',fn(int $id)=>(new CasesController($pdo))->manage($id));
 
  $router->get('/admin/structures',fn()=>(new ImportStructuresController($pdo))->index());
  $router->get('/admin/structures/create',fn()=>(new ImportStructuresController($pdo))->createForm());
