@@ -18,17 +18,38 @@ final class ImportStagingService
     public function stage(array $file, int $versionId, ?int $queueId, int $userId): int
     {
         $version = $this->repo->activeVersion($versionId);
-        if (!$version) throw new \RuntimeException('La estructura seleccionada no está activa.');
+        if (!$version) {
+            throw new \RuntimeException('La estructura seleccionada no está activa.');
+        }
 
         $fields = $this->repo->fields($versionId);
-        if (!$fields) throw new \RuntimeException('La estructura activa no tiene campos configurados.');
+        if (!$fields) {
+            throw new \RuntimeException('La estructura activa no tiene campos configurados.');
+        }
 
-        if ($queueId !== null) {
-            $validQueue = false;
-            foreach ($this->repo->queuesForVersion($versionId) as $q) {
-                if ((int)$q['id'] === $queueId) $validQueue = true;
+        $queues = $this->repo->queuesForVersion($versionId);
+
+        if ($queueId === null) {
+            if (count($queues) === 1) {
+                $queueId = (int)$queues[0]['id'];
+            } elseif (count($queues) === 0) {
+                throw new \RuntimeException('La estructura activa no tiene una cola asociada.');
+            } else {
+                throw new \RuntimeException('La estructura tiene varias colas asociadas. Debes seleccionar una.');
             }
-            if (!$validQueue) throw new \RuntimeException('La cola no está asociada a la estructura seleccionada.');
+        } else {
+            $validQueue = false;
+
+            foreach ($queues as $queue) {
+                if ((int)$queue['id'] === $queueId) {
+                    $validQueue = true;
+                    break;
+                }
+            }
+
+            if (!$validQueue) {
+                throw new \RuntimeException('La cola seleccionada no está asociada a la estructura.');
+            }
         }
 
         $meta = (new ImportFileValidator())->validate(
@@ -58,17 +79,23 @@ final class ImportStagingService
                 $destination,
                 $meta['extension'],
                 (string)$version['target_sheet_mode'],
-                $version['target_sheet_value'] !== null ? (string)$version['target_sheet_value'] : null,
+                $version['target_sheet_value'] !== null
+                    ? (string)$version['target_sheet_value']
+                    : null,
                 (int)$version['header_row'],
                 (int)$version['data_start_row']
             );
+
+            (new HeaderValidator())->validate($fields, $data['headers']);
 
             $headerSignature = HeaderNormalizer::signature($data['headers']);
 
             $validator = new RowValidator();
             $rows = [];
             $seen = [];
-            $valid = $invalid = $duplicates = 0;
+            $valid = 0;
+            $invalid = 0;
+            $duplicates = 0;
 
             foreach ($data['rows'] as $rowNumber => $values) {
                 $result = $validator->validate(
@@ -90,9 +117,13 @@ final class ImportStagingService
                     }
                 }
 
-                if ($status === 'VALID') $valid++;
-                elseif ($status === 'DUPLICATE') $duplicates++;
-                else $invalid++;
+                if ($status === 'VALID') {
+                    $valid++;
+                } elseif ($status === 'DUPLICATE') {
+                    $duplicates++;
+                } else {
+                    $invalid++;
+                }
 
                 $rows[] = [
                     'source_row_number'=>(int)$rowNumber,
@@ -105,12 +136,21 @@ final class ImportStagingService
             }
 
             $total = count($rows);
-            if ($total === 0) throw new \RuntimeException('El archivo no contiene filas de datos.');
+            if ($total === 0) {
+                throw new \RuntimeException('El archivo no contiene filas de datos.');
+            }
 
-            $status = ($invalid > 0 || $duplicates > 0) ? 'VALIDATED_WITH_ERRORS' : 'VALIDATED';
-            $batchNumber = 'IMP-' . date('Ymd-His') . '-' . strtoupper(substr(bin2hex(random_bytes(3)), 0, 6));
+            $status = ($invalid > 0 || $duplicates > 0)
+                ? 'VALIDATED_WITH_ERRORS'
+                : 'VALIDATED';
+
+            $batchNumber = 'IMP-'
+                . date('Ymd-His')
+                . '-'
+                . strtoupper(substr(bin2hex(random_bytes(3)), 0, 6));
 
             $this->pdo->beginTransaction();
+
             try {
                 $batchId = $this->repo->create([
                     'batch_number'=>$batchNumber,
@@ -139,11 +179,16 @@ final class ImportStagingService
                         'duplicates'=>$duplicates,
                     ],
                 ]);
+
                 $this->repo->insertRows($batchId, $rows);
                 $this->pdo->commit();
+
                 return $batchId;
             } catch (\Throwable $e) {
-                if ($this->pdo->inTransaction()) $this->pdo->rollBack();
+                if ($this->pdo->inTransaction()) {
+                    $this->pdo->rollBack();
+                }
+
                 throw $e;
             }
         } catch (\Throwable $e) {

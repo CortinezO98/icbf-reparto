@@ -44,18 +44,37 @@ final class CaseRepository
     }
 
     /** @return array<string,mixed>|null */
-    public function findByExternalKey(string $externalKey): ?array
+    public function findByExternalKeyForUpdate(string $externalKey): ?array
     {
         $st = $this->pdo->prepare(
             "SELECT *
              FROM cases
              WHERE external_key=:external_key
-             LIMIT 1"
+             LIMIT 1
+             FOR UPDATE"
         );
         $st->execute([':external_key'=>$externalKey]);
         $row = $st->fetch();
 
         return $row ?: null;
+    }
+
+    public function addCreatedEvent(int $caseId, ?int $actorUserId, int $batchId): void
+    {
+        $st = $this->pdo->prepare(
+            "INSERT INTO case_events
+             (case_id,actor_user_id,event_type,from_state,to_state,details_json,created_at)
+             VALUES
+             (:case_id,:actor,'CASE_CREATED',NULL,'PENDING_ASSIGNMENT',:details,NOW(6))"
+        );
+        $st->execute([
+            ':case_id'=>$caseId,
+            ':actor'=>$actorUserId,
+            ':details'=>json_encode(
+                ['source'=>'IMPORT_BATCH','batch_id'=>$batchId],
+                JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES
+            ),
+        ]);
     }
 
     /** @return list<array<string,mixed>> */

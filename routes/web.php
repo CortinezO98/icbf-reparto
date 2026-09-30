@@ -6,6 +6,8 @@ use App\Controllers\UsersController;
 use App\Controllers\ImportStructuresController;
 use App\Controllers\QueuesController;
 use App\Controllers\ImportsController;
+use App\Controllers\AgentPresenceController;
+use App\Controllers\AgentStatusController;
 use App\Http\Router;
 
 return static function(Router $router,PDO $pdo): void {
@@ -17,6 +19,13 @@ return static function(Router $router,PDO $pdo): void {
  $router->get('/admin/users',fn()=>(new UsersController($pdo))->index());
  $router->get('/admin/users/create',fn()=>(new UsersController($pdo))->createForm());
  $router->post('/admin/users/create',fn()=>(new UsersController($pdo))->create());
+ $router->get('/admin/users/{id}/edit',fn(int $id)=>(new UsersController($pdo))->editForm($id));
+ $router->post('/admin/users/{id}/edit',fn(int $id)=>(new UsersController($pdo))->update($id));
+ $router->post('/admin/users/{id}/toggle-active',fn(int $id)=>(new UsersController($pdo))->toggleActive($id));
+ $router->get('/admin/users/import',fn()=>(new UsersController($pdo))->importForm());
+ $router->post('/admin/users/import',fn()=>(new UsersController($pdo))->importUsers());
+ $router->get('/admin/users/template',fn()=>(new UsersController($pdo))->exportTemplate());
+ $router->get('/admin/users/export',fn()=>(new UsersController($pdo))->exportUsers());
 
  $router->get('/admin/structures',fn()=>(new ImportStructuresController($pdo))->index());
  $router->get('/admin/structures/create',fn()=>(new ImportStructuresController($pdo))->createForm());
@@ -33,4 +42,12 @@ return static function(Router $router,PDO $pdo): void {
  $router->get('/imports',fn()=>(new ImportsController($pdo))->index());
  $router->post('/imports/upload',fn()=>(new ImportsController($pdo))->upload());
  $router->get('/imports/{id}',fn(int $id)=>(new ImportsController($pdo))->show($id));
+ $router->post('/imports/{id}/confirm',fn(int $id)=>(new ImportsController($pdo))->confirm($id));
+
+ $router->get('/agent/presence',fn()=>(new AgentPresenceController($pdo))->current());
+ $router->post('/agent/presence',fn()=>(new AgentPresenceController($pdo))->update());
+ $router->post('/agent/heartbeat',fn()=>(new AgentPresenceController($pdo))->heartbeat());
+
+ $router->get('/supervisor/agents',fn()=>(new AgentStatusController($pdo))->index());
+ $router->get('/supervisor/agents/data',fn()=>(new AgentStatusController($pdo))->data());
 };

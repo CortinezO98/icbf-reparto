@@ -4,8 +4,10 @@ declare(strict_types=1);
 namespace App\Controllers;
 
 use App\Auth\Auth;
+use App\Auth\Authorization;
 use App\Auth\Csrf;
 use App\Repositories\AuditRepository;
+use App\Repositories\PresenceRepository;
 use App\Repositories\UserRepository;
 use App\Security\LoginRateLimiter;
 use PDO;
@@ -84,11 +86,21 @@ final class AuthController
 
         Auth::login($user);
 
+        $uid = (int)$user['id'];
+
+        try {
+            if (in_array('AGENTE', Authorization::roles($this->pdo, $uid), true)) {
+                (new PresenceRepository($this->pdo))->markOffline($uid, $uid, 'LOGIN');
+            }
+        } catch (\Throwable $e) {
+            error_log('[AgentPresence][LOGIN] ' . $e->getMessage());
+        }
+
         (new AuditRepository($this->pdo))->log(
-            (int)$user['id'],
+            $uid,
             'LOGIN_SUCCESS',
             'USER',
-            (string)$user['id']
+            (string)$uid
         );
 
         header('Location: /');
@@ -100,7 +112,16 @@ final class AuthController
         Csrf::validate($_POST['_csrf'] ?? null);
 
         $uid = Auth::id();
+
         if ($uid) {
+            try {
+                if (in_array('AGENTE', Authorization::roles($this->pdo, $uid), true)) {
+                    (new PresenceRepository($this->pdo))->markOffline($uid, $uid, 'LOGOUT');
+                }
+            } catch (\Throwable $e) {
+                error_log('[AgentPresence][LOGOUT] ' . $e->getMessage());
+            }
+
             (new AuditRepository($this->pdo))->log(
                 $uid,
                 'LOGOUT',

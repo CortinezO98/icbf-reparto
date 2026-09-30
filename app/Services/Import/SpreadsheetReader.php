@@ -3,11 +3,16 @@ declare(strict_types=1);
 
 namespace App\Services\Import;
 
+use PhpOffice\PhpSpreadsheet\Cell\Coordinate;
 use PhpOffice\PhpSpreadsheet\IOFactory;
+use PhpOffice\PhpSpreadsheet\Reader\IReader;
+use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
 
 final class SpreadsheetReader
 {
-    /** @return array{sheet:string,headers:list<string>,rows:list<array<int,mixed>>} */
+    private const MAX_IMPORT_COLUMNS = 128;
+
+    /** @return array{sheet:string,headers:list<string>,rows:array<int,array<int,mixed>>} */
     public function read(
         string $path,
         string $extension,
@@ -20,66 +25,169 @@ final class SpreadsheetReader
         $reader = IOFactory::createReaderForFile($path);
         $reader->setReadDataOnly(true);
 
-        if ($extension === 'csv' && method_exists($reader, 'setInputEncoding')) {
-            $reader->setInputEncoding('UTF-8');
+        if ($extension === 'csv') {
+            if (method_exists($reader, 'setInputEncoding')) {
+                $reader->setInputEncoding('UTF-8');
+            }
+
+            return $this->readLoadedWorkbook(
+                $reader,
+                $path,
+                null,
+                $headerRow,
+                $dataStartRow,
+                $maxRows
+            );
         }
 
-        $spreadsheet = $reader->load($path);
-        $sheet = $this->selectSheet($spreadsheet, $sheetMode, $sheetValue);
-        $sheetName = $sheet->getTitle();
+        $sheetNames = $reader->listWorksheetNames($path);
+        $selectedSheetName = $this->selectSheetName($sheetNames, $sheetMode, $sheetValue);
 
-        $highestColumn = $sheet->getHighestDataColumn();
-        $highestRow = min($sheet->getHighestDataRow(), $dataStartRow + $maxRows - 1);
-
-        $headerValues = $sheet->rangeToArray(
-            "A{$headerRow}:{$highestColumn}{$headerRow}",
-            null, true, false
-        )[0] ?? [];
-
-        $headers = array_map(
-            static fn(mixed $v): string => trim((string)$v),
-            array_values($headerValues)
+        $reader->setLoadSheetsOnly([$selectedSheetName]);
+        $reader->setReadFilter(
+            new SpreadsheetReadFilter(
+                min($headerRow, $dataStartRow),
+                $dataStartRow + $maxRows - 1,
+                self::MAX_IMPORT_COLUMNS
+            )
         );
 
-        $rows = [];
-        for ($r = $dataStartRow; $r <= $highestRow; $r++) {
-            $values = $sheet->rangeToArray(
-                "A{$r}:{$highestColumn}{$r}",
-                null, true, false
-            )[0] ?? [];
-
-            $nonEmpty = array_filter($values, static fn(mixed $v): bool => trim((string)$v) !== '');
-            if (!$nonEmpty) {
-                continue;
-            }
-            $rows[$r] = array_values($values);
-        }
-
-        $spreadsheet->disconnectWorksheets();
-        unset($spreadsheet);
-
-        return ['sheet'=>$sheetName,'headers'=>$headers,'rows'=>$rows];
+        return $this->readLoadedWorkbook(
+            $reader,
+            $path,
+            $selectedSheetName,
+            $headerRow,
+            $dataStartRow,
+            $maxRows
+        );
     }
 
-    private function selectSheet(
-        \PhpOffice\PhpSpreadsheet\Spreadsheet $spreadsheet,
+    /** @return array{sheet:string,headers:list<string>,rows:array<int,array<int,mixed>>} */
+    private function readLoadedWorkbook(
+        IReader $reader,
+        string $path,
+        ?string $selectedSheetName,
+        int $headerRow,
+        int $dataStartRow,
+        int $maxRows
+    ): array {
+        $spreadsheet = $reader->load($path);
+
+        try {
+            $sheet = $selectedSheetName !== null
+                ? $spreadsheet->getSheetByName($selectedSheetName)
+                : $spreadsheet->getSheet(0);
+
+            if (!$sheet instanceof Worksheet) {
+                throw new \RuntimeException('No fue posible abrir la hoja seleccionada.');
+            }
+
+            $sheetName = $sheet->getTitle();
+
+            $headerValues = $sheet->rangeToArray(
+                'A' . $headerRow . ':'
+                . Coordinate::stringFromColumnIndex(self::MAX_IMPORT_COLUMNS)
+                . $headerRow,
+                null,
+                true,
+                false
+            )[0] ?? [];
+
+            $lastHeaderIndex = $this->lastMeaningfulColumnIndex($headerValues);
+            if ($lastHeaderIndex === 0) {
+                throw new \RuntimeException('No se encontraron encabezados en la fila configurada.');
+            }
+
+            $headerValues = array_slice($headerValues, 0, $lastHeaderIndex);
+            $headers = array_map(
+                static fn(mixed $value): string => trim((string)$value),
+                array_values($headerValues)
+            );
+
+            $lastColumn = Coordinate::stringFromColumnIndex($lastHeaderIndex);
+            $highestRow = min(
+                $sheet->getHighestDataRow(),
+                $dataStartRow + $maxRows - 1
+            );
+
+            $rows = [];
+
+            for ($rowNumber = $dataStartRow; $rowNumber <= $highestRow; $rowNumber++) {
+                $values = $sheet->rangeToArray(
+                    "A{$rowNumber}:{$lastColumn}{$rowNumber}",
+                    null,
+                    true,
+                    false
+                )[0] ?? [];
+
+                $nonEmpty = array_filter(
+                    $values,
+                    static fn(mixed $value): bool => trim((string)$value) !== ''
+                );
+
+                if ($nonEmpty === []) {
+                    continue;
+                }
+
+                $rows[$rowNumber] = array_values($values);
+            }
+
+            return [
+                'sheet'=>$sheetName,
+                'headers'=>$headers,
+                'rows'=>$rows,
+            ];
+        } finally {
+            $spreadsheet->disconnectWorksheets();
+            unset($spreadsheet);
+        }
+    }
+
+    /** @param list<string> $sheetNames */
+    private function selectSheetName(
+        array $sheetNames,
         string $mode,
         ?string $value
-    ): \PhpOffice\PhpSpreadsheet\Worksheet\Worksheet {
+    ): string {
+        if ($sheetNames === []) {
+            throw new \RuntimeException('El archivo no contiene hojas disponibles.');
+        }
+
         if ($mode === 'FIRST_MATCH' || $value === null || trim($value) === '') {
-            return $spreadsheet->getSheet(0);
+            return $sheetNames[0];
         }
 
-        foreach ($spreadsheet->getWorksheetIterator() as $sheet) {
-            if ($mode === 'EXACT' && $sheet->getTitle() === $value) {
-                return $sheet;
+        $expected = trim($value);
+
+        foreach ($sheetNames as $sheetName) {
+            if ($mode === 'EXACT' && trim($sheetName) === $expected) {
+                return $sheetName;
             }
+
             if ($mode === 'REGEX') {
-                $ok = @preg_match($value, $sheet->getTitle());
-                if ($ok === 1) return $sheet;
+                $ok = @preg_match($expected, $sheetName);
+                if ($ok === 1) {
+                    return $sheetName;
+                }
             }
         }
 
-        throw new \RuntimeException('No se encontró la hoja configurada para esta estructura.');
+        throw new \RuntimeException(
+            'No se encontró la hoja configurada. Hojas disponibles: '
+            . implode(', ', $sheetNames)
+            . '.'
+        );
+    }
+
+    /** @param array<int,mixed> $values */
+    private function lastMeaningfulColumnIndex(array $values): int
+    {
+        for ($index = count($values) - 1; $index >= 0; $index--) {
+            if (trim((string)$values[$index]) !== '') {
+                return $index + 1;
+            }
+        }
+
+        return 0;
     }
 }

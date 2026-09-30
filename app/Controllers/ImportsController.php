@@ -7,7 +7,9 @@ use App\Auth\Auth;
 use App\Auth\Authorization;
 use App\Auth\Csrf;
 use App\Repositories\AuditRepository;
+use App\Repositories\CaseRepository;
 use App\Repositories\ImportBatchRepository;
+use App\Services\Import\ConfirmImportService;
 use App\Services\Import\ImportStagingService;
 use PDO;
 
@@ -79,6 +81,7 @@ final class ImportsController
         Authorization::requirePermission($this->pdo, 'IMPORT_VALIDATE');
         $repo = new ImportBatchRepository($this->pdo);
         $batch = $repo->find($id);
+
         if (!$batch) {
             http_response_code(404);
             exit('Lote no encontrado.');
@@ -91,7 +94,47 @@ final class ImportsController
         }
         unset($row);
 
+        $error = $_SESSION['_flash_error'] ?? null;
+        $success = $_SESSION['_flash_success'] ?? null;
+        unset($_SESSION['_flash_error'], $_SESSION['_flash_success']);
+
         $view = dirname(__DIR__) . '/Views/imports/show.php';
         require dirname(__DIR__) . '/Views/layout.php';
+    }
+
+    public function confirm(int $id): void
+    {
+        Authorization::requirePermission($this->pdo, 'IMPORT_CONFIRM');
+        Csrf::validate($_POST['_csrf'] ?? null);
+
+        try {
+            $batches = new ImportBatchRepository($this->pdo);
+            $result = (new ConfirmImportService(
+                $this->pdo,
+                $batches,
+                new CaseRepository($this->pdo)
+            ))->confirm($id, (int)Auth::id());
+
+            (new AuditRepository($this->pdo))->log(
+                Auth::id(),
+                'IMPORT_BATCH_CONFIRMED',
+                'IMPORT_BATCH',
+                (string)$id,
+                $result
+            );
+
+            $_SESSION['_flash_success'] =
+                'Importación confirmada. Casos creados: '
+                . $result['created']
+                . '. Duplicados omitidos: '
+                . $result['duplicates']
+                . '.';
+        } catch (\Throwable $e) {
+            error_log('[ImportsController::confirm] ' . $e->getMessage());
+            $_SESSION['_flash_error'] = $e->getMessage();
+        }
+
+        header('Location: /imports/' . $id);
+        exit;
     }
 }

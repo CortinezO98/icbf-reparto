@@ -175,6 +175,20 @@ final class ImportBatchRepository
         return $row ?: null;
     }
 
+    /** @return array<string,mixed>|null */
+    public function findForUpdate(int $id): ?array
+    {
+        $st = $this->pdo->prepare(
+            "SELECT *
+             FROM import_batches
+             WHERE id=:id
+             FOR UPDATE"
+        );
+        $st->execute([':id'=>$id]);
+        $row = $st->fetch();
+        return $row ?: null;
+    }
+
     /** @return list<array<string,mixed>> */
     public function rows(int $batchId, int $limit = 300): array
     {
@@ -189,5 +203,69 @@ final class ImportBatchRepository
         );
         $st->execute([':bid'=>$batchId]);
         return $st->fetchAll() ?: [];
+    }
+
+    /** @return list<array<string,mixed>> */
+    public function validRowsForConfirmation(int $batchId): array
+    {
+        $st = $this->pdo->prepare(
+            "SELECT id,source_row_number,external_key,normalized_json
+             FROM import_batch_rows
+             WHERE batch_id=:bid
+               AND validation_status='VALID'
+             ORDER BY source_row_number
+             FOR UPDATE"
+        );
+        $st->execute([':bid'=>$batchId]);
+        return $st->fetchAll() ?: [];
+    }
+
+    /** @param list<string> $errors */
+    public function markRowDuplicate(int $rowId, array $errors): void
+    {
+        $st = $this->pdo->prepare(
+            "UPDATE import_batch_rows
+             SET validation_status='DUPLICATE',
+                 validation_errors_json=:errors
+             WHERE id=:id"
+        );
+        $st->execute([
+            ':id'=>$rowId,
+            ':errors'=>json_encode($errors, JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES),
+        ]);
+    }
+
+    public function markImporting(int $batchId): void
+    {
+        $st = $this->pdo->prepare(
+            "UPDATE import_batches
+             SET status='IMPORTING', error_message=NULL
+             WHERE id=:id"
+        );
+        $st->execute([':id'=>$batchId]);
+    }
+
+    public function markCompleted(
+        int $batchId,
+        int $confirmedBy,
+        int $createdCases,
+        int $duplicateRows
+    ): void {
+        $st = $this->pdo->prepare(
+            "UPDATE import_batches
+             SET status='COMPLETED',
+                 valid_rows=:created_cases,
+                 duplicate_rows=:duplicates,
+                 confirmed_by=:uid,
+                 confirmed_at=NOW(6),
+                 error_message=NULL
+             WHERE id=:id"
+        );
+        $st->execute([
+            ':id'=>$batchId,
+            ':created_cases'=>$createdCases,
+            ':duplicates'=>$duplicateRows,
+            ':uid'=>$confirmedBy,
+        ]);
     }
 }
