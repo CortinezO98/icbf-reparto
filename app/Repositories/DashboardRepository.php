@@ -112,6 +112,7 @@ final class DashboardRepository
         $channels = $this->dimensionSummary('origin_channel', $from, $to, $queueId, $agentId);
         $trend = $this->dailyTrend(7);
         $alerts = $this->alerts(12, $queueId, $agentId);
+        $cases = $this->activeCases(30, $queueId, $agentId);
         $imports = $this->recentImports(8);
         $presence = $this->presenceSummary();
 
@@ -143,6 +144,7 @@ final class DashboardRepository
             'channels' => $channels,
             'trend' => $trend,
             'alerts' => $alerts,
+            'cases' => $cases,
             'imports' => $imports,
             'presence' => $presence,
             'filters' => [
@@ -499,6 +501,59 @@ final class DashboardRepository
              LEFT JOIN users u ON u.id=c.assigned_user_id
              {$where}
              ORDER BY FIELD(a.severity,'CRITICAL','WARNING','INFO'),a.opened_at
+             LIMIT {$limit}",
+            $params
+        );
+    }
+
+    
+    /**
+     * Casos activos para navegación directa desde el tablero.
+     *
+     * La consulta respeta los filtros operativos del tablero, pero la
+     * autorización definitiva para consultar el detalle se mantiene en
+     * CasesController.
+     *
+     * @return list<array<string,mixed>>
+     */
+    private function activeCases(int $limit, ?int $queueId, ?int $agentId): array
+    {
+        $limit = max(1, min(100, $limit));
+        $where = "WHERE c.closed_at IS NULL AND c.current_state <> 'CLOSED'";
+        $params = [];
+
+        if ($queueId !== null) {
+            $where .= ' AND c.queue_id=:case_queue';
+            $params[':case_queue'] = $queueId;
+        }
+
+        if ($agentId !== null) {
+            $where .= ' AND c.assigned_user_id=:case_agent';
+            $params[':case_agent'] = $agentId;
+        }
+
+        return $this->rows(
+            "SELECT
+                c.id,c.case_number,c.external_key,c.petition_type,
+                c.current_state,c.current_management_type_code,
+                c.sla_status,c.sla_elapsed_minutes,c.sla_due_at,
+                c.created_at,c.radicated_at,
+                q.code queue_code,q.name queue_name,
+                u.full_name assigned_user_name
+             FROM cases c
+             LEFT JOIN work_queues q ON q.id=c.queue_id
+             LEFT JOIN users u ON u.id=c.assigned_user_id
+             {$where}
+             ORDER BY
+                CASE c.sla_status
+                    WHEN 'BREACHED' THEN 0
+                    WHEN 'RED' THEN 1
+                    WHEN 'YELLOW' THEN 2
+                    WHEN 'GREEN' THEN 3
+                    ELSE 4
+                END,
+                COALESCE(c.radicated_at,c.created_at) ASC,
+                c.id ASC
              LIMIT {$limit}",
             $params
         );
