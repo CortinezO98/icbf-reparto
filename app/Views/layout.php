@@ -70,8 +70,8 @@ $rolesLabel = $currentUserRoles !== [] ? implode(', ', $currentUserRoles) : '';
      aria-label="Navegación principal">
     <div class="container-fluid">
         <a class="navbar-brand fw-semibold d-flex align-items-center gap-2"
-           href="/sla"
-           aria-label="ICBF Reparto - Tablero ANS">
+           href="<?= $isAgent ? '/cases' : '/sla' ?>"
+           aria-label="ICBF Reparto">
             <i class="bi bi-diagram-3" aria-hidden="true"></i>
             <span>ICBF Reparto</span>
         </a>
