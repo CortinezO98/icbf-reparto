@@ -142,6 +142,14 @@ final class CasesController
                 ]
             );
 
+            if ($type === 'CLOSED') {
+                try {
+                    (new SlaService(new SlaRepository($this->pdo)))->evaluateCase($id);
+                } catch (Throwable $slaError) {
+                    error_log('[CasesController::manage][SLA_CLOSE] ' . $slaError->getMessage());
+                }
+            }
+
             (new AuditRepository($this->pdo))->log(
                 $uid,
                 'CASE_MANAGED',
