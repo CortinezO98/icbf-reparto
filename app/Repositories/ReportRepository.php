@@ -1026,6 +1026,10 @@ final class ReportRepository
         if ($filters['to'] !== null) {
             $condition .= ' AND c.created_at < :agent_to';
             $params[':agent_to'] = $filters['to'];
+            $params[':agent_presence_to_filter'] = $filters['to'];
+            $params[':agent_presence_from_filter'] = $filters['from'];
+            $params[':agent_presence_from'] = $filters['from'];
+            $params[':agent_presence_to'] = $filters['to'];
         }
 
         if ($filters['queue_id'] !== null) {
@@ -1078,7 +1082,7 @@ final class ReportRepository
             $params[':agent_segment'] = $filters['segment'];
         }
 
-        return $this->rows(
+        $rows = $this->rows(
             "SELECT
                 u.id,
                 u.full_name,
@@ -1108,7 +1112,35 @@ final class ReportRepository
                 COUNT(DISTINCT CASE
                     WHEN c.closed_at IS NOT NULL OR c.current_state='CLOSED'
                     THEN c.id
-                END) closed_cases
+                END) closed_cases,
+                COUNT(DISTINCT CASE
+                    WHEN c.first_management_at IS NOT NULL
+                    THEN c.id
+                END) managed_cases,
+                COUNT(DISTINCT CASE
+                    WHEN c.closed_at IS NULL AND c.current_state<>'CLOSED'
+                    THEN c.id
+                END) pending_cases,
+                COALESCE(
+                    (
+                        SELECT SUM(
+                            GREATEST(
+                                0,
+                                TIMESTAMPDIFF(
+                                    MINUTE,
+                                    GREATEST(ap2.started_at,:agent_presence_from),
+                                    LEAST(COALESCE(ap2.ended_at,NOW(6)),:agent_presence_to)
+                                )
+                            )
+                        )
+                        FROM agent_presence ap2
+                        WHERE ap2.user_id=u.id
+                          AND ap2.status_code='AVAILABLE'
+                          AND ap2.started_at<:agent_presence_to_filter
+                          AND (ap2.ended_at IS NULL OR ap2.ended_at>:agent_presence_from_filter)
+                    ),
+                    0
+                ) available_minutes
              FROM users u
              JOIN user_roles ur
                ON ur.user_id=u.id
@@ -1125,6 +1157,25 @@ final class ReportRepository
              ORDER BY assigned_cases DESC,u.full_name",
             $params
         );
+        $standard = isset($_ENV['PRODUCTIVITY_STANDARD_PER_HOUR'])
+            ? (float)$_ENV['PRODUCTIVITY_STANDARD_PER_HOUR']
+            : null;
+
+        foreach ($rows as &$row) {
+            $availableMinutes = (int)($row['available_minutes'] ?? 0);
+            $managedCases = (int)($row['managed_cases'] ?? 0);
+            $row['productivity_per_hour'] = $availableMinutes > 0
+                ? round($managedCases / ($availableMinutes / 60), 2)
+                : null;
+            $row['productivity_standard_per_hour'] = $standard;
+            $row['productivity_compliance_percent'] =
+                $standard !== null && $standard > 0 && $row['productivity_per_hour'] !== null
+                    ? round(((float)$row['productivity_per_hour'] / $standard) * 100, 1)
+                    : null;
+        }
+        unset($row);
+
+        return $rows;
     }
 
     /**
