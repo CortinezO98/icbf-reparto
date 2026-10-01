@@ -7,6 +7,7 @@ use App\Config\Database;
 $summary = $data['summary'] ?? [];
 $daily = $data['daily'] ?? [];
 $agents = $data['agents'] ?? [];
+$presenceHistory = $data['presence_history'] ?? [];
 $queues = $data['queues'] ?? [];
 $cases = $data['cases'] ?? [];
 $filters = $data['filters'] ?? ['queues'=>[],'agents'=>[]];
@@ -487,6 +488,81 @@ $exportUrl = static function (string $report, string $format) use ($startDate, $
         </div>
     </div>
 
+    <div class="report-card mb-3">
+        <div class="report-card-body">
+            <div class="d-flex justify-content-between align-items-start gap-3 mb-3">
+                <div>
+                    <div class="d-flex align-items-center gap-2">
+                        <i class="bi bi-clock-history" style="color:var(--color-primary)"></i>
+                        <div>
+                            <div class="report-section-title">Histórico de estados de agentes</div>
+                            <div class="report-section-subtitle">Muestra cada cambio de estado dentro del periodo, incluyendo la desconexión registrada por cierre de sesión o detectada por heartbeat.</div>
+                        </div>
+                    </div>
+                </div>
+                <span class="small text-muted d-none d-md-block"><?= count($presenceHistory) ?> registros</span>
+            </div>
+
+            <div class="report-scroll">
+                <table class="productivity-table">
+                    <thead>
+                        <tr>
+                            <th>Agente</th>
+                            <th>Estado</th>
+                            <th>Inicio</th>
+                            <th>Fin / desconexión</th>
+                            <th>Duración</th>
+                            <th>Origen</th>
+                            <th>Establecido por</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    <?php foreach (array_slice($presenceHistory, 0, 200) as $presence): ?>
+                        <?php
+                            $presenceCode = (string)($presence['status_code'] ?? '');
+                            $presenceLabel = (string)($presence['status_label'] ?? $presenceCode);
+                            $presenceClass = $presenceCode === 'OFFLINE'
+                                ? 'status-gray'
+                                : ($presenceCode === 'AVAILABLE' ? 'status-green' : 'status-blue');
+                            $started = (string)($presence['started_at'] ?? '');
+                            $ended = (string)($presence['ended_at'] ?? '');
+                            $duration = (int)($presence['duration_minutes'] ?? 0);
+                        ?>
+                        <tr>
+                            <td>
+                                <div class="agent-name"><?= htmlspecialchars((string)$presence['full_name'], ENT_QUOTES, 'UTF-8') ?></div>
+                                <div class="muted"><?= htmlspecialchars((string)$presence['username'], ENT_QUOTES, 'UTF-8') ?></div>
+                            </td>
+                            <td>
+                                <span class="sla-status-badge <?= $presenceClass ?>">
+                                    <?= htmlspecialchars($presenceLabel, ENT_QUOTES, 'UTF-8') ?>
+                                </span>
+                            </td>
+                            <td><?= htmlspecialchars($started, ENT_QUOTES, 'UTF-8') ?></td>
+                            <td>
+                                <?= $ended !== ''
+                                    ? htmlspecialchars($ended, ENT_QUOTES, 'UTF-8')
+                                    : '<span class="text-muted">En curso</span>' ?>
+                            </td>
+                            <td><?= $hours($duration) ?></td>
+                            <td><?= htmlspecialchars((string)($presence['source'] ?? ''), ENT_QUOTES, 'UTF-8') ?></td>
+                            <td><?= htmlspecialchars((string)($presence['set_by_name'] ?? 'Sistema'), ENT_QUOTES, 'UTF-8') ?></td>
+                        </tr>
+                    <?php endforeach; ?>
+
+                    <?php if ($presenceHistory === []): ?>
+                        <tr><td colspan="7" class="report-empty">No hay cambios de estado de agentes en el periodo seleccionado.</td></tr>
+                    <?php endif; ?>
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="small text-muted mt-3">
+                Si el agente cierra sesión, la desconexión se registra en ese momento. Si pierde conexión o cierra el navegador sin cerrar sesión, la desconexión se registra cuando el sistema detecta que el heartbeat superó el tiempo configurado.
+            </div>
+        </div>
+    </div>
+
     <div class="row g-3 mb-3">
         <div class="col-12 col-xl-6">
             <div class="report-card">
@@ -618,75 +694,3 @@ $exportUrl = static function (string $report, string $format) use ($startDate, $
                         <div class="report-export-description">
                             Detalle de casos, tiempos y estado de cumplimiento ANS.
                         </div>
-                    </div>
-                    <div class="report-export-actions">
-                        <a class="btn btn-outline-secondary" href="<?= htmlspecialchars($exportUrl('cases', 'csv'), ENT_QUOTES, 'UTF-8') ?>">
-                            <i class="bi bi-filetype-csv me-1"></i>CSV
-                        </a>
-                        <a class="btn btn-outline-success btn-excel" href="<?= htmlspecialchars($exportUrl('cases', 'xlsx'), ENT_QUOTES, 'UTF-8') ?>">
-                            <i class="bi bi-file-earmark-excel me-1"></i>Excel
-                        </a>
-                    </div>
-                </div>
-
-                <div class="report-export-item">
-                    <div class="report-export-info">
-                        <div class="report-export-title">
-                            <i class="bi bi-person-lines-fill"></i>Agentes — Resumen
-                        </div>
-                        <div class="report-export-description">
-                            Casos asignados, resueltos, vencidos, tiempo de primera gestión y cumplimiento ANS.
-                        </div>
-                    </div>
-                    <div class="report-export-actions">
-                        <a class="btn btn-outline-secondary" href="<?= htmlspecialchars($exportUrl('agents_summary', 'csv'), ENT_QUOTES, 'UTF-8') ?>">
-                            <i class="bi bi-filetype-csv me-1"></i>CSV
-                        </a>
-                        <a class="btn btn-outline-success btn-excel" href="<?= htmlspecialchars($exportUrl('agents_summary', 'xlsx'), ENT_QUOTES, 'UTF-8') ?>">
-                            <i class="bi bi-file-earmark-excel me-1"></i>Excel
-                        </a>
-                    </div>
-                </div>
-
-                <div class="report-export-item">
-                    <div class="report-export-info">
-                        <div class="report-export-title">
-                            <i class="bi bi-clock-history"></i>Agentes — Histórico Detallado
-                        </div>
-                        <div class="report-export-description">
-                            Cada transición de estado con hora de inicio, fin, duración y origen.
-                        </div>
-                    </div>
-                    <div class="report-export-actions">
-                        <a class="btn btn-outline-secondary" href="<?= htmlspecialchars($exportUrl('agents_history', 'csv'), ENT_QUOTES, 'UTF-8') ?>">
-                            <i class="bi bi-filetype-csv me-1"></i>CSV
-                        </a>
-                        <a class="btn btn-outline-success btn-excel" href="<?= htmlspecialchars($exportUrl('agents_history', 'xlsx'), ENT_QUOTES, 'UTF-8') ?>">
-                            <i class="bi bi-file-earmark-excel me-1"></i>Excel
-                        </a>
-                    </div>
-                </div>
-
-                <div class="report-export-item">
-                    <div class="report-export-info">
-                        <div class="report-export-title">
-                            <i class="bi bi-broadcast-pin"></i>Agentes — Estado en Tiempo Real
-                        </div>
-                        <div class="report-export-description">
-                            Estado actual, disponibilidad para reparto, último heartbeat, colas y capacidad.
-                        </div>
-                    </div>
-                    <div class="report-export-actions">
-                        <a class="btn btn-outline-secondary" href="<?= htmlspecialchars($exportUrl('agents_realtime', 'csv'), ENT_QUOTES, 'UTF-8') ?>">
-                            <i class="bi bi-filetype-csv me-1"></i>CSV
-                        </a>
-                        <a class="btn btn-outline-success btn-excel" href="<?= htmlspecialchars($exportUrl('agents_realtime', 'xlsx'), ENT_QUOTES, 'UTF-8') ?>">
-                            <i class="bi bi-file-earmark-excel me-1"></i>Excel
-                        </a>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
-<?php endif; ?>
