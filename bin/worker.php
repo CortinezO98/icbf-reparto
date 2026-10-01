@@ -7,6 +7,7 @@ use App\Config\Database;
 use App\Repositories\AssignmentRepository;
 use App\Repositories\ShiftRepository;
 use App\Repositories\SlaRepository;
+use App\Repositories\PresenceRepository;
 use App\Services\Assignment\AssignmentEngine;
 use App\Services\Sla\SlaService;
 use App\Services\ShiftService;
@@ -59,6 +60,18 @@ try {
         $startedAt = microtime(true);
 
         try {
+            $presenceResult = $presenceRepository->expireStalePresences(
+                max(30, (int)($_ENV['AGENT_PRESENCE_STALE_SECONDS'] ?? 90))
+            );
+
+            if ($presenceResult['processed'] > 0) {
+                echo sprintf(
+                    "[worker] desconexiones detectadas=%d cutoff=%s\n",
+                    $presenceResult['processed'],
+                    $presenceResult['cutoff']
+                );
+            }
+
             $shiftResult = $shiftService->processEndedShifts();
 
             if ($shiftResult['processed'] > 0) {
