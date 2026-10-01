@@ -45,6 +45,7 @@ $startDate = (string)($selected['start_date'] ?? '');
 $endDate = (string)($selected['end_date'] ?? '');
 $selectedRegional = (string)($selected['regional'] ?? '');
 $selectedPetitionType = (string)($selected['petition_type'] ?? '');
+$selectedManagementType = (string)($selected['management_type'] ?? '');
 
 $green = (int)($summary['sla_green'] ?? 0);
 $yellow = (int)($summary['sla_yellow'] ?? 0);
@@ -74,7 +75,7 @@ $exportUrl = static function (string $report, string $format) use ($startDate, $
         'end' => $endDate,
     ];
 
-    foreach (['queue_id', 'agent_id', 'state', 'sla', 'regional', 'petition_type'] as $key) {
+    foreach (['queue_id', 'agent_id', 'state', 'sla', 'regional', 'petition_type', 'management_type'] as $key) {
         if (($selected[$key] ?? null) !== null && ($selected[$key] ?? '') !== '') {
             $query[$key] = $selected[$key];
         }
@@ -144,7 +145,7 @@ $exportUrl = static function (string $report, string $format) use ($startDate, $
 .reports-export-modal .reports-export-intro{width:100%}
 .report-export-grid{width:100%;max-width:760px;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
 .report-export-grid .report-export-item{width:100%}
-.reports-export-intro{grid-column:1 / -1;font-size:.77rem;line-height:1.55;color:#667085;background:#f8fafb;border:1px solid #e5e7eb;border-radius:10px;padding:11px 13px;margin:0 0 2px}
+.reports-export-intro{font-size:.77rem;line-height:1.55;color:#667085;background:#f8fafb;border:1px solid #e5e7eb;border-radius:10px;padding:11px 13px;margin:0 0 2px}
 .report-export-item{display:grid;grid-template-rows:auto 1fr auto;gap:12px;border:1px solid #dfe3e8;border-radius:12px;padding:15px;background:#fff;margin:0;min-width:0;min-height:150px;transition:border-color .15s ease,box-shadow .15s ease}
 .report-export-item:hover{border-color:#cbd5df;box-shadow:0 5px 16px rgba(16,24,40,.06)}
 .report-export-info{min-width:0}
@@ -155,9 +156,6 @@ $exportUrl = static function (string $report, string $format) use ($startDate, $
 .report-export-actions .btn{font-size:.74rem;padding:6px 11px;min-width:70px}
 .report-export-actions .btn-excel{border-color:#198754;color:#198754}
 .report-export-actions .btn-excel:hover{background:#198754;color:#fff}
-@media(max-width:767.98px){
-  .reports-export-modal .modal-body{grid-template-columns:1fr}
-}
 @media(max-width:575.98px){
   .reports-export-modal .modal-body{padding:12px}
   .report-export-item{padding:12px;min-height:0}
@@ -268,6 +266,19 @@ $exportUrl = static function (string $report, string $format) use ($startDate, $
                         <option value="<?= htmlspecialchars((string)$petition['petition_type'], ENT_QUOTES, 'UTF-8') ?>"
                             <?= $selectedPetitionType === (string)$petition['petition_type'] ? 'selected' : '' ?>>
                             <?= htmlspecialchars((string)$petition['petition_type'], ENT_QUOTES, 'UTF-8') ?>
+                        </option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+
+            <div class="col-12 col-md-3">
+                <label for="management_type">Tipo de gestión</label>
+                <select class="form-select" id="management_type" name="management_type">
+                    <option value="">Todos los tipos de gestión</option>
+                    <?php foreach (($filters['management_types'] ?? []) as $management): ?>
+                        <option value="<?= htmlspecialchars((string)$management['code'], ENT_QUOTES, 'UTF-8') ?>"
+                            <?= $selectedManagementType === (string)$management['code'] ? 'selected' : '' ?>>
+                            <?= htmlspecialchars((string)$management['label'], ENT_QUOTES, 'UTF-8') ?>
                         </option>
                     <?php endforeach; ?>
                 </select>
@@ -813,7 +824,8 @@ $exportUrl = static function (string $report, string $format) use ($startDate, $
                             <a class="btn btn-outline-success btn-excel" href="<?= htmlspecialchars($exportUrl('agents_realtime', 'xlsx'), ENT_QUOTES, 'UTF-8') ?>"><i class="bi bi-file-earmark-excel me-1"></i>Excel</a>
                         </div>
                     </div>
-                </div>            </div>
+                </div>
+            </div>
         </div>
     </div>
 </div>
