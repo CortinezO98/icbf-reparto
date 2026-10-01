@@ -412,6 +412,9 @@ final class CaseOperationsRepository
         }
     }
 
+    /**
+     * @param array<string,mixed> $data
+     */
     public function addManagement(
         int $caseId,
         int $actorUserId,
