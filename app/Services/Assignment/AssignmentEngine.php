@@ -156,6 +156,21 @@ final class AssignmentEngine
         ];
     }
 
+
+    /**
+     * Libera los casos abiertos de un agente desconectado y devuelve las colas
+     * que deben volver a procesarse por el motor de reparto.
+     *
+     * @return array{case_ids:list<int>,queue_ids:list<int>}
+     */
+    public function releaseCasesForAgent(
+        int $userId,
+        string $reason = 'STALE_HEARTBEAT'
+    ): array {
+        return $this->repo->releaseCasesForAgent($userId, $reason);
+    }
+
+
     /**
      * @param array<int,bool> $blockedQueueIds
      * @return array{status:'ASSIGNED'|'NO_AGENT'|'NO_CASE',queue_id:int|null}
