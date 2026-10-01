@@ -62,6 +62,23 @@ Variables:
 
 El worker utiliza un GET_LOCK de MariaDB para evitar dos instancias activas simultáneamente.
 
+## Activación automática del reparto
+
+El reparto no depende únicamente de que exista un caso nuevo.
+
+Cuando un agente cambia su presencia de cualquier estado a `AVAILABLE`, el sistema identifica la transición y ejecuta un despacho inmediato limitado a las colas en las que ese agente es elegible. Para cada cola se vuelve a validar:
+
+- agente activo y habilitado para reparto;
+- presencia Disponible y heartbeat vigente;
+- turno vigente;
+- pertenencia a la cola;
+- habilidades requeridas;
+- capacidad disponible.
+
+El worker permanente funciona como segunda capa: revisa el reparto de forma continua cada 5 segundos por defecto. Así, si un caso se crea mientras no hay agentes disponibles, queda en `PENDING_ASSIGNMENT` y se asigna automáticamente cuando aparece un candidato elegible.
+
+La capacidad es por agente y por cola. Si no existe un valor específico, se utiliza `work_queues.default_capacity`; el administrador puede establecer un `capacity_override` para un agente concreto.
+
 ## Reasignación manual
 
 El permiso existente `CASE_REASSIGN` habilita la operación para los perfiles autorizados, actualmente Administrador y Supervisor.
