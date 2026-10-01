@@ -548,6 +548,21 @@ final class ReportRepository
             $where .= " AND c.current_management_type_code = :{$prefix}_management_type";
             $params[":{$prefix}_management_type"] = $filters['management_type'];
         }
+
+        if (($filters['supervisor_id'] ?? null) !== null) {
+            $where .= " AND EXISTS (
+                SELECT 1
+                FROM users assigned_agent
+                WHERE assigned_agent.id=c.assigned_user_id
+                  AND assigned_agent.supervisor_user_id=:{$prefix}_supervisor
+            )";
+            $params[":{$prefix}_supervisor"] = $filters['supervisor_id'];
+        }
+
+        if (($filters['segment'] ?? null) !== null) {
+            $where .= " AND c.segment = :{$prefix}_segment";
+            $params[":{$prefix}_segment"] = $filters['segment'];
+        }
     }
 
     /**
@@ -591,6 +606,19 @@ final class ReportRepository
 
         if (($filters['management_type'] ?? null) !== null) {
             $where .= ' AND c.current_management_type_code = :management_type';
+        }
+
+        if (($filters['supervisor_id'] ?? null) !== null) {
+            $where .= ' AND EXISTS (
+                SELECT 1
+                FROM users assigned_agent
+                WHERE assigned_agent.id=c.assigned_user_id
+                  AND assigned_agent.supervisor_user_id=:supervisor_id
+            )';
+        }
+
+        if (($filters['segment'] ?? null) !== null) {
+            $where .= ' AND c.segment = :segment';
         }
 
         return $where;
@@ -638,6 +666,14 @@ final class ReportRepository
 
         if (($filters['management_type'] ?? null) !== null) {
             $params[':management_type'] = $filters['management_type'];
+        }
+
+        if (($filters['supervisor_id'] ?? null) !== null) {
+            $params[':supervisor_id'] = $filters['supervisor_id'];
+        }
+
+        if (($filters['segment'] ?? null) !== null) {
+            $params[':segment'] = $filters['segment'];
         }
 
         return $params;
@@ -776,6 +812,21 @@ final class ReportRepository
         if (($filters['management_type'] ?? null) !== null) {
             $condition .= ' AND c.current_management_type_code = :agent_management_type';
             $params[':agent_management_type'] = $filters['management_type'];
+        }
+
+        if (($filters['supervisor_id'] ?? null) !== null) {
+            $condition .= ' AND EXISTS (
+                SELECT 1
+                FROM users assigned_agent
+                WHERE assigned_agent.id=c.assigned_user_id
+                  AND assigned_agent.supervisor_user_id=:agent_supervisor
+            )';
+            $params[':agent_supervisor'] = $filters['supervisor_id'];
+        }
+
+        if (($filters['segment'] ?? null) !== null) {
+            $condition .= ' AND c.segment = :agent_segment';
+            $params[':agent_segment'] = $filters['segment'];
         }
 
         return $this->rows(
@@ -944,6 +995,21 @@ final class ReportRepository
             $params[":{$prefix}_sla"] = $filters['sla'];
         }
 
+        if (($filters['supervisor_id'] ?? null) !== null) {
+            $condition .= " AND EXISTS (
+                SELECT 1
+                FROM users assigned_agent
+                WHERE assigned_agent.id=c.assigned_user_id
+                  AND assigned_agent.supervisor_user_id=:{$prefix}_supervisor
+            )";
+            $params[":{$prefix}_supervisor"] = $filters['supervisor_id'];
+        }
+
+        if (($filters['segment'] ?? null) !== null) {
+            $condition .= " AND c.segment = :{$prefix}_segment";
+            $params[":{$prefix}_segment"] = $filters['segment'];
+        }
+
         return [$condition, $params];
     }
 
@@ -967,6 +1033,33 @@ final class ReportRepository
              FROM cases
              WHERE regional IS NOT NULL AND TRIM(regional)<>''
              ORDER BY regional"
+        );
+    }
+
+    /** @return list<array{id:int,full_name:string}> */
+    private function activeSupervisors(): array
+    {
+        return $this->rows(
+            "SELECT DISTINCT u.id,u.full_name
+             FROM users u
+             JOIN user_roles ur ON ur.user_id=u.id
+             JOIN roles r ON r.id=ur.role_id
+                AND r.code='SUPERVISOR'
+                AND r.is_active=1
+             WHERE u.is_active=1
+             ORDER BY u.full_name,u.id"
+        );
+    }
+
+    /** @return list<array{segment:string}> */
+    private function activeSegments(): array
+    {
+        return $this->rows(
+            "SELECT DISTINCT segment
+             FROM cases
+             WHERE segment IS NOT NULL
+               AND TRIM(segment)<>''
+             ORDER BY segment"
         );
     }
 
