@@ -46,9 +46,13 @@ final class AgentPresenceController
         try {
             $repo = new PresenceRepository($this->pdo);
             $previousPresence = $repo->currentForUser($uid);
+            $staleCutoff = (new \DateTimeImmutable())
+                ->modify('-' . $this->staleSeconds() . ' seconds');
+
             $wasAvailable = $previousPresence !== null
                 && (string)$previousPresence['status_code'] === 'AVAILABLE'
-                && !empty($previousPresence['last_heartbeat_at']);
+                && !empty($previousPresence['last_heartbeat_at'])
+                && new \DateTimeImmutable((string)$previousPresence['last_heartbeat_at']) >= $staleCutoff;
 
             $repo->setSelectableStatus($uid, $status, $uid, 'USER');
 
