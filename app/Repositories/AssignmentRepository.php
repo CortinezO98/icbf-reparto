@@ -12,8 +12,10 @@ final class AssignmentRepository
     {
     }
 
-    /** @return array<string,mixed>|null */
-    public function nextPendingCaseForUpdate(?int $queueId = null): ?array
+    /** @param list<int> $excludedQueueIds
+     * @return array<string,mixed>|null
+     */
+    public function nextPendingCaseForUpdate(?int $queueId = null, array $excludedQueueIds = []): ?array
     {
         $sql = "SELECT c.*
                 FROM cases c
@@ -27,6 +29,17 @@ final class AssignmentRepository
         if ($queueId !== null) {
             $sql .= " AND c.queue_id=:qid";
             $params[':qid'] = $queueId;
+        }
+
+        $excludedQueueIds = array_values(array_unique(array_filter(
+            array_map('intval', $excludedQueueIds),
+            static fn (int $id): bool => $id > 0
+        )));
+
+        foreach ($excludedQueueIds as $index => $excludedId) {
+            $placeholder = ':excluded_queue_' . $index;
+            $sql .= " AND c.queue_id<>" . $placeholder;
+            $params[$placeholder] = $excludedId;
         }
 
         $sql .= " ORDER BY q.priority ASC,c.created_at ASC,c.id ASC
