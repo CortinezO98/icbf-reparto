@@ -61,7 +61,6 @@ final class ReportsController
                 $matrix['data'],
                 $matrix['filename']
             );
-            return;
         }
 
         $this->sendCsv(
