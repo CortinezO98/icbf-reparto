@@ -122,6 +122,12 @@ final class PresenceRepository
 
     public function markOffline(int $userId, ?int $setBy = null, string $reason = 'SYSTEM'): int
     {
+        $current = $this->currentForUser($userId);
+
+        if ($current !== null && (string)$current['status_code'] === 'OFFLINE') {
+            return (int)$current['id'];
+        }
+
         return $this->setStatus(
             $userId,
             'OFFLINE',
