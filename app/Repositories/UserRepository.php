@@ -17,7 +17,7 @@ final class UserRepository
         $identifier = trim($identifier);
 
         $st = $this->pdo->prepare(
-            'SELECT id,document_number,username,email,full_name,password_hash,is_active
+            'SELECT id,document_number,username,email,full_name,password_hash,must_change_password,is_active
              FROM users
              WHERE username=:u OR email=:e
              LIMIT 1'
@@ -338,9 +338,9 @@ final class UserRepository
         try {
             $st = $this->pdo->prepare(
                 'INSERT INTO users
-                 (document_number,username,email,full_name,password_hash,is_active,assign_enabled,created_at,updated_at)
+                 (document_number,username,email,full_name,password_hash,must_change_password,is_active,assign_enabled,created_at,updated_at)
                  VALUES
-                 (:document,:username,:email,:full_name,:password_hash,:active,:assign_enabled,NOW(6),NOW(6))'
+                 (:document,:username,:email,:full_name,:password_hash,:must_change_password,:active,:assign_enabled,NOW(6),NOW(6))'
             );
             $st->execute([
                 ':document'=>$data['document_number'],
@@ -348,6 +348,7 @@ final class UserRepository
                 ':email'=>$data['email'],
                 ':full_name'=>$data['full_name'],
                 ':password_hash'=>$data['password_hash'],
+                ':must_change_password'=>(int)($data['must_change_password'] ?? 0),
                 ':active'=>(int)$data['is_active'],
                 ':assign_enabled'=>(int)$data['assign_enabled'],
             ]);
@@ -408,8 +409,10 @@ final class UserRepository
             ];
 
             if (!empty($data['password_hash'])) {
-                $sql .= ', password_hash=:password_hash';
+                $sql .= ', password_hash=:password_hash,
+                           must_change_password=:must_change_password';
                 $params[':password_hash'] = $data['password_hash'];
+                $params[':must_change_password'] = (int)($data['must_change_password'] ?? 0);
             }
 
             $sql .= ' WHERE id=:id';
@@ -529,6 +532,122 @@ final class UserRepository
         }
 
         return [$where, $params];
+    }
+
+    /** @return array<string,mixed>|null */
+    public function findActiveByEmail(string $email): ?array
+    {
+        $st = $this->pdo->prepare(
+            'SELECT id,username,email,full_name,must_change_password
+             FROM users
+             WHERE email=:email
+               AND is_active=1
+             LIMIT 1'
+        );
+        $st->execute([':email'=>trim($email)]);
+        $row = $st->fetch();
+
+        return $row ?: null;
+    }
+
+    public function storePasswordResetToken(
+        int $userId,
+        string $email,
+        string $tokenHash,
+        string $expiresAt
+    ): void {
+        $this->pdo->prepare(
+            "UPDATE password_resets
+             SET used_at=NOW(6)
+             WHERE user_id=:user_id
+               AND used_at IS NULL"
+        )->execute([':user_id'=>$userId]);
+
+        $st = $this->pdo->prepare(
+            'INSERT INTO password_resets
+             (user_id,email,token_hash,expires_at)
+             VALUES(:user_id,:email,:token_hash,:expires_at)'
+        );
+        $st->execute([
+            ':user_id'=>$userId,
+            ':email'=>trim($email),
+            ':token_hash'=>$tokenHash,
+            ':expires_at'=>$expiresAt,
+        ]);
+    }
+
+    /** @return array<string,mixed>|null */
+    public function findValidPasswordResetByTokenHash(string $tokenHash): ?array
+    {
+        $st = $this->pdo->prepare(
+            "SELECT pr.*,u.email user_email,u.username,u.full_name
+             FROM password_resets pr
+             JOIN users u ON u.id=pr.user_id
+             WHERE pr.token_hash=:token_hash
+               AND pr.used_at IS NULL
+               AND pr.expires_at>=NOW(6)
+               AND u.is_active=1
+             LIMIT 1"
+        );
+        $st->execute([':token_hash'=>$tokenHash]);
+        $row = $st->fetch();
+
+        return $row ?: null;
+    }
+
+    public function updatePasswordHash(int $userId, string $passwordHash): void
+    {
+        $st = $this->pdo->prepare(
+            'UPDATE users
+             SET password_hash=:password_hash,
+                 must_change_password=0,
+                 updated_at=NOW(6)
+             WHERE id=:id
+             LIMIT 1'
+        );
+        $st->execute([
+            ':password_hash'=>$passwordHash,
+            ':id'=>$userId,
+        ]);
+    }
+
+    public function markPasswordResetUsed(int $resetId): void
+    {
+        $this->pdo->prepare(
+            'UPDATE password_resets
+             SET used_at=NOW(6)
+             WHERE id=:id
+               AND used_at IS NULL
+             LIMIT 1'
+        )->execute([':id'=>$resetId]);
+    }
+
+    public function setTemporaryPassword(
+        int $userId,
+        string $passwordHash
+    ): void {
+        $st = $this->pdo->prepare(
+            'UPDATE users
+             SET password_hash=:password_hash,
+                 must_change_password=1,
+                 updated_at=NOW(6)
+             WHERE id=:id
+             LIMIT 1'
+        );
+        $st->execute([
+            ':password_hash'=>$passwordHash,
+            ':id'=>$userId,
+        ]);
+    }
+
+    public function invalidatePasswordResets(int $userId): void
+    {
+        $this->pdo->prepare(
+            'UPDATE password_resets
+             SET used_at=NOW(6)
+             WHERE user_id=:user_id
+               AND used_at IS NULL'
+        )->execute([':user_id'=>$userId]);
     }
 
     /** @param list<int> $roleIds */
