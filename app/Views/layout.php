@@ -18,6 +18,7 @@ $canViewAgentStatus = false;
 $canViewUsers = false;
 $canViewStructures = false;
 $canViewQueues = false;
+$canViewReports = false;
 
 if (Auth::check() && Auth::id() !== null) {
     $pdo = Database::connection();
@@ -29,6 +30,7 @@ if (Auth::check() && Auth::id() !== null) {
     $canViewUsers = Authorization::hasPermission($pdo, $uid, 'USER_VIEW');
     $canViewStructures = Authorization::hasPermission($pdo, $uid, 'STRUCTURE_VIEW');
     $canViewQueues = Authorization::hasPermission($pdo, $uid, 'QUEUE_VIEW');
+    $canViewReports = Authorization::hasPermission($pdo, $uid, 'REPORT_VIEW');
 }
 
 $isActive = static function (string $prefix) use ($path): bool {
@@ -101,6 +103,14 @@ $rolesLabel = $currentUserRoles !== [] ? implode(', ', $currentUserRoles) : '';
                         <i class="bi bi-inbox me-1" aria-hidden="true"></i>Casos
                     </a>
                 </li>
+
+                <?php if ($canViewReports): ?>
+                    <li class="nav-item">
+                        <a class="nav-link <?= $isActive('/reports') ? 'active' : '' ?>" href="/reports">
+                            <i class="bi bi-file-earmark-bar-graph me-1" aria-hidden="true"></i>Reportes
+                        </a>
+                    </li>
+                <?php endif; ?>
 
                 <?php if (Authorization::hasPermission(Database::connection(), (int)Auth::id(), 'IMPORT_UPLOAD')): ?>
                     <li class="nav-item">
