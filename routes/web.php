@@ -43,6 +43,7 @@ return static function(Router $router,PDO $pdo): void {
  $router->get('/admin/users/{id}/edit',fn(int $id)=>(new UsersController($pdo))->editForm($id));
  $router->post('/admin/users/{id}/edit',fn(int $id)=>(new UsersController($pdo))->update($id));
  $router->post('/admin/users/{id}/toggle-active',fn(int $id)=>(new UsersController($pdo))->toggleActive($id));
+ $router->post('/admin/users/{id}/reset-temporary-password',fn(int $id)=>(new UsersController($pdo))->resetTemporaryPassword($id));
  $router->get('/admin/users/import',fn()=>(new UsersController($pdo))->importForm());
  $router->post('/admin/users/import',fn()=>(new UsersController($pdo))->importUsers());
  $router->get('/admin/users/template',fn()=>(new UsersController($pdo))->exportTemplate());
