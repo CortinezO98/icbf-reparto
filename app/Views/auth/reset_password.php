@@ -20,7 +20,7 @@ $tokenValue = (string)($token ?? '');
                 </p>
 
                 <form method="post" action="/reset-password" autocomplete="off">
-                    <input type="hidden" name="_csrf" value="<?= htmlspecialchars(AppAuthCsrf::token(), ENT_QUOTES, 'UTF-8') ?>">
+                    <input type="hidden" name="_csrf" value="<?= htmlspecialchars(\App\Auth\Csrf::token(), ENT_QUOTES, 'UTF-8') ?>">
                     <input type="hidden" name="token" value="<?= htmlspecialchars($tokenValue, ENT_QUOTES, 'UTF-8') ?>">
 
                     <div class="mb-3">
