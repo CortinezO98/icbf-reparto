@@ -59,6 +59,10 @@ $year = date('Y');
                         </button>
                     </div>
                 </form>
+
+                <div class="text-center mt-3">
+                    <a href="/forgot-password">¿Olvidaste tu contraseña?</a>
+                </div>
             </div>
         </div>
 
