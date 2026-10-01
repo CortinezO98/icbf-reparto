@@ -10,6 +10,7 @@ use App\Controllers\AgentStatusController;
 use App\Controllers\CasesController;
 use App\Controllers\SlaController;
 use App\Controllers\ReportsController;
+use App\Controllers\ShiftController;
 use App\Auth\Auth;
 use App\Auth\Authorization;
 use App\Http\Router;
@@ -59,6 +60,11 @@ return static function(Router $router,PDO $pdo): void {
  $router->get('/admin/queues',fn()=>(new QueuesController($pdo))->index());
  $router->post('/admin/queues/create',fn()=>(new QueuesController($pdo))->create());
  $router->post('/admin/queues/attach-structure',fn()=>(new QueuesController($pdo))->attach());
+
+ $router->get('/admin/shifts',fn()=>(new ShiftController($pdo))->index());
+ $router->post('/admin/shifts/create',fn()=>(new ShiftController($pdo))->createShift());
+ $router->post('/admin/shifts/schedules/create',fn()=>(new ShiftController($pdo))->createSchedule());
+ $router->post('/admin/shifts/schedules/{id}/toggle',fn(int $id)=>(new ShiftController($pdo))->toggleSchedule($id));
 
  $router->get('/imports',fn()=>(new ImportsController($pdo))->index());
  $router->post('/imports/upload',fn()=>(new ImportsController($pdo))->upload());
