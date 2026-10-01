@@ -101,5 +101,13 @@ final class Auth
             header('Location: /login');
             exit;
         }
+
+        $mustChange = (int)($_SESSION['user']['must_change_password'] ?? 0) === 1;
+        $path = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?: '/';
+
+        if ($mustChange && $path !== '/change-password') {
+            header('Location: /change-password');
+            exit;
+        }
     }
 }
