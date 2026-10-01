@@ -64,6 +64,8 @@ final class UserRepository
                 u.full_name,
                 u.is_active,
                 u.assign_enabled,
+                u.supervisor_user_id,
+                supervisor.full_name AS supervisor_name,
                 u.last_assigned_at,
                 GROUP_CONCAT(DISTINCT r.code ORDER BY r.code SEPARATOR ', ') AS roles,
                 GROUP_CONCAT(DISTINCT q.code ORDER BY q.code SEPARATOR ', ') AS queues,
@@ -72,6 +74,7 @@ final class UserRepository
             FROM users u
             LEFT JOIN user_roles ur ON ur.user_id=u.id
             LEFT JOIN roles r ON r.id=ur.role_id
+            LEFT JOIN users supervisor ON supervisor.id=u.supervisor_user_id
             LEFT JOIN queue_agents qa
               ON qa.user_id=u.id
              AND qa.is_enabled=1
@@ -93,7 +96,7 @@ final class UserRepository
             {$where}
             GROUP BY
                 u.id,u.document_number,u.username,u.email,u.full_name,
-                u.is_active,u.assign_enabled,u.last_assigned_at,
+                u.is_active,u.assign_enabled,u.supervisor_user_id,supervisor.full_name,u.last_assigned_at,
                 ap.status_code,ci.label
             ORDER BY u.full_name,u.id
             LIMIT :limit OFFSET :offset
@@ -162,7 +165,7 @@ final class UserRepository
     public function findById(int $id): ?array
     {
         $st = $this->pdo->prepare(
-            'SELECT id,document_number,username,email,full_name,is_active,assign_enabled,last_assigned_at
+            'SELECT id,document_number,username,email,full_name,is_active,assign_enabled,supervisor_user_id,last_assigned_at
              FROM users WHERE id=:id LIMIT 1'
         );
         $st->execute([':id'=>$id]);
@@ -209,6 +212,39 @@ final class UserRepository
              WHERE is_active=1
              ORDER BY priority,code'
         )->fetchAll() ?: [];
+    }
+
+    /** @return list<array{id:int,full_name:string}> */
+    public function supervisors(): array
+    {
+        return $this->pdo->query(
+            "SELECT DISTINCT u.id,u.full_name
+             FROM users u
+             JOIN user_roles ur ON ur.user_id=u.id
+             JOIN roles r ON r.id=ur.role_id
+                AND r.code='SUPERVISOR'
+                AND r.is_active=1
+             WHERE u.is_active=1
+             ORDER BY u.full_name,u.id"
+        )->fetchAll() ?: [];
+    }
+
+    public function isActiveSupervisor(int $userId): bool
+    {
+        $st = $this->pdo->prepare(
+            "SELECT 1
+             FROM users u
+             JOIN user_roles ur ON ur.user_id=u.id
+             JOIN roles r ON r.id=ur.role_id
+                AND r.code='SUPERVISOR'
+                AND r.is_active=1
+             WHERE u.id=:id
+               AND u.is_active=1
+             LIMIT 1"
+        );
+        $st->execute([':id'=>$userId]);
+
+        return (bool)$st->fetchColumn();
     }
 
     /** @return list<int> */
@@ -338,9 +374,9 @@ final class UserRepository
         try {
             $st = $this->pdo->prepare(
                 'INSERT INTO users
-                 (document_number,username,email,full_name,password_hash,must_change_password,is_active,assign_enabled,created_at,updated_at)
+                 (document_number,username,email,full_name,password_hash,must_change_password,is_active,assign_enabled,supervisor_user_id,created_at,updated_at)
                  VALUES
-                 (:document,:username,:email,:full_name,:password_hash,:must_change_password,:active,:assign_enabled,NOW(6),NOW(6))'
+                 (:document,:username,:email,:full_name,:password_hash,:must_change_password,:active,:assign_enabled,:supervisor_user_id,NOW(6),NOW(6))'
             );
             $st->execute([
                 ':document'=>$data['document_number'],
@@ -351,6 +387,7 @@ final class UserRepository
                 ':must_change_password'=>(int)($data['must_change_password'] ?? 0),
                 ':active'=>(int)$data['is_active'],
                 ':assign_enabled'=>(int)$data['assign_enabled'],
+                ':supervisor_user_id'=>$data['supervisor_user_id'] ?? null,
             ]);
 
             $userId = (int)$this->pdo->lastInsertId();
@@ -397,6 +434,7 @@ final class UserRepository
                         full_name=:full_name,
                         is_active=:active,
                         assign_enabled=:assign_enabled,
+                        supervisor_user_id=:supervisor_user_id,
                         updated_at=NOW(6)';
             $params = [
                 ':document'=>$data['document_number'],
@@ -405,6 +443,7 @@ final class UserRepository
                 ':full_name'=>$data['full_name'],
                 ':active'=>(int)$data['is_active'],
                 ':assign_enabled'=>(int)$data['assign_enabled'],
+                ':supervisor_user_id'=>$data['supervisor_user_id'] ?? null,
                 ':id'=>$userId,
             ];
 
