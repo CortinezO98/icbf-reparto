@@ -53,20 +53,21 @@ final class ReportsController
         );
 
         $matrix = $this->exportMatrix($report, $rows);
+        $filename = $matrix['filename'] . '.' . $format;
 
         if ($format === 'xlsx') {
             $this->sendExcel(
                 $matrix['title'],
                 $matrix['headers'],
                 $matrix['data'],
-                $matrix['filename']
+                $filename
             );
         }
 
         $this->sendCsv(
             $matrix['headers'],
             $matrix['data'],
-            $matrix['filename']
+            $filename
         );
     }
 
