@@ -188,8 +188,8 @@ final class ReportsController
                 'title' => 'Casos y SLA',
                 'filename' => 'reporte_casos_sla_' . $stamp,
                 'headers' => [
-                    'Caso','Clave externa','Tipo petición','Regional','Canal',
-                    'Cola','Agente','Estado','Gestión actual','ANS',
+                    'Caso','Clave externa','Tipo petición','Regional','Segmento','Canal',
+                    'Cola','Agente','Supervisor','Estado','Gestión actual','ANS',
                     'Minutos ANS','Vencimiento ANS','Radicado','Creado',
                     'Asignado','Primera gestión','Última gestión','Cerrado'
                 ],
@@ -199,9 +199,11 @@ final class ReportsController
                         $row['external_key'] ?? '',
                         $row['petition_type'] ?? '',
                         $row['regional'] ?? '',
+                        $row['segment'] ?? '',
                         $row['origin_channel'] ?? '',
                         $row['queue_code'] ?? '',
                         $row['agent_name'] ?? '',
+                        $row['supervisor_name'] ?? '',
                         $row['current_state'] ?? '',
                         $row['current_management_type_code'] ?? '',
                         $row['sla_status'] ?? '',
@@ -221,8 +223,9 @@ final class ReportsController
                 'title' => 'Agentes - Resumen',
                 'filename' => 'reporte_agentes_resumen_' . $stamp,
                 'headers' => [
-                    'Agente','Usuario','Asignados','Resueltos','Vencidos',
-                    'Tiempo primera gestión (min)','Cumplimiento SLA (%)'
+                    'Agente','Usuario','Asignados','Gestionados','Pendientes','Resueltos','Vencidos',
+                    'Tiempo primera gestión (min)','Horas disponibles','Peticiones gestionadas/hora',
+                    'Estándar por hora','Cumplimiento productividad (%)','Cumplimiento SLA (%)'
                 ],
                 'data' => array_map(
                     static function(array $row): array {
@@ -236,9 +239,15 @@ final class ReportsController
                             $row['full_name'] ?? '',
                             $row['username'] ?? '',
                             (int)($row['assigned_cases'] ?? 0),
+                            (int)($row['managed_cases'] ?? 0),
+                            (int)($row['pending_cases'] ?? 0),
                             (int)($row['resolved_cases'] ?? 0),
                             (int)($row['breached_cases'] ?? 0),
                             $row['response_minutes'] ?? '',
+                            isset($row['available_minutes']) ? round(((int)$row['available_minutes']) / 60, 2) : '',
+                            $row['productivity_per_hour'] ?? '',
+                            $row['productivity_standard_per_hour'] ?? '',
+                            $row['productivity_compliance_percent'] ?? '',
                             $compliance ?? '',
                         ];
                     },
@@ -384,6 +393,98 @@ final class ReportsController
                         $row['avg_response_minutes'] ?? '',
                         $row['avg_resolution_minutes'] ?? '',
                         $row['sla_compliance_percent'] ?? '',
+                    ],
+                    $rows
+                ),
+            ],
+            'police' => [
+                'title' => 'Reportes a Policía',
+                'filename' => 'reporte_policia_' . $stamp,
+                'headers' => [
+                    'Caso','Fecha reporte','Agente','Supervisor','Regional','Segmento',
+                    'Tipo petición','Categoría','Ampliación','Observación','Soporte','Estado'
+                ],
+                'data' => array_map(
+                    static fn(array $row): array => [
+                        $row['case_number'] ?? '',
+                        $row['report_date'] ?? '',
+                        $row['agent_name'] ?? '',
+                        $row['supervisor_name'] ?? '',
+                        $row['regional'] ?? '',
+                        $row['segment'] ?? '',
+                        $row['petition_type'] ?? '',
+                        $row['category'] ?? '',
+                        $row['is_extension'] ?? 'No',
+                        $row['observation'] ?? '',
+                        $row['support_path'] ?? '',
+                        $row['current_state'] ?? '',
+                    ],
+                    $rows
+                ),
+            ],
+            'escalations' => [
+                'title' => 'Escalamientos',
+                'filename' => 'reporte_escalamientos_' . $stamp,
+                'headers' => [
+                    'Caso','Fecha escalamiento','Agente','Supervisor','Motivo',
+                    'Fecha resolución','Tiempo hasta resolución (min)','Estado'
+                ],
+                'data' => array_map(
+                    static fn(array $row): array => [
+                        $row['case_number'] ?? '',
+                        $row['escalation_date'] ?? '',
+                        $row['agent_name'] ?? '',
+                        $row['supervisor_name'] ?? '',
+                        $row['reason'] ?? '',
+                        $row['resolved_at'] ?? '',
+                        $row['resolution_minutes'] ?? '',
+                        $row['current_state'] ?? '',
+                    ],
+                    $rows
+                ),
+            ],
+            'reassignments' => [
+                'title' => 'Reasignaciones',
+                'filename' => 'reporte_reasignaciones_' . $stamp,
+                'headers' => [
+                    'Caso','Cola','Agente origen','Agente destino','Supervisor destino',
+                    'Asignado por','Fecha','Fin','Motivo','Estado'
+                ],
+                'data' => array_map(
+                    static fn(array $row): array => [
+                        $row['case_number'] ?? '',
+                        $row['queue_code'] ?? '',
+                        $row['origin_agent'] ?? '',
+                        $row['destination_agent'] ?? '',
+                        $row['destination_supervisor'] ?? '',
+                        $row['assigned_by_name'] ?? '',
+                        $row['assigned_at'] ?? '',
+                        $row['ended_at'] ?? '',
+                        $row['reason'] ?? '',
+                        $row['current_state'] ?? '',
+                    ],
+                    $rows
+                ),
+            ],
+            'directed' => [
+                'title' => 'Direccionamientos',
+                'filename' => 'reporte_direccionamientos_' . $stamp,
+                'headers' => [
+                    'Caso','Fecha direccionamiento','Agente','Supervisor','Cola',
+                    'Regional','Segmento','Tipo petición','Observación','Estado'
+                ],
+                'data' => array_map(
+                    static fn(array $row): array => [
+                        $row['case_number'] ?? '',
+                        $row['directed_at'] ?? '',
+                        $row['agent_name'] ?? '',
+                        $row['supervisor_name'] ?? '',
+                        $row['queue_code'] ?? '',
+                        $row['regional'] ?? '',
+                        $row['segment'] ?? '',
+                        $row['petition_type'] ?? '',
+                        $row['observation'] ?? '',
+                        $row['current_state'] ?? '',
                     ],
                     $rows
                 ),
