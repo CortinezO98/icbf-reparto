@@ -156,7 +156,9 @@ final class ReportRepository
                 u.full_name,
                 u.username,
                 ap.status_code,
-                COALESCE(ci.label,ap.status_code) status_label,
+                COALESCE(ci.label,
+                    CASE WHEN ap.status_code='OFFLINE' THEN 'Desconectado' ELSE ap.status_code END
+                ) status_label,
                 ap.started_at,
                 ap.ended_at,
                 ap.last_heartbeat_at,
