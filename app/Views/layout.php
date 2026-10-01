@@ -158,6 +158,11 @@ $rolesLabel = $currentUserRoles !== [] ? implode(', ', $currentUserRoles) : '';
                                         <i class="bi bi-diagram-2 me-2" aria-hidden="true"></i>Colas
                                     </a>
                                 </li>
+                                <li>
+                                    <a class="dropdown-item" href="/admin/shifts">
+                                        <i class="bi bi-calendar3 me-2" aria-hidden="true"></i>Cronograma de agentes
+                                    </a>
+                                </li>
                             <?php endif; ?>
                         </ul>
                     </li>
