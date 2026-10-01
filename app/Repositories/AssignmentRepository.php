@@ -723,6 +723,124 @@ final class AssignmentRepository
         }
     }
 
+
+    /**
+     * Libera los casos abiertos de un agente que dejó de estar disponible
+     * por pérdida de heartbeat u otra desconexión automática.
+     *
+     * @return array{case_ids:list<int>,queue_ids:list<int>}
+     */
+    public function releaseCasesForAgent(
+        int $userId,
+        string $reason = 'STALE_HEARTBEAT'
+    ): array {
+        $reason = strtoupper(trim($reason));
+
+        if (!in_array($reason, ['STALE_HEARTBEAT', 'LOGOUT', 'OFFLINE'], true)) {
+            throw new \InvalidArgumentException('Motivo de liberación no permitido.');
+        }
+
+        $this->pdo->beginTransaction();
+
+        try {
+            $st = $this->pdo->prepare(
+                "SELECT
+                    c.id,
+                    c.case_number,
+                    c.queue_id
+                 FROM cases c
+                 WHERE c.assigned_user_id=:user_id
+                   AND c.closed_at IS NULL
+                   AND c.current_state='ASSIGNED'
+                 ORDER BY COALESCE(c.radicated_at,c.created_at),c.id
+                 FOR UPDATE"
+            );
+            $st->execute([':user_id'=>$userId]);
+            $cases = $st->fetchAll() ?: [];
+
+            $caseIds = [];
+            $queueIds = [];
+
+            foreach ($cases as $case) {
+                $caseId = (int)$case['id'];
+                $queueId = (int)$case['queue_id'];
+
+                $closeAssignment = $this->pdo->prepare(
+                    "UPDATE case_assignments
+                     SET ended_at=NOW(6),
+                         end_reason=:reason
+                     WHERE case_id=:case_id
+                       AND user_id=:user_id
+                       AND ended_at IS NULL"
+                );
+                $closeAssignment->execute([
+                    ':reason'=>$reason,
+                    ':case_id'=>$caseId,
+                    ':user_id'=>$userId,
+                ]);
+
+                $update = $this->pdo->prepare(
+                    "UPDATE cases
+                     SET assigned_user_id=NULL,
+                         assigned_at=NULL,
+                         current_state='PENDING_ASSIGNMENT',
+                         updated_at=NOW(6)
+                     WHERE id=:case_id
+                       AND assigned_user_id=:user_id
+                       AND closed_at IS NULL"
+                );
+                $update->execute([
+                    ':case_id'=>$caseId,
+                    ':user_id'=>$userId,
+                ]);
+
+                if ($update->rowCount() !== 1) {
+                    throw new \RuntimeException(
+                        "No fue posible liberar el caso {$caseId}."
+                    );
+                }
+
+                $event = $this->pdo->prepare(
+                    "INSERT INTO case_events
+                     (case_id,actor_user_id,event_type,from_state,to_state,details_json,created_at)
+                     VALUES
+                     (:case_id,NULL,'CASE_RELEASED_OFFLINE','ASSIGNED','PENDING_ASSIGNMENT',:details,NOW(6))"
+                );
+                $event->execute([
+                    ':case_id'=>$caseId,
+                    ':details'=>json_encode(
+                        [
+                            'reason'=>$reason,
+                            'previous_user_id'=>$userId,
+                            'queue_id'=>$queueId,
+                            'case_number'=>(string)$case['case_number'],
+                        ],
+                        JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES
+                    ),
+                ]);
+
+                $caseIds[] = $caseId;
+
+                if ($queueId > 0) {
+                    $queueIds[$queueId] = true;
+                }
+            }
+
+            $this->pdo->commit();
+
+            return [
+                'case_ids'=>$caseIds,
+                'queue_ids'=>array_map('intval', array_keys($queueIds)),
+            ];
+        } catch (\Throwable $e) {
+            if ($this->pdo->inTransaction()) {
+                $this->pdo->rollBack();
+            }
+
+            throw $e;
+        }
+    }
+
     private function presenceCutoff(): string
     {
         $stale = max(30, (int)($_ENV['AGENT_PRESENCE_STALE_SECONDS'] ?? 90));

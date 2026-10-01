@@ -175,7 +175,7 @@ final class PresenceRepository
      * registrada corresponde al momento en que el worker detecta el heartbeat
      * vencido.
      *
-     * @return array{processed:int,cutoff:string}
+     * @return array{processed:int,cutoff:string,user_ids:list<int>}
      */
     public function expireStalePresences(int $staleSeconds): array
     {
@@ -206,6 +206,7 @@ final class PresenceRepository
                 return [
                     'processed'=>0,
                     'cutoff'=>$cutoff,
+                    'user_ids'=>[],
                 ];
             }
 
@@ -222,7 +223,12 @@ final class PresenceRepository
                  (:user_id,'OFFLINE',NOW(6),NULL,:notes,'SYSTEM',:set_by)"
             );
 
+            $userIds = [];
+
             foreach ($rows as $row) {
+                $userId = (int)$row['user_id'];
+                $userIds[$userId] = true;
+
                 $update->execute([':id'=>(int)$row['id']]);
 
                 $insert->execute([
@@ -237,6 +243,7 @@ final class PresenceRepository
             return [
                 'processed'=>count($rows),
                 'cutoff'=>$cutoff,
+                'user_ids'=>array_map('intval', array_keys($userIds)),
             ];
         } catch (\Throwable $e) {
             if ($this->pdo->inTransaction()) {
