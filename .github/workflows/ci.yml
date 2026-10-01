@@ -36,17 +36,4 @@ jobs:
         run: composer test
 
       - name: Static analysis
-        id: phpstan
-        continue-on-error: true
-        run: composer analyse 2>&1 | tee phpstan-output.txt
-
-      - name: Upload PHPStan output
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: phpstan-output
-          path: phpstan-output.txt
-
-      - name: Fail if static analysis failed
-        if: steps.phpstan.outcome == 'failure'
-        run: exit 1
+        run: composer analyse
