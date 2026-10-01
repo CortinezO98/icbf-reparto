@@ -419,6 +419,255 @@ final class ReportRepository
      * @param array<string,mixed> $filters
      * @return list<array<string,mixed>>
      */
+    /**
+     * Reporte de reportes a policía, incluyendo ampliaciones.
+     *
+     * @param array<string,mixed> $filters
+     * @return list<array<string,mixed>>
+     */
+    private function policeForExport(array $filters): array
+    {
+        $params = [];
+        $where = "WHERE cm.management_type_code='POLICE_REPORT'";
+
+        if (($filters['from'] ?? null) !== null) {
+            $where .= ' AND cm.created_at >= :police_from';
+            $params[':police_from'] = $filters['from'];
+        }
+
+        if (($filters['to'] ?? null) !== null) {
+            $where .= ' AND cm.created_at < :police_to';
+            $params[':police_to'] = $filters['to'];
+        }
+
+        $this->appendCaseFilter($where, $params, $filters, 'police');
+
+        return $this->rows(
+            "SELECT
+                c.case_number,
+                cm.created_at report_date,
+                actor.full_name agent_name,
+                supervisor.full_name supervisor_name,
+                c.regional,
+                c.segment,
+                c.petition_type,
+                COALESCE(eci.label,cm.escalation_category_code) category,
+                CASE WHEN cm.escalation_category_code='EXTENSION' THEN 'Sí' ELSE 'No' END is_extension,
+                cm.observation,
+                cm.support_path,
+                c.current_state
+             FROM case_managements cm
+             JOIN cases c ON c.id=cm.case_id
+             JOIN users actor ON actor.id=cm.actor_user_id
+             LEFT JOIN users supervisor ON supervisor.id=actor.supervisor_user_id
+             LEFT JOIN catalogs ec ON ec.code='ESCALATION_CATEGORY'
+             LEFT JOIN catalog_items eci
+               ON eci.catalog_id=ec.id
+              AND eci.code=cm.escalation_category_code
+             {$where}
+             ORDER BY cm.created_at DESC,cm.id DESC
+             LIMIT 5000",
+            $params
+        );
+    }
+
+    /**
+     * Escalamientos con tiempo hasta resolución/cierre.
+     *
+     * @param array<string,mixed> $filters
+     * @return list<array<string,mixed>>
+     */
+    private function escalationsForExport(array $filters): array
+    {
+        $params = [];
+        $where = "WHERE cm.management_type_code='ESCALATED'";
+
+        if (($filters['from'] ?? null) !== null) {
+            $where .= ' AND cm.created_at >= :esc_from';
+            $params[':esc_from'] = $filters['from'];
+        }
+
+        if (($filters['to'] ?? null) !== null) {
+            $where .= ' AND cm.created_at < :esc_to';
+            $params[':esc_to'] = $filters['to'];
+        }
+
+        $this->appendCaseFilter($where, $params, $filters, 'esc');
+
+        return $this->rows(
+            "SELECT
+                c.case_number,
+                cm.created_at escalation_date,
+                actor.full_name agent_name,
+                supervisor.full_name supervisor_name,
+                COALESCE(eci.label,cm.escalation_category_code) reason,
+                COALESCE(
+                    (
+                        SELECT MIN(cm2.created_at)
+                        FROM case_managements cm2
+                        WHERE cm2.case_id=cm.case_id
+                          AND cm2.management_type_code='CLOSED'
+                          AND cm2.created_at>cm.created_at
+                    ),
+                    c.closed_at
+                ) resolved_at,
+                CASE
+                    WHEN COALESCE(
+                        (
+                            SELECT MIN(cm3.created_at)
+                            FROM case_managements cm3
+                            WHERE cm3.case_id=cm.case_id
+                              AND cm3.management_type_code='CLOSED'
+                              AND cm3.created_at>cm.created_at
+                        ),
+                        c.closed_at
+                    ) IS NULL THEN NULL
+                    ELSE TIMESTAMPDIFF(
+                        MINUTE,
+                        cm.created_at,
+                        COALESCE(
+                            (
+                                SELECT MIN(cm4.created_at)
+                                FROM case_managements cm4
+                                WHERE cm4.case_id=cm.case_id
+                                  AND cm4.management_type_code='CLOSED'
+                                  AND cm4.created_at>cm.created_at
+                            ),
+                            c.closed_at
+                        )
+                    )
+                END resolution_minutes,
+                c.current_state
+             FROM case_managements cm
+             JOIN cases c ON c.id=cm.case_id
+             JOIN users actor ON actor.id=cm.actor_user_id
+             LEFT JOIN users supervisor ON supervisor.id=actor.supervisor_user_id
+             LEFT JOIN catalogs ec ON ec.code='ESCALATION_CATEGORY'
+             LEFT JOIN catalog_items eci
+               ON eci.catalog_id=ec.id
+              AND eci.code=cm.escalation_category_code
+             {$where}
+             ORDER BY cm.created_at DESC,cm.id DESC
+             LIMIT 5000",
+            $params
+        );
+    }
+
+    /**
+     * Reasignaciones con agente origen y destino.
+     *
+     * @param array<string,mixed> $filters
+     * @return list<array<string,mixed>>
+     */
+    private function reassignmentsForExport(array $filters): array
+    {
+        $params = [];
+        $where = "WHERE ca.assignment_type='REASSIGN'";
+
+        if (($filters['from'] ?? null) !== null) {
+            $where .= ' AND ca.assigned_at >= :reassign_from';
+            $params[':reassign_from'] = $filters['from'];
+        }
+
+        if (($filters['to'] ?? null) !== null) {
+            $where .= ' AND ca.assigned_at < :reassign_to';
+            $params[':reassign_to'] = $filters['to'];
+        }
+
+        $this->appendCaseFilter($where, $params, $filters, 'reassign');
+
+        return $this->rows(
+            "SELECT
+                c.case_number,
+                q.code queue_code,
+                origin.full_name origin_agent,
+                destination.full_name destination_agent,
+                supervisor.full_name destination_supervisor,
+                assigner.full_name assigned_by_name,
+                ca.assigned_at,
+                ca.ended_at,
+                COALESCE(
+                    JSON_UNQUOTE(JSON_EXTRACT(ev.details_json,'$.reason')),
+                    ''
+                ) reason,
+                c.current_state
+             FROM case_assignments ca
+             JOIN cases c ON c.id=ca.case_id
+             LEFT JOIN work_queues q ON q.id=ca.queue_id
+             JOIN users destination ON destination.id=ca.user_id
+             LEFT JOIN users supervisor ON supervisor.id=destination.supervisor_user_id
+             LEFT JOIN users assigner ON assigner.id=ca.assigned_by
+             LEFT JOIN case_assignments previous
+               ON previous.id=(
+                    SELECT MAX(pa.id)
+                    FROM case_assignments pa
+                    WHERE pa.case_id=ca.case_id
+                      AND pa.assigned_at<ca.assigned_at
+               )
+             LEFT JOIN users origin ON origin.id=previous.user_id
+             LEFT JOIN case_events ev
+               ON ev.id=(
+                    SELECT MAX(ev2.id)
+                    FROM case_events ev2
+                    WHERE ev2.case_id=ca.case_id
+                      AND ev2.event_type='CASE_REASSIGNED'
+                      AND JSON_EXTRACT(ev2.details_json,'$.to_user_id')=ca.user_id
+                      AND ABS(TIMESTAMPDIFF(SECOND,ev2.created_at,ca.assigned_at))<=5
+               )
+             {$where}
+             ORDER BY ca.assigned_at DESC,ca.id DESC
+             LIMIT 5000",
+            $params
+        );
+    }
+
+    /**
+     * Direccionamientos registrados como gestión.
+     *
+     * @param array<string,mixed> $filters
+     * @return list<array<string,mixed>>
+     */
+    private function directedForExport(array $filters): array
+    {
+        $params = [];
+        $where = "WHERE cm.management_type_code='DIRECTED'";
+
+        if (($filters['from'] ?? null) !== null) {
+            $where .= ' AND cm.created_at >= :directed_from';
+            $params[':directed_from'] = $filters['from'];
+        }
+
+        if (($filters['to'] ?? null) !== null) {
+            $where .= ' AND cm.created_at < :directed_to';
+            $params[':directed_to'] = $filters['to'];
+        }
+
+        $this->appendCaseFilter($where, $params, $filters, 'directed');
+
+        return $this->rows(
+            "SELECT
+                c.case_number,
+                cm.created_at directed_at,
+                actor.full_name agent_name,
+                supervisor.full_name supervisor_name,
+                q.code queue_code,
+                c.regional,
+                c.segment,
+                c.petition_type,
+                cm.observation,
+                c.current_state
+             FROM case_managements cm
+             JOIN cases c ON c.id=cm.case_id
+             JOIN users actor ON actor.id=cm.actor_user_id
+             LEFT JOIN users supervisor ON supervisor.id=actor.supervisor_user_id
+             LEFT JOIN work_queues q ON q.id=c.queue_id
+             {$where}
+             ORDER BY cm.created_at DESC,cm.id DESC
+             LIMIT 5000",
+            $params
+        );
+    }
+
     private function volumeTimeForExport(array $filters): array
     {
         $where = $this->where($filters);
