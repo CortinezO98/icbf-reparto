@@ -406,7 +406,9 @@ final class ReportsController
      *   queue_id:?int,
      *   agent_id:?int,
      *   state:?string,
-     *   sla:?string
+     *   sla:?string,
+     *   regional:?string,
+     *   petition_type:?string
      * }
      */
     private function filters(): array
