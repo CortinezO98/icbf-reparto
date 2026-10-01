@@ -225,6 +225,190 @@ final class CaseOperationsRepository
     /**
      * @param array<string,mixed> $data
      */
+    /** @return list<array<string,mixed>> */
+    public function reassignmentCandidates(int $caseId): array
+    {
+        $st = $this->pdo->prepare(
+            "SELECT
+                u.id,
+                u.full_name,
+                u.username,
+                COALESCE(qa.capacity_override,q.default_capacity) capacity,
+                (
+                    SELECT COUNT(*)
+                    FROM cases c2
+                    WHERE c2.assigned_user_id=u.id
+                      AND c2.queue_id=c.queue_id
+                      AND c2.closed_at IS NULL
+                      AND c2.current_state<>'PENDING_ASSIGNMENT'
+                ) open_cases
+             FROM cases c
+             JOIN queue_agents qa ON qa.queue_id=c.queue_id
+             JOIN users u
+               ON u.id=qa.user_id
+              AND u.is_active=1
+              AND u.assign_enabled=1
+             JOIN user_roles ur ON ur.user_id=u.id
+             JOIN roles r
+               ON r.id=ur.role_id
+              AND r.code='AGENTE'
+              AND r.is_active=1
+             JOIN agent_presence ap
+               ON ap.user_id=u.id
+              AND ap.ended_at IS NULL
+              AND ap.status_code='AVAILABLE'
+              AND ap.last_heartbeat_at>=:presence_cutoff
+             WHERE c.id=:case_id
+               AND qa.is_enabled=1
+               AND qa.removed_at IS NULL
+               AND u.id<>COALESCE(c.assigned_user_id,0)
+               AND (
+                   :require_shift=0
+                   OR EXISTS (
+                        SELECT 1
+                        FROM agent_shifts ash
+                        WHERE ash.user_id=u.id
+                          AND ash.is_active=1
+                          AND ash.starts_at<=NOW(6)
+                          AND ash.ends_at>NOW(6)
+                          AND (ash.queue_id IS NULL OR ash.queue_id=c.queue_id)
+                   )
+               )
+               AND NOT EXISTS (
+                    SELECT 1
+                    FROM queue_skills qs
+                    WHERE qs.queue_id=c.queue_id
+                      AND qs.is_required=1
+                      AND NOT EXISTS (
+                          SELECT 1
+                          FROM user_skills us
+                          WHERE us.user_id=u.id
+                            AND us.skill_id=qs.skill_id
+                            AND us.is_active=1
+                            AND us.removed_at IS NULL
+                      )
+               )
+             GROUP BY u.id,u.full_name,u.username,qa.capacity_override,q.default_capacity,c.queue_id,c.assigned_user_id
+             HAVING open_cases<capacity
+             ORDER BY open_cases ASC,u.last_assigned_at ASC,u.full_name ASC,u.id ASC"
+        );
+        $st->execute([
+            ':case_id'=>$caseId,
+            ':presence_cutoff'=>(new \DateTimeImmutable())
+                ->modify('-' . max(30,(int)($_ENV['AGENT_PRESENCE_STALE_SECONDS'] ?? 90)) . ' seconds')
+                ->format('Y-m-d H:i:s.u'),
+            ':require_shift'=>filter_var(
+                $_ENV['ASSIGNMENT_REQUIRE_SHIFT'] ?? '1',
+                FILTER_VALIDATE_BOOL
+            ) ? 1 : 0,
+        ]);
+
+        return $st->fetchAll() ?: [];
+    }
+
+    public function reassignCase(
+        int $caseId,
+        int $targetUserId,
+        int $actorUserId
+    ): void {
+        $this->pdo->beginTransaction();
+
+        try {
+            $lock = $this->pdo->prepare(
+                "SELECT id,queue_id,assigned_user_id,current_state,closed_at
+                 FROM cases
+                 WHERE id=:id
+                 FOR UPDATE"
+            );
+            $lock->execute([':id'=>$caseId]);
+            $case = $lock->fetch();
+
+            if (!$case) {
+                throw new \RuntimeException('Caso no encontrado.');
+            }
+
+            if ($case['closed_at'] !== null || (string)$case['current_state'] === 'CLOSED') {
+                throw new \RuntimeException('El caso ya está cerrado.');
+            }
+
+            $currentUserId = (int)($case['assigned_user_id'] ?? 0);
+            if ($currentUserId === $targetUserId) {
+                throw new \RuntimeException('El caso ya está asignado al agente seleccionado.');
+            }
+
+            $candidates = $this->reassignmentCandidates((int)$case['id']);
+            $eligible = false;
+            foreach ($candidates as $candidate) {
+                if ((int)$candidate['id'] === $targetUserId) {
+                    $eligible = true;
+                    break;
+                }
+            }
+
+            if (!$eligible) {
+                throw new \RuntimeException('El agente seleccionado no está disponible o no puede recibir este caso.');
+            }
+
+            $this->pdo->prepare(
+                "UPDATE case_assignments
+                 SET ended_at=NOW(6),end_reason='MANUAL_REASSIGN'
+                 WHERE case_id=:case_id
+                   AND ended_at IS NULL"
+            )->execute([':case_id'=>$caseId]);
+
+            $this->pdo->prepare(
+                "UPDATE cases
+                 SET assigned_user_id=:target,
+                     assigned_at=NOW(6),
+                     current_state='ASSIGNED',
+                     updated_at=NOW(6)
+                 WHERE id=:case_id"
+            )->execute([
+                ':target'=>$targetUserId,
+                ':case_id'=>$caseId,
+            ]);
+
+            $assignment = $this->pdo->prepare(
+                "INSERT INTO case_assignments
+                 (case_id,queue_id,user_id,assignment_type,assigned_by,assigned_at)
+                 VALUES(:case_id,:queue_id,:user_id,'REASSIGN',:actor,NOW(6))"
+            );
+            $assignment->execute([
+                ':case_id'=>$caseId,
+                ':queue_id'=>$case['queue_id'] !== null ? (int)$case['queue_id'] : null,
+                ':user_id'=>$targetUserId,
+                ':actor'=>$actorUserId,
+            ]);
+
+            $event = $this->pdo->prepare(
+                "INSERT INTO case_events
+                 (case_id,actor_user_id,event_type,from_state,to_state,details_json,created_at)
+                 VALUES(:case_id,:actor,'CASE_REASSIGNED',:from_state,'ASSIGNED',:details,NOW(6))"
+            );
+            $event->execute([
+                ':case_id'=>$caseId,
+                ':actor'=>$actorUserId,
+                ':from_state'=>$case['current_state'],
+                ':details'=>json_encode([
+                    'assignment_type'=>'REASSIGN',
+                    'previous_user_id'=>$currentUserId ?: null,
+                    'new_user_id'=>$targetUserId,
+                ], JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES),
+            ]);
+
+            $this->pdo->prepare(
+                "UPDATE users SET last_assigned_at=NOW(6) WHERE id=:id"
+            )->execute([':id'=>$targetUserId]);
+
+            $this->pdo->commit();
+        } catch (\Throwable $e) {
+            if ($this->pdo->inTransaction()) {
+                $this->pdo->rollBack();
+            }
+            throw $e;
+        }
+    }
+
     public function addManagement(
         int $caseId,
         int $actorUserId,
