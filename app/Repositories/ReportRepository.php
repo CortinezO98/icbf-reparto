@@ -540,6 +540,19 @@ final class ReportRepository
         }
     }
 
+    /**
+     * @param array{
+     *   from:?string,
+     *   to:?string,
+     *   queue_id:?int,
+     *   agent_id:?int,
+     *   state:?string,
+     *   sla:?string,
+     *   regional:?string,
+     *   petition_type:?string,
+     *   management_type:?string
+     * } $filters
+     */
     private function where(array $filters): string
     {
         $where = 'WHERE 1=1';
@@ -585,7 +598,15 @@ final class ReportRepository
 
     /**
      * @param array{
-     *   from:?string,to:?string,queue_id:?int,agent_id:?int,state:?string,sla:?string
+     *   from:?string,
+     *   to:?string,
+     *   queue_id:?int,
+     *   agent_id:?int,
+     *   state:?string,
+     *   sla:?string,
+     *   regional:?string,
+     *   petition_type:?string,
+     *   management_type:?string
      * } $filters
      * @return array<string,mixed>
      */
@@ -994,6 +1015,7 @@ final class ReportRepository
         );
     }
 
+    /** @return list<array{id:int,full_name:string}> */
     private function activeAgents(): array
     {
         return $this->rows(
