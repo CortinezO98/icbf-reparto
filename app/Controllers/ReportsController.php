@@ -109,6 +109,7 @@ final class ReportsController
         }
 
         return [
+            'period'=>$period,
             'from'=>$from,
             'to'=>$to,
             'queue_id'=>$this->positiveInt($_GET['queue_id'] ?? null),
