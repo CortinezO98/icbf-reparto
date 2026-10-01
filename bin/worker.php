@@ -55,7 +55,7 @@ echo sprintf(
 $lastSlaAt = 0.0;
 
 try {
-    while (true) {
+    for (;;) {
         $startedAt = microtime(true);
 
         try {
