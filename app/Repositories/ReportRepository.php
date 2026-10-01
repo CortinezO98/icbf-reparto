@@ -323,6 +323,7 @@ final class ReportRepository
                 cm.created_at management_created_at,
                 actor.full_name actor_name,
                 actor.username actor_username,
+                supervisor.full_name supervisor_name,
                 cm.management_type_code,
                 COALESCE(mti.label,cm.management_type_code) management_type_label,
                 cm.escalation_category_code,
@@ -338,6 +339,7 @@ final class ReportRepository
              FROM case_managements cm
              JOIN cases c ON c.id=cm.case_id
              JOIN users actor ON actor.id=cm.actor_user_id
+             LEFT JOIN users supervisor ON supervisor.id=actor.supervisor_user_id
              LEFT JOIN catalogs mtc ON mtc.code='CASE_MANAGEMENT_TYPE'
              LEFT JOIN catalog_items mti
                ON mti.catalog_id=mtc.id
