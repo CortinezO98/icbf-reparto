@@ -67,7 +67,10 @@ final class Auth
             'username' => (string)$user['username'],
             'full_name' => (string)$user['full_name'],
             'email' => (string)$user['email'],
+            'password_must_change' => (int)($user['password_must_change'] ?? 0),
         ];
+
+        $_SESSION['_password_must_change'] = (int)($user['password_must_change'] ?? 0);
 
         $_SESSION['_last_activity'] = time();
     }
@@ -98,6 +101,14 @@ final class Auth
     {
         if (!self::check()) {
             header('Location: /login');
+            exit;
+        }
+
+        $path = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?: '/';
+        $mustChange = (int)($_SESSION['_password_must_change'] ?? 0) === 1;
+
+        if ($mustChange && $path !== '/change-password') {
+            header('Location: /change-password');
             exit;
         }
     }
