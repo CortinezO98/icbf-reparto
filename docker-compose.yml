@@ -44,6 +44,8 @@ services:
       - .env
     command: ["php", "bin/worker.php"]
     depends_on:
+      app:
+        condition: service_healthy
       db:
         condition: service_healthy
     volumes:
