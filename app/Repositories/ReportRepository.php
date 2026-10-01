@@ -158,8 +158,8 @@ final class ReportRepository
                     0,
                     TIMESTAMPDIFF(
                         MINUTE,
-                        GREATEST(ap.started_at,:history_from),
-                        LEAST(COALESCE(ap.ended_at,NOW(6)),:history_to)
+                        GREATEST(ap.started_at,:history_from_calc),
+                        LEAST(COALESCE(ap.ended_at,NOW(6)),:history_to_calc)
                     )
                 ) duration_minutes
              FROM agent_presence ap
