@@ -408,7 +408,8 @@ final class ReportsController
      *   state:?string,
      *   sla:?string,
      *   regional:?string,
-     *   petition_type:?string
+     *   petition_type:?string,
+     *   management_type:?string
      * }
      */
     private function filters(): array
@@ -455,6 +456,7 @@ final class ReportsController
             ),
             'regional' => $this->optionalText($_GET['regional'] ?? null),
             'petition_type' => $this->optionalText($_GET['petition_type'] ?? null),
+            'management_type' => $this->optionalText($_GET['management_type'] ?? null),
         ];
     }
 
