@@ -34,8 +34,7 @@ SELECT
     1
 FROM import_structure_versions v
 JOIN import_structures s ON s.id=v.structure_id
-WHERE s.code='PETICIONES'
-  AND v.version_number=1
+WHERE v.status='ACTIVE'
 ON DUPLICATE KEY UPDATE
     display_name=VALUES(display_name),
     excel_header=VALUES(excel_header),
