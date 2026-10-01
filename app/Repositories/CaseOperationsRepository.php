@@ -233,6 +233,7 @@ final class CaseOperationsRepository
                 u.id,
                 u.full_name,
                 u.username,
+                u.last_assigned_at,
                 COALESCE(qa.capacity_override,q.default_capacity) capacity,
                 (
                     SELECT COUNT(*)
@@ -288,7 +289,7 @@ final class CaseOperationsRepository
                             AND us.removed_at IS NULL
                       )
                )
-             GROUP BY u.id,u.full_name,u.username,qa.capacity_override,q.default_capacity,c.queue_id,c.assigned_user_id
+             GROUP BY u.id,u.full_name,u.username,u.last_assigned_at,qa.capacity_override,q.default_capacity,c.queue_id,c.assigned_user_id
              HAVING open_cases<capacity
              ORDER BY open_cases ASC,u.last_assigned_at ASC,u.full_name ASC,u.id ASC"
         );
