@@ -2,6 +2,7 @@
 /** @var array<string,mixed> $editUser */
 /** @var list<array<string,mixed>> $roles */
 /** @var list<array<string,mixed>> $queues */
+/** @var list<array<string,mixed>> $supervisors */
 /** @var string|null $error */
 
 $selectedRoles = array_map('intval', (array)($editUser['role_ids'] ?? []));
@@ -139,6 +140,19 @@ $allQueuesSelected = $activeQueueIds !== []
                             </option>
                         <?php endforeach; ?>
                     </select>
+
+                    <div class="mt-3">
+                        <label for="supervisor_user_id" class="form-label">Supervisor del agente</label>
+                        <select class="form-select" id="supervisor_user_id" name="supervisor_user_id">
+                            <option value="">Sin supervisor asignado</option>
+                            <?php foreach ($supervisors as $supervisor): ?>
+                                <option value="<?= (int)$supervisor['id'] ?>" <?= (int)($editUser['supervisor_user_id'] ?? 0) === (int)$supervisor['id'] ? 'selected' : '' ?>>
+                                    <?= htmlspecialchars((string)$supervisor['full_name'], ENT_QUOTES, 'UTF-8') ?>
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
+                        <div class="form-text">Se utiliza para organizar el equipo y filtrar la reportería.</div>
+                    </div>
 
                     <div id="queueSection" class="mt-4">
                         <h6 class="form-section-title">
