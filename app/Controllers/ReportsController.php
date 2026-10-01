@@ -306,7 +306,7 @@ final class ReportsController
                 'title' => 'Gestiones de Casos',
                 'filename' => 'reporte_gestiones_casos_' . $stamp,
                 'headers' => [
-                    'Caso','Fecha gestión','Agente','Usuario','Tipo gestión',
+                    'Caso','Fecha gestión','Agente','Usuario','Supervisor','Tipo gestión',
                     'Escalamiento','Tipo petición seleccionado','Tipo petición anterior',
                     'Tipo petición nuevo','Observación','Soporte','Creado caso',
                     'Estado actual','ANS'
@@ -317,6 +317,7 @@ final class ReportsController
                         $row['management_created_at'] ?? '',
                         $row['actor_name'] ?? '',
                         $row['actor_username'] ?? '',
+                        $row['supervisor_name'] ?? '',
                         $row['management_type_label'] ?? $row['management_type_code'] ?? '',
                         $row['escalation_label'] ?? $row['escalation_category_code'] ?? '',
                         $row['petition_type_selected'] ?? '',
