@@ -1,4 +1,8 @@
 <?php
+use App\Auth\Auth;
+use App\Auth\Authorization;
+use App\Config\Database;
+
 /** @var array<string,mixed> $data */
 $summary = $data['summary'] ?? [];
 $cases = $data['cases'] ?? [];
