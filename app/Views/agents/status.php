@@ -7,7 +7,7 @@
         <h1><i class="bi bi-person-workspace text-brand me-2"></i>Estado de agentes</h1>
         <p class="muted">Seguimiento operativo de presencia, carga activa y capacidad de asignación.</p>
     </div>
-    <div class="refresh-note"><i class="bi bi-arrow-repeat me-1"></i>Actualización automática cada 15 segundos</div>
+    <div class="refresh-note"><i class="bi bi-arrow-repeat me-1"></i>Actualización automática cada 5 segundos</div>
 </div>
 
 <div class="metric-grid" id="presenceMetrics">
@@ -106,6 +106,6 @@
         } catch (_) {}
     };
 
-    window.setInterval(refresh, 15000);
+    window.setInterval(refresh, 5000);
 })();
 </script>
