@@ -1,6 +1,7 @@
 <?php
 /** @var array<string,mixed> $case */
 /** @var list<array<string,mixed>> $managements */
+/** @var list<array<string,mixed>> $assignments */
 /** @var list<array<string,mixed>> $events */
 /** @var list<array<string,mixed>> $managementTypes */
 /** @var list<array<string,mixed>> $escalations */
@@ -189,6 +190,44 @@ $elapsedLabel = $elapsedMinutes === null || $elapsedMinutes === ''
                 <?php endif; ?>
             </div>
         <?php endif; ?>
+
+        <div class="case-card" style="margin-top:18px">
+            <h2 style="margin-top:0"><i class="bi bi-clock-history me-1"></i>Historial de asignación</h2>
+            <?php if ($assignments !== []): ?>
+                <div class="timeline">
+                    <?php foreach ($assignments as $assignment): ?>
+                        <div class="timeline-item">
+                            <div class="d-flex justify-content-between gap-2 flex-wrap">
+                                <strong>
+                                    <?= htmlspecialchars((string)$assignment['user_name'], ENT_QUOTES, 'UTF-8') ?>
+                                </strong>
+                                <span class="badge text-bg-light border">
+                                    <?= htmlspecialchars((string)$assignment['assignment_type'], ENT_QUOTES, 'UTF-8') ?>
+                                </span>
+                            </div>
+                            <div class="muted">
+                                Asignado: <?= htmlspecialchars((string)$assignment['assigned_at'], ENT_QUOTES, 'UTF-8') ?>
+                                <?php if (!empty($assignment['assigned_by_name'])): ?>
+                                    · Por: <?= htmlspecialchars((string)$assignment['assigned_by_name'], ENT_QUOTES, 'UTF-8') ?>
+                                <?php else: ?>
+                                    · Sistema
+                                <?php endif; ?>
+                            </div>
+                            <?php if (!empty($assignment['ended_at'])): ?>
+                                <div class="muted">
+                                    Finalizado: <?= htmlspecialchars((string)$assignment['ended_at'], ENT_QUOTES, 'UTF-8') ?>
+                                    <?php if (!empty($assignment['end_reason'])): ?>
+                                        · Motivo: <?= htmlspecialchars((string)$assignment['end_reason'], ENT_QUOTES, 'UTF-8') ?>
+                                    <?php endif; ?>
+                                </div>
+                            <?php endif; ?>
+                        </div>
+                    <?php endforeach; ?>
+                </div>
+            <?php else: ?>
+                <div class="muted">No existe historial de asignación.</div>
+            <?php endif; ?>
+        </div>
 
         <div class="case-card" style="margin-top:18px">
             <h2 style="margin-top:0">Eventos</h2>
