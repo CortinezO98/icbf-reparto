@@ -61,6 +61,7 @@ final class UsersController
         $repo = new UserRepository($this->pdo);
         $roles = $repo->roles();
         $queues = $repo->queues();
+        $supervisors = $repo->supervisors();
 
         $error = $_SESSION['_flash_error'] ?? null;
         $old = $_SESSION['_old_user_form'] ?? [];
@@ -110,6 +111,9 @@ final class UsersController
         if (!$isAgent) {
             $queueIds = [];
             $data['assign_enabled'] = 0;
+            $data['supervisor_user_id'] = null;
+        } elseif (!empty($data['supervisor_user_id']) && !$repo->isActiveSupervisor((int)$data['supervisor_user_id'])) {
+            $this->fail('El supervisor seleccionado no es válido o está inactivo.', '/admin/users/create');
         }
 
         $password = trim((string)($_POST['password'] ?? ''));
@@ -185,6 +189,7 @@ final class UsersController
 
         $roles = $repo->roles();
         $queues = $repo->queues();
+        $supervisors = $repo->supervisors();
         $error = $_SESSION['_flash_error'] ?? null;
         $success = $_SESSION['_flash_success'] ?? null;
         unset($_SESSION['_flash_error'], $_SESSION['_flash_success']);
@@ -230,6 +235,9 @@ final class UsersController
         if (!$isAgent) {
             $queueIds = [];
             $data['assign_enabled'] = 0;
+            $data['supervisor_user_id'] = null;
+        } elseif (!empty($data['supervisor_user_id']) && !$repo->isActiveSupervisor((int)$data['supervisor_user_id'])) {
+            $this->fail('El supervisor seleccionado no es válido o está inactivo.', "/admin/users/{$id}/edit");
         }
 
         if ($repo->duplicateExists(
@@ -525,6 +533,7 @@ final class UsersController
             'username'=>trim((string)($_POST['username'] ?? '')),
             'email'=>mb_strtolower(trim((string)($_POST['email'] ?? ''))),
             'full_name'=>$this->singleLine((string)($_POST['full_name'] ?? '')),
+            'supervisor_user_id'=>$this->positiveInt($_POST['supervisor_user_id'] ?? null),
             'is_active'=>isset($_POST['is_active']) ? 1 : 0,
             'assign_enabled'=>isset($_POST['assign_enabled']) ? 1 : 0,
         ];
@@ -561,6 +570,17 @@ final class UsersController
         }
 
         return $data;
+    }
+
+    private function positiveInt(mixed $value): ?int
+    {
+        if ($value === null || $value === '' || !is_scalar($value)) {
+            return null;
+        }
+
+        $value = (int)$value;
+
+        return $value > 0 ? $value : null;
     }
 
     private function singleLine(string $value): string
