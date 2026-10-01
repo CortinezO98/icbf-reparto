@@ -776,12 +776,13 @@ final class ReportRepository
                 HOUR(c.created_at) hour,
                 q.code queue_code,
                 c.regional,
+                c.segment,
                 c.petition_type,
                 COUNT(*) total_cases
              FROM cases c
              LEFT JOIN work_queues q ON q.id=c.queue_id
              {$where}
-             GROUP BY DATE(c.created_at),HOUR(c.created_at),q.code,c.regional,c.petition_type
+             GROUP BY DATE(c.created_at),HOUR(c.created_at),q.code,c.regional,c.segment,c.petition_type
              ORDER BY day ASC,hour ASC,q.code,c.regional,c.petition_type
              LIMIT 5000",
             $params
