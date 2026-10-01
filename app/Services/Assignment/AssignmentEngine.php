@@ -230,7 +230,7 @@ final class AssignmentEngine
             $this->pdo->commit();
 
             return ['status'=>'NO_AGENT','queue_id'=>$caseQueueId];
-        } catch (\Throwable $e) {
+        } catch (\\Throwable $e) {
             if ($this->pdo->inTransaction()) {
                 $this->pdo->rollBack();
             }
