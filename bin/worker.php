@@ -5,14 +5,11 @@ require dirname(__DIR__) . '/bootstrap/app.php';
 
 use App\Config\Database;
 use App\Repositories\AssignmentRepository;
-use App\Repositories\AuditRepository;
 use App\Repositories\ShiftRepository;
 use App\Repositories\SlaRepository;
 use App\Services\Assignment\AssignmentEngine;
 use App\Services\Sla\SlaService;
 use App\Services\ShiftService;
-use DateTimeImmutable;
-use DateTimeZone;
 
 $pdo = Database::connection();
 
