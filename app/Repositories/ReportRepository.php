@@ -87,6 +87,8 @@ final class ReportRepository
             'filters' => [
                 'queues' => $this->activeQueues(),
                 'agents' => $this->activeAgents(),
+                'regionals' => $this->activeRegionals(),
+                'petition_types' => $this->activePetitionTypes(),
             ],
         ];
     }
@@ -121,6 +123,10 @@ final class ReportRepository
             'agents_summary' => $this->productivity($filters),
             'agents_history' => $this->agentHistory($filters),
             'agents_realtime' => $this->agentRealtime(max(30, $staleSeconds)),
+            'managements' => $this->managementsForExport($filters),
+            'assignments' => $this->assignmentsForExport($filters),
+            'volume_time' => $this->volumeTimeForExport($filters),
+            'monthly' => $this->monthlyForExport($filters),
             default => throw new \InvalidArgumentException('Tipo de reporte no permitido.'),
         };
     }
@@ -271,6 +277,258 @@ final class ReportRepository
      *   from:?string,to:?string,queue_id:?int,agent_id:?int,state:?string,sla:?string
      * } $filters
      */
+
+    /**
+     * Detalle de todas las gestiones registradas en el periodo.
+     *
+     * @param array<string,mixed> $filters
+     * @return list<array<string,mixed>>
+     */
+    private function managementsForExport(array $filters): array
+    {
+        $params = [];
+        $where = 'WHERE 1=1';
+
+        if (($filters['from'] ?? null) !== null) {
+            $where .= ' AND cm.created_at >= :management_from';
+            $params[':management_from'] = $filters['from'];
+        }
+
+        if (($filters['to'] ?? null) !== null) {
+            $where .= ' AND cm.created_at < :management_to';
+            $params[':management_to'] = $filters['to'];
+        }
+
+        $this->appendCaseFilter($where, $params, $filters, 'management');
+
+        return $this->rows(
+            "SELECT
+                c.case_number,
+                cm.created_at management_created_at,
+                actor.full_name actor_name,
+                actor.username actor_username,
+                cm.management_type_code,
+                COALESCE(mti.label,cm.management_type_code) management_type_label,
+                cm.escalation_category_code,
+                COALESCE(eci.label,cm.escalation_category_code) escalation_label,
+                cm.petition_type_selected,
+                cm.previous_petition_type,
+                cm.new_petition_type,
+                cm.observation,
+                cm.support_path,
+                c.created_at case_created_at,
+                c.current_state,
+                c.sla_status
+             FROM case_managements cm
+             JOIN cases c ON c.id=cm.case_id
+             JOIN users actor ON actor.id=cm.actor_user_id
+             LEFT JOIN catalogs mtc ON mtc.code='CASE_MANAGEMENT_TYPE'
+             LEFT JOIN catalog_items mti
+               ON mti.catalog_id=mtc.id
+              AND mti.code=cm.management_type_code
+             LEFT JOIN catalogs esc ON esc.code='ESCALATION_CATEGORY'
+             LEFT JOIN catalog_items eci
+               ON eci.catalog_id=esc.id
+              AND eci.code=cm.escalation_category_code
+             {$where}
+             ORDER BY cm.created_at DESC,cm.id DESC
+             LIMIT 5000",
+            $params
+        );
+    }
+
+    /**
+     * Trazabilidad de asignaciones y reasignaciones.
+     *
+     * @param array<string,mixed> $filters
+     * @return list<array<string,mixed>>
+     */
+    private function assignmentsForExport(array $filters): array
+    {
+        $params = [];
+        $where = 'WHERE 1=1';
+
+        if (($filters['from'] ?? null) !== null) {
+            $where .= ' AND ca.assigned_at >= :assignment_from';
+            $params[':assignment_from'] = $filters['from'];
+        }
+
+        if (($filters['to'] ?? null) !== null) {
+            $where .= ' AND ca.assigned_at < :assignment_to';
+            $params[':assignment_to'] = $filters['to'];
+        }
+
+        $this->appendCaseFilter($where, $params, $filters, 'assignment');
+
+        return $this->rows(
+            "SELECT
+                c.case_number,
+                q.code queue_code,
+                assigned.full_name agent_name,
+                assigned.username agent_username,
+                ca.assignment_type,
+                assigner.full_name assigned_by_name,
+                ca.assigned_at,
+                ca.ended_at,
+                ca.end_reason,
+                COALESCE(
+                    (
+                        SELECT JSON_UNQUOTE(JSON_EXTRACT(ev.details_json,'$.reason'))
+                        FROM case_events ev
+                        WHERE ev.case_id=ca.case_id
+                          AND ev.event_type='CASE_REASSIGNED'
+                          AND JSON_EXTRACT(ev.details_json,'$.to_user_id')=ca.user_id
+                          AND ABS(TIMESTAMPDIFF(SECOND,ev.created_at,ca.assigned_at)) <= 5
+                        ORDER BY ev.id DESC
+                        LIMIT 1
+                    ),
+                    ''
+                ) reassignment_reason,
+                c.current_state
+             FROM case_assignments ca
+             JOIN cases c ON c.id=ca.case_id
+             LEFT JOIN work_queues q ON q.id=ca.queue_id
+             JOIN users assigned ON assigned.id=ca.user_id
+             LEFT JOIN users assigner ON assigner.id=ca.assigned_by
+             {$where}
+             ORDER BY ca.assigned_at DESC,ca.id DESC
+             LIMIT 5000",
+            $params
+        );
+    }
+
+    /**
+     * Volumen operativo por día, hora, regional, tipo de petición y cola.
+     *
+     * @param array<string,mixed> $filters
+     * @return list<array<string,mixed>>
+     */
+    private function volumeTimeForExport(array $filters): array
+    {
+        $where = $this->where($filters);
+        $params = $this->params($filters);
+
+        return $this->rows(
+            "SELECT
+                DATE(c.created_at) day,
+                HOUR(c.created_at) hour,
+                q.code queue_code,
+                c.regional,
+                c.petition_type,
+                COUNT(*) total_cases
+             FROM cases c
+             LEFT JOIN work_queues q ON q.id=c.queue_id
+             {$where}
+             GROUP BY DATE(c.created_at),HOUR(c.created_at),q.code,c.regional,c.petition_type
+             ORDER BY day ASC,hour ASC,q.code,c.regional,c.petition_type
+             LIMIT 5000",
+            $params
+        );
+    }
+
+    /**
+     * Consolidado mensual con indicadores del ciclo de atención.
+     *
+     * @param array<string,mixed> $filters
+     * @return list<array<string,mixed>>
+     */
+    private function monthlyForExport(array $filters): array
+    {
+        $where = $this->where($filters);
+        $params = $this->params($filters);
+
+        return $this->rows(
+            "SELECT
+                DATE_FORMAT(c.created_at,'%Y-%m') month_key,
+                DATE_FORMAT(c.created_at,'%m/%Y') month_label,
+                COUNT(*) total_cases,
+                SUM(c.current_state <> 'CLOSED' AND c.closed_at IS NULL) open_cases,
+                SUM(c.closed_at IS NOT NULL OR c.current_state='CLOSED') closed_cases,
+                SUM(c.first_management_at IS NOT NULL) managed_cases,
+                SUM(c.sla_status='BREACHED') breached_cases,
+                ROUND(AVG(CASE
+                    WHEN c.first_management_at IS NOT NULL
+                    THEN TIMESTAMPDIFF(
+                        MINUTE,
+                        COALESCE(c.assigned_at,c.created_at),
+                        c.first_management_at
+                    )
+                END),1) avg_response_minutes,
+                ROUND(AVG(CASE
+                    WHEN c.closed_at IS NOT NULL
+                    THEN TIMESTAMPDIFF(
+                        MINUTE,
+                        COALESCE(c.assigned_at,c.created_at),
+                        c.closed_at
+                    )
+                END),1) avg_resolution_minutes,
+                ROUND(
+                    100 * SUM(
+                        CASE
+                            WHEN (c.closed_at IS NOT NULL OR c.current_state='CLOSED')
+                             AND c.sla_status IN ('GREEN','YELLOW','RED')
+                            THEN 1 ELSE 0
+                        END
+                    ) / NULLIF(
+                        SUM(CASE
+                            WHEN c.closed_at IS NOT NULL OR c.current_state='CLOSED'
+                            THEN 1 ELSE 0
+                        END),
+                        0
+                    ),
+                    1
+                ) sla_compliance_percent
+             FROM cases c
+             {$where}
+             GROUP BY DATE_FORMAT(c.created_at,'%Y-%m'),DATE_FORMAT(c.created_at,'%m/%Y')
+             ORDER BY month_key ASC",
+            $params
+        );
+    }
+
+    /**
+     * Agrega filtros comunes de casos a reportes basados en eventos.
+     *
+     * @param array<string,mixed> $params
+     * @param array<string,mixed> $filters
+     */
+    private function appendCaseFilter(
+        string &$where,
+        array &$params,
+        array $filters,
+        string $prefix
+    ): void {
+        if (($filters['queue_id'] ?? null) !== null) {
+            $where .= " AND c.queue_id = :{$prefix}_queue";
+            $params[":{$prefix}_queue"] = $filters['queue_id'];
+        }
+
+        if (($filters['agent_id'] ?? null) !== null) {
+            $where .= " AND c.assigned_user_id = :{$prefix}_agent";
+            $params[":{$prefix}_agent"] = $filters['agent_id'];
+        }
+
+        if (($filters['state'] ?? null) !== null) {
+            $where .= " AND c.current_state = :{$prefix}_state";
+            $params[":{$prefix}_state"] = $filters['state'];
+        }
+
+        if (($filters['sla'] ?? null) !== null) {
+            $where .= " AND c.sla_status = :{$prefix}_sla";
+            $params[":{$prefix}_sla"] = $filters['sla'];
+        }
+
+        if (($filters['regional'] ?? null) !== null) {
+            $where .= " AND c.regional = :{$prefix}_regional";
+            $params[":{$prefix}_regional"] = $filters['regional'];
+        }
+
+        if (($filters['petition_type'] ?? null) !== null) {
+            $where .= " AND c.petition_type = :{$prefix}_petition_type";
+            $params[":{$prefix}_petition_type"] = $filters['petition_type'];
+        }
+    }
+
     private function where(array $filters): string
     {
         $where = 'WHERE 1=1';
@@ -297,6 +555,14 @@ final class ReportRepository
 
         if ($filters['sla'] !== null) {
             $where .= ' AND c.sla_status = :sla';
+        }
+
+        if (($filters['regional'] ?? null) !== null) {
+            $where .= ' AND c.regional = :regional';
+        }
+
+        if (($filters['petition_type'] ?? null) !== null) {
+            $where .= ' AND c.petition_type = :petition_type';
         }
 
         return $where;
@@ -334,6 +600,14 @@ final class ReportRepository
 
         if ($filters['sla'] !== null) {
             $params[':sla'] = $filters['sla'];
+        }
+
+        if (($filters['regional'] ?? null) !== null) {
+            $params[':regional'] = $filters['regional'];
+        }
+
+        if (($filters['petition_type'] ?? null) !== null) {
+            $params[':petition_type'] = $filters['petition_type'];
         }
 
         return $params;
@@ -650,6 +924,28 @@ final class ReportRepository
     }
 
     /** @return list<array<string,mixed>> */
+    /** @return list<array<string,mixed>> */
+    private function activeRegionals(): array
+    {
+        return $this->rows(
+            "SELECT DISTINCT regional
+             FROM cases
+             WHERE regional IS NOT NULL AND TRIM(regional)<>''
+             ORDER BY regional"
+        );
+    }
+
+    /** @return list<array<string,mixed>> */
+    private function activePetitionTypes(): array
+    {
+        return $this->rows(
+            "SELECT DISTINCT petition_type
+             FROM cases
+             WHERE petition_type IS NOT NULL AND TRIM(petition_type)<>''
+             ORDER BY petition_type"
+        );
+    }
+
     private function activeAgents(): array
     {
         return $this->rows(
