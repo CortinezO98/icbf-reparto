@@ -218,36 +218,36 @@ final class ReportRepository
         $params = [];
 
         if ($filters['from'] !== null) {
-            $receivedPeriod .= ' AND c.created_at >= :ag_received_from';
-            $closedPeriod .= ' AND c.created_at >= :ag_closed_from';
-            $managedPeriod .= ' AND c.created_at >= :ag_managed_from';
-            $params[':ag_received_from'] = $filters['from'];
-            $params[':ag_closed_from'] = $filters['from'];
-            $params[':ag_managed_from'] = $filters['from'];
+            $receivedPeriod .= ' AND c.created_at >= ?';
+            $closedPeriod .= ' AND c.created_at >= ?';
+            $managedPeriod .= ' AND c.created_at >= ?';
+            $params[] = $filters['from'];
+            $params[] = $filters['from'];
+            $params[] = $filters['from'];
         }
         if ($filters['to'] !== null) {
-            $receivedPeriod .= ' AND c.created_at < :ag_received_to';
-            $closedPeriod .= ' AND c.created_at < :ag_closed_to';
-            $managedPeriod .= ' AND c.created_at < :ag_managed_to';
-            $params[':ag_received_to'] = $filters['to'];
-            $params[':ag_closed_to'] = $filters['to'];
-            $params[':ag_managed_to'] = $filters['to'];
+            $receivedPeriod .= ' AND c.created_at < ?';
+            $closedPeriod .= ' AND c.created_at < ?';
+            $managedPeriod .= ' AND c.created_at < ?';
+            $params[] = $filters['to'];
+            $params[] = $filters['to'];
+            $params[] = $filters['to'];
         }
         if ($filters['queue_id'] !== null) {
-            $receivedPeriod .= ' AND c.queue_id = :ag_received_queue';
-            $closedPeriod .= ' AND c.queue_id = :ag_closed_queue';
-            $managedPeriod .= ' AND c.queue_id = :ag_managed_queue';
-            $params[':ag_received_queue'] = $filters['queue_id'];
-            $params[':ag_closed_queue'] = $filters['queue_id'];
-            $params[':ag_managed_queue'] = $filters['queue_id'];
+            $receivedPeriod .= ' AND c.queue_id = ?';
+            $closedPeriod .= ' AND c.queue_id = ?';
+            $managedPeriod .= ' AND c.queue_id = ?';
+            $params[] = $filters['queue_id'];
+            $params[] = $filters['queue_id'];
+            $params[] = $filters['queue_id'];
         }
         if ($filters['agent_id'] !== null) {
-            $receivedPeriod .= ' AND c.assigned_user_id = :ag_received_agent';
-            $closedPeriod .= ' AND c.assigned_user_id = :ag_closed_agent';
-            $managedPeriod .= ' AND c.assigned_user_id = :ag_managed_agent';
-            $params[':ag_received_agent'] = $filters['agent_id'];
-            $params[':ag_closed_agent'] = $filters['agent_id'];
-            $params[':ag_managed_agent'] = $filters['agent_id'];
+            $receivedPeriod .= ' AND c.assigned_user_id = ?';
+            $closedPeriod .= ' AND c.assigned_user_id = ?';
+            $managedPeriod .= ' AND c.assigned_user_id = ?';
+            $params[] = $filters['agent_id'];
+            $params[] = $filters['agent_id'];
+            $params[] = $filters['agent_id'];
         }
 
         return $this->rows(
