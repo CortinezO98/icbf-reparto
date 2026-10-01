@@ -32,6 +32,8 @@ $slaIntervalSeconds = max(
     (int)($_ENV['SLA_WORKER_INTERVAL_SECONDS'] ?? 300)
 );
 
+$presenceRepository = new PresenceRepository($pdo);
+
 $assignment = new AssignmentEngine(
     $pdo,
     new AssignmentRepository($pdo)
