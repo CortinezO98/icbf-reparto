@@ -296,7 +296,10 @@ final class UsersController
         Csrf::validate($_POST['_csrf'] ?? null);
 
         if ((int)(Auth::id() ?? 0) === $id) {
-            $this->fail('Para tu propia cuenta utiliza la opción de cambio de contraseña.', '/change-password');
+            $this->fail(
+                'Para tu propia cuenta utiliza la opción de cambio de contraseña.',
+                '/change-password'
+            );
         }
 
         $repo = new UserRepository($this->pdo);
@@ -471,3 +474,115 @@ final class UsersController
     public function exportUsers(): void
     {
         Authorization::requirePermission($this->pdo, 'USER_VIEW');
+
+        $repo = new UserRepository($this->pdo);
+        $result = $repo->paginate(1, 100, trim((string)($_GET['search'] ?? '')));
+
+        $spreadsheet = new Spreadsheet();
+        $sheet = $spreadsheet->getActiveSheet();
+        $sheet->setTitle('Usuarios');
+
+        $sheet->fromArray([
+            'ID','Documento','Usuario','Nombre','Correo','Roles','Colas',
+            'Activo','Habilitado Reparto','Presencia'
+        ], null, 'A1');
+
+        $row = 2;
+        foreach ($result['rows'] as $user) {
+            $sheet->fromArray([
+                (int)$user['id'],
+                (string)$user['document_number'],
+                (string)$user['username'],
+                (string)$user['full_name'],
+                (string)$user['email'],
+                (string)($user['roles'] ?? ''),
+                (string)($user['queues'] ?? ''),
+                (int)$user['is_active'],
+                (int)$user['assign_enabled'],
+                (string)($user['presence_label'] ?? 'Desconectado'),
+            ], null, 'A' . $row);
+            $row++;
+        }
+
+        foreach (range('A', 'J') as $column) {
+            $sheet->getColumnDimension($column)->setAutoSize(true);
+        }
+        $sheet->freezePane('A2');
+
+        header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        header('Content-Disposition: attachment; filename="usuarios_icbf_reparto.xlsx"');
+        header('Cache-Control: no-store');
+
+        (new Xlsx($spreadsheet))->save('php://output');
+        exit;
+    }
+
+    /** @return array<string,mixed> */
+    private function commonData(): array
+    {
+        $data = [
+            'document_number'=>$this->singleLine((string)($_POST['document_number'] ?? '')),
+            'username'=>trim((string)($_POST['username'] ?? '')),
+            'email'=>mb_strtolower(trim((string)($_POST['email'] ?? ''))),
+            'full_name'=>$this->singleLine((string)($_POST['full_name'] ?? '')),
+            'is_active'=>isset($_POST['is_active']) ? 1 : 0,
+            'assign_enabled'=>isset($_POST['assign_enabled']) ? 1 : 0,
+        ];
+
+        if (
+            $data['document_number'] === ''
+            || $data['username'] === ''
+            || $data['full_name'] === ''
+            || !filter_var($data['email'], FILTER_VALIDATE_EMAIL)
+        ) {
+            $this->fail(
+                'Completa correctamente los datos obligatorios.',
+                $_SERVER['HTTP_REFERER'] ?? '/admin/users'
+            );
+        }
+
+        if (
+            mb_strlen((string)$data['document_number']) > 50
+            || mb_strlen((string)$data['username']) > 100
+            || mb_strlen((string)$data['email']) > 180
+            || mb_strlen((string)$data['full_name']) > 180
+        ) {
+            $this->fail(
+                'Uno de los campos supera la longitud máxima permitida.',
+                $_SERVER['HTTP_REFERER'] ?? '/admin/users'
+            );
+        }
+
+        if (!preg_match('/^[A-Za-z0-9._-]{3,100}$/', (string)$data['username'])) {
+            $this->fail(
+                'El nombre de usuario debe tener entre 3 y 100 caracteres y solo puede contener letras, números, punto, guion o guion bajo.',
+                $_SERVER['HTTP_REFERER'] ?? '/admin/users'
+            );
+        }
+
+        return $data;
+    }
+
+    private function singleLine(string $value): string
+    {
+        $value = preg_replace('/[\x00-\x1F\x7F]/u', ' ', $value) ?? '';
+        $value = preg_replace('/\s+/u', ' ', $value) ?? '';
+
+        return trim($value);
+    }
+
+    /** @return list<int> */
+    private function intArray(mixed $value): array
+    {
+        if (!is_array($value)) {
+            $value = [$value];
+        }
+
+        return array_values(array_unique(array_filter(
+            array_map('intval', $value),
+            static fn(int $id): bool => $id > 0
+        )));
+    }
+
+    private function fail(string $message, string $redirect): never
+    {
