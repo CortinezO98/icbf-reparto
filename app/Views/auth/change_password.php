@@ -31,16 +31,16 @@ $year = date('Y');
 
                     <div class="mb-3">
                         <label for="password" class="form-label">Nueva contraseña</label>
-                        <input id="password" name="password" type="password" class="form-control" required minlength="12" autocomplete="new-password">
+                        <input id="password" name="password" type="password" class="form-control" required minlength="8" autocomplete="new-password">
                     </div>
 
                     <div class="mb-3">
                         <label for="password_confirm" class="form-label">Confirmar nueva contraseña</label>
-                        <input id="password_confirm" name="password_confirm" type="password" class="form-control" required minlength="12" autocomplete="new-password">
+                        <input id="password_confirm" name="password_confirm" type="password" class="form-control" required minlength="8" autocomplete="new-password">
                     </div>
 
                     <div class="small text-muted mb-3">
-                        Mínimo 12 caracteres, con mayúscula, minúscula, número y símbolo.
+                        Mínimo 8 caracteres, con mayúscula, minúscula, número y símbolo.
                     </div>
 
                     <div class="d-grid">
