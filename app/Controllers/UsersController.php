@@ -236,6 +236,8 @@ final class UsersController
             $queueIds = [];
             $data['assign_enabled'] = 0;
             $data['supervisor_user_id'] = null;
+        } elseif (!empty($data['supervisor_user_id']) && (int)$data['supervisor_user_id'] === $id) {
+            $this->fail('Un usuario no puede ser su propio supervisor.', "/admin/users/{$id}/edit");
         } elseif (!empty($data['supervisor_user_id']) && !$repo->isActiveSupervisor((int)$data['supervisor_user_id'])) {
             $this->fail('El supervisor seleccionado no es válido o está inactivo.', "/admin/users/{$id}/edit");
         }
