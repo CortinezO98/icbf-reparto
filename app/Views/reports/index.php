@@ -15,7 +15,7 @@ $selected = $data['selected'] ?? [];
 $period = (string)($data['period'] ?? 'Hoy');
 
 $fmt = static fn(mixed $value): string => number_format((float)$value, 0, ',', '.');
-$hours = static function(mixed $minutes): string {
+$hours = static function(mixed $minutes) use ($fmt): string {
     if ($minutes === null || $minutes === '') return '—';
     $minutes = max(0, (float)$minutes);
     return $minutes < 60
