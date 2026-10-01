@@ -60,11 +60,20 @@ final class ShiftService
                 $released += count($releasedCaseIds);
                 $queues[$queueId] = true;
 
-                $engine = new \App\Services\Assignment\AssignmentEngine(
-                    $this->pdo,
-                    new AssignmentRepository($this->pdo)
-                );
-                $engine->run($queueId, 500, 'REASSIGN');
+                $assignmentError = null;
+
+                try {
+                    $engine = new \App\Services\Assignment\AssignmentEngine(
+                        $this->pdo,
+                        new AssignmentRepository($this->pdo)
+                    );
+                    $engine->run($queueId, 500, 'REASSIGN');
+                } catch (\Throwable $e) {
+                    $assignmentError = $e;
+                    error_log(
+                        '[SHIFT_END_REASSIGN] ' . $e->getMessage()
+                    );
+                }
 
                 $pendingCases = $this->repository->pendingForCaseIds(
                     $releasedCaseIds
@@ -84,6 +93,10 @@ final class ShiftService
                         $this->pdo->rollBack();
                     }
                     throw $e;
+                }
+
+                if ($assignmentError !== null) {
+                    throw $assignmentError;
                 }
             } catch (\Throwable $e) {
                 if ($this->pdo->inTransaction()) {
