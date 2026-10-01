@@ -36,7 +36,7 @@ final class ReportsController
 
         $report = $this->allowed(
             $_GET['report'] ?? 'cases',
-            ['cases', 'agents_summary', 'agents_history', 'agents_realtime', 'managements', 'assignments', 'volume_time', 'monthly']
+            ['cases', 'agents_summary', 'agents_history', 'agents_realtime', 'managements', 'assignments', 'volume_time', 'monthly', 'police', 'escalations', 'reassignments', 'directed']
         ) ?? 'cases';
 
         $format = strtolower(trim((string)($_GET['format'] ?? 'csv')));
@@ -457,6 +457,8 @@ final class ReportsController
             'regional' => $this->optionalText($_GET['regional'] ?? null),
             'petition_type' => $this->optionalText($_GET['petition_type'] ?? null),
             'management_type' => $this->optionalText($_GET['management_type'] ?? null),
+            'supervisor_id' => $this->positiveInt($_GET['supervisor_id'] ?? null),
+            'segment' => $this->optionalText($_GET['segment'] ?? null),
         ];
     }
 
