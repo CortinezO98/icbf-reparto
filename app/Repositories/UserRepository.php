@@ -449,6 +449,13 @@ final class UserRepository
             ':must_change'=>$mustChange ? 1 : 0,
             ':id'=>$userId,
         ]);
+
+        $this->pdo->prepare(
+            'UPDATE password_reset_tokens
+             SET used_at=COALESCE(used_at,NOW(6))
+             WHERE user_id=:user_id
+               AND used_at IS NULL'
+        )->execute([':user_id'=>$userId]);
     }
 
     public function createPasswordResetToken(int $userId, string $tokenHash, string $expiresAt): void
