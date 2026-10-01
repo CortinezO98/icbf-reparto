@@ -8,10 +8,12 @@ use App\Auth\Authorization;
 use App\Auth\Csrf;
 use App\Auth\PasswordPolicy;
 use App\Config\App;
+use App\Repositories\AssignmentRepository;
 use App\Repositories\AuditRepository;
 use App\Repositories\PresenceRepository;
 use App\Repositories\UserRepository;
 use App\Security\LoginRateLimiter;
+use App\Services\Assignment\AssignmentEngine;
 use App\Services\Users\TemporaryPasswordGenerator;
 use PDO;
 
@@ -132,6 +134,24 @@ final class AuthController
             try {
                 if (in_array('AGENTE', Authorization::roles($this->pdo, $uid), true)) {
                     (new PresenceRepository($this->pdo))->markOffline($uid, $uid, 'LOGOUT');
+
+                    try {
+                        $assignment = new AssignmentEngine(
+                            $this->pdo,
+                            new AssignmentRepository($this->pdo)
+                        );
+
+                        $released = $assignment->releaseCasesForAgent($uid, 'LOGOUT');
+
+                        foreach ($released['queue_ids'] as $queueId) {
+                            $assignment->run($queueId, 500, 'REASSIGN');
+                        }
+                    } catch (\Throwable $assignmentError) {
+                        error_log(
+                            '[AgentPresence][LOGOUT][ASSIGNMENT] '
+                            . $assignmentError->getMessage()
+                        );
+                    }
                 }
             } catch (\Throwable $e) {
                 error_log('[AgentPresence][LOGOUT] ' . $e->getMessage());
