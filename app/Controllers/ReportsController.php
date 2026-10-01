@@ -126,6 +126,7 @@ final class ReportsController
         return $value > 0 ? $value : null;
     }
 
+    /** @param list<string> $allowed */
     private function allowed(mixed $value, array $allowed): ?string
     {
         if ($value === null || !is_scalar($value)) return null;
