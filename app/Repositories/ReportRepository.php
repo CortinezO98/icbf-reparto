@@ -212,29 +212,42 @@ final class ReportRepository
      */
     private function agents(array $filters): array
     {
-        $period = '1=1';
+        $receivedPeriod = '1=1';
+        $closedPeriod = '1=1';
         $params = [];
 
         if ($filters['from'] !== null) {
-            $period .= ' AND c.created_at >= :ag_from';
-            $params[':ag_from'] = $filters['from'];
+            $receivedPeriod .= ' AND c.created_at >= :ag_received_from';
+            $closedPeriod .= ' AND c.created_at >= :ag_closed_from';
+            $params[':ag_received_from'] = $filters['from'];
+            $params[':ag_closed_from'] = $filters['from'];
         }
         if ($filters['to'] !== null) {
-            $period .= ' AND c.created_at < :ag_to';
-            $params[':ag_to'] = $filters['to'];
+            $receivedPeriod .= ' AND c.created_at < :ag_received_to';
+            $closedPeriod .= ' AND c.created_at < :ag_closed_to';
+            $params[':ag_received_to'] = $filters['to'];
+            $params[':ag_closed_to'] = $filters['to'];
         }
         if ($filters['queue_id'] !== null) {
-            $period .= ' AND c.queue_id = :ag_queue';
-            $params[':ag_queue'] = $filters['queue_id'];
+            $receivedPeriod .= ' AND c.queue_id = :ag_received_queue';
+            $closedPeriod .= ' AND c.queue_id = :ag_closed_queue';
+            $params[':ag_received_queue'] = $filters['queue_id'];
+            $params[':ag_closed_queue'] = $filters['queue_id'];
+        }
+        if ($filters['agent_id'] !== null) {
+            $receivedPeriod .= ' AND c.assigned_user_id = :ag_received_agent';
+            $closedPeriod .= ' AND c.assigned_user_id = :ag_closed_agent';
+            $params[':ag_received_agent'] = $filters['agent_id'];
+            $params[':ag_closed_agent'] = $filters['agent_id'];
         }
 
         return $this->rows(
             "SELECT
                 u.id,u.full_name,u.username,
                 COUNT(DISTINCT CASE WHEN c.closed_at IS NULL AND c.current_state <> 'CLOSED' THEN c.id END) open_cases,
-                COUNT(DISTINCT CASE WHEN {$period} THEN c.id END) received_period,
-                COUNT(DISTINCT CASE WHEN {$period} AND (c.closed_at IS NOT NULL OR c.current_state='CLOSED') THEN c.id END) closed_period,
-                COUNT(DISTINCT CASE WHEN {$period} AND c.first_management_at IS NOT NULL THEN c.id END) managed_period
+                COUNT(DISTINCT CASE WHEN {$receivedPeriod} THEN c.id END) received_period,
+                COUNT(DISTINCT CASE WHEN {$closedPeriod} AND (c.closed_at IS NOT NULL OR c.current_state='CLOSED') THEN c.id END) closed_period,
+                COUNT(DISTINCT CASE WHEN {$receivedPeriod} AND c.first_management_at IS NOT NULL THEN c.id END) managed_period
              FROM users u
              JOIN user_roles ur ON ur.user_id=u.id
              JOIN roles r ON r.id=ur.role_id AND r.code='AGENTE' AND r.is_active=1
