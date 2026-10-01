@@ -228,7 +228,10 @@ final class ReportRepository
         );
     }
 
-    /** @return list<array<string,mixed>> */
+    /**
+     * @param ReportFilters $filters
+     * @return list<array<string,mixed>>
+     */
     private function agentRealtime(int $staleSeconds, array $filters): array
     {
         $cutoff = (new \DateTimeImmutable())
@@ -765,6 +768,10 @@ final class ReportRepository
         );
     }
 
+    /**
+     * @param ReportFilters $filters
+     * @return list<array<string,mixed>>
+     */
     private function volumeTimeForExport(array $filters): array
     {
         $where = $this->where($filters);
