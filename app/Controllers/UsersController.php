@@ -153,6 +153,15 @@ final class UsersController
                 ]
             );
 
+            if ($passwordWasGenerated) {
+                $this->sendTemporaryPasswordEmail(
+                    (string)$data['email'],
+                    (string)$data['full_name'],
+                    (string)$data['username'],
+                    $password
+                );
+            }
+
             unset($_SESSION['_old_user_form']);
             $_SESSION['_flash_success'] =
                 'Usuario creado correctamente. Contraseña temporal: ' . $password;
@@ -260,6 +269,15 @@ final class UsersController
                 (int)(Auth::id() ?? 0)
             );
 
+            if ($passwordChanged) {
+                $this->sendTemporaryPasswordEmail(
+                    (string)$data['email'],
+                    (string)$data['full_name'],
+                    (string)$data['username'],
+                    $password
+                );
+            }
+
             (new AuditRepository($this->pdo))->log(
                 Auth::id(),
                 'USER_UPDATED',
@@ -279,6 +297,67 @@ final class UsersController
         } catch (\Throwable $e) {
             error_log('[UsersController::update] ' . $e->getMessage());
             $this->fail('No fue posible actualizar el usuario.', "/admin/users/{$id}/edit");
+        }
+    }
+
+    private function sendTemporaryPasswordEmail(
+        string $email,
+        string $fullName,
+        string $username,
+        string $temporaryPassword
+    ): void {
+        if (
+            !filter_var($email, FILTER_VALIDATE_EMAIL)
+            || !filter_var(
+                $_ENV['SEND_TEMP_PASSWORD_EMAILS'] ?? '1',
+                FILTER_VALIDATE_BOOL
+            )
+        ) {
+            return;
+        }
+
+        try {
+            $appUrl = rtrim((string)($_ENV['APP_URL'] ?? ''), '/');
+            if ($appUrl === '') {
+                return;
+            }
+
+            $fromEmail = (string)($_ENV['MAIL_FROM_EMAIL'] ?? 'noreply@icbf.gov.co');
+            $fromName = (string)($_ENV['MAIL_FROM_NAME'] ?? 'ICBF Reparto');
+            $subject = 'Activación de cuenta - ICBF Reparto';
+
+            $safeName = htmlspecialchars($fullName, ENT_QUOTES, 'UTF-8');
+            $safeUser = htmlspecialchars($username, ENT_QUOTES, 'UTF-8');
+            $safePassword = htmlspecialchars($temporaryPassword, ENT_QUOTES, 'UTF-8');
+            $safeUrl = htmlspecialchars($appUrl . '/login', ENT_QUOTES, 'UTF-8');
+
+            $html = '<!doctype html><html lang="es"><body style="font-family:Arial,sans-serif">'
+                . '<h2>Activación de cuenta</h2>'
+                . '<p>Hola ' . $safeName . '.</p>'
+                . '<p>Tu cuenta de ICBF Reparto fue creada o restablecida.</p>'
+                . '<p><strong>Usuario:</strong> ' . $safeUser . '</p>'
+                . '<p><strong>Contraseña temporal:</strong> ' . $safePassword . '</p>'
+                . '<p><a href="' . $safeUrl . '">Ingresar al sistema</a></p>'
+                . '<p><strong>Por seguridad, debes cambiar la contraseña en tu primer ingreso.</strong></p>'
+                . '</body></html>';
+
+            $headers = [
+                'MIME-Version: 1.0',
+                'Content-Type: text/html; charset=UTF-8',
+                'From: ' . $fromName . ' <' . $fromEmail . '>',
+            ];
+
+            if (mail($email, $subject, $html, implode("\r\n", $headers))) {
+                (new AuditRepository($this->pdo))->log(
+                    Auth::id(),
+                    'TEMP_PASSWORD_EMAIL_SENT',
+                    'USER',
+                    null,
+                    ['recipient_domain'=>strtolower((string)substr(strrchr($email, '@') ?: '', 1))]
+                );
+            }
+        } catch (\Throwable $e) {
+            error_log('[UsersController::sendTemporaryPasswordEmail] ' . $e->getMessage());
         }
     }
 
