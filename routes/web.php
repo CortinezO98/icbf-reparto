@@ -62,6 +62,7 @@ return static function(Router $router,PDO $pdo): void {
  $router->get('/admin/queues',fn()=>(new QueuesController($pdo))->index());
  $router->post('/admin/queues/create',fn()=>(new QueuesController($pdo))->create());
  $router->post('/admin/queues/attach-structure',fn()=>(new QueuesController($pdo))->attach());
+ $router->post('/admin/queues/{queueId}/agents/{userId}/capacity',fn(int $queueId,int $userId)=>(new QueuesController($pdo))->updateAgentCapacity($queueId,$userId));
 
  $router->get('/admin/shifts',fn()=>(new ShiftController($pdo))->index());
  $router->post('/admin/shifts/create',fn()=>(new ShiftController($pdo))->createShift());
