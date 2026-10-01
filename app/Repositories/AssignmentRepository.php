@@ -56,6 +56,12 @@ final class AssignmentRepository
     /** @return list<array<string,mixed>> */
     public function eligibleCandidateIds(int $queueId): array
     {
+        $tz = new \DateTimeZone($_ENV['APP_TIMEZONE'] ?? 'America/Bogota');
+        $now = new \DateTimeImmutable('now', $tz);
+        $date = $now->format('Y-m-d');
+        $weekday = (int)$now->format('N');
+        $time = $now->format('H:i:s');
+
         $st = $this->pdo->prepare(
             "SELECT DISTINCT
                 u.id,
@@ -83,6 +89,27 @@ final class AssignmentRepository
              WHERE qa.queue_id=:qid
                AND qa.is_enabled=1
                AND qa.removed_at IS NULL
+               AND EXISTS (
+                    SELECT 1
+                    FROM agent_shift_schedules ass
+                    JOIN work_shifts ws
+                      ON ws.id=ass.shift_id
+                     AND ws.is_active=1
+                    WHERE ass.user_id=u.id
+                      AND ass.queue_id=qa.queue_id
+                      AND ass.is_active=1
+                      AND (
+                           ass.schedule_date=:shift_date_specific
+                           OR (
+                               ass.schedule_date IS NULL
+                               AND ass.weekday=:shift_weekday
+                           )
+                      )
+                      AND (ass.valid_from IS NULL OR ass.valid_from<=:shift_valid_from)
+                      AND (ass.valid_to IS NULL OR ass.valid_to>=:shift_valid_to)
+                      AND ws.start_time<=:shift_time_start
+                      AND ws.end_time>:shift_time_end
+               )
                AND NOT EXISTS (
                     SELECT 1
                     FROM queue_skills qs
@@ -106,6 +133,12 @@ final class AssignmentRepository
         $st->execute([
             ':qid'=>$queueId,
             ':presence_cutoff'=>$this->presenceCutoff(),
+            ':shift_date_specific'=>$date,
+            ':shift_weekday'=>$weekday,
+            ':shift_valid_from'=>$date,
+            ':shift_valid_to'=>$date,
+            ':shift_time_start'=>$time,
+            ':shift_time_end'=>$time,
         ]);
 
         return $st->fetchAll() ?: [];
@@ -124,6 +157,58 @@ final class AssignmentRepository
         $row = $st->fetch();
 
         return $row ?: null;
+    }
+
+    public function isOnShiftForQueue(
+        int $queueId,
+        int $userId,
+        ?\DateTimeImmutable $now = null
+    ): bool {
+        $tz = new \DateTimeZone($_ENV['APP_TIMEZONE'] ?? 'America/Bogota');
+        $local = ($now ?? new \DateTimeImmutable('now', $tz))->setTimezone($tz);
+        $date = $local->format('Y-m-d');
+        $weekday = (int)$local->format('N');
+        $time = $local->format('H:i:s');
+
+        $st = $this->pdo->prepare(
+            "SELECT 1
+             FROM agent_shift_schedules ass
+             JOIN work_shifts ws
+               ON ws.id=ass.shift_id
+              AND ws.is_active=1
+             WHERE ass.user_id=:user_id
+               AND ass.queue_id=:queue_id
+               AND ass.is_active=1
+               AND (
+                    ass.schedule_date=:specific_date
+                    OR (
+                        ass.schedule_date IS NULL
+                        AND ass.weekday=:weekday
+                    )
+               )
+               AND (ass.valid_from IS NULL OR ass.valid_from<=:valid_from)
+               AND (ass.valid_to IS NULL OR ass.valid_to>=:valid_to)
+               AND ws.start_time<=:start_time
+               AND ws.end_time>:end_time
+             ORDER BY
+                CASE WHEN ass.schedule_date IS NULL THEN 1 ELSE 0 END,
+                ass.valid_from DESC,
+                ws.start_time DESC,
+                ass.id DESC
+             LIMIT 1"
+        );
+        $st->execute([
+            ':user_id'=>$userId,
+            ':queue_id'=>$queueId,
+            ':specific_date'=>$date,
+            ':weekday'=>$weekday,
+            ':valid_from'=>$date,
+            ':valid_to'=>$date,
+            ':start_time'=>$time,
+            ':end_time'=>$time,
+        ]);
+
+        return (bool)$st->fetchColumn();
     }
 
     public function isAvailableNow(int $userId): bool
@@ -228,7 +313,12 @@ final class AssignmentRepository
         return (int)$st->fetchColumn();
     }
 
-    public function assignCase(int $caseId, int $queueId, int $userId): void
+    public function assignCase(
+        int $caseId,
+        int $queueId,
+        int $userId,
+        string $assignmentType = 'AUTO'
+    ): void
     {
         $st = $this->pdo->prepare(
             "UPDATE cases
@@ -251,15 +341,22 @@ final class AssignmentRepository
             throw new \RuntimeException('El caso cambió durante el reparto.');
         }
 
+        $assignmentType = strtoupper(trim($assignmentType));
+
+        if (!in_array($assignmentType, ['AUTO','REASSIGN'], true)) {
+            throw new \InvalidArgumentException('Tipo de asignación no permitido.');
+        }
+
         $assignment = $this->pdo->prepare(
             "INSERT INTO case_assignments
              (case_id,queue_id,user_id,assignment_type,assigned_by,assigned_at)
-             VALUES(:cid,:qid,:uid,'AUTO',NULL,NOW(6))"
+             VALUES(:cid,:qid,:uid,:assignment_type,NULL,NOW(6))"
         );
         $assignment->execute([
             ':cid'=>$caseId,
             ':qid'=>$queueId,
             ':uid'=>$userId,
+            ':assignment_type'=>$assignmentType,
         ]);
 
         $event = $this->pdo->prepare(
@@ -272,7 +369,7 @@ final class AssignmentRepository
             ':cid'=>$caseId,
             ':details'=>json_encode(
                 [
-                    'assignment_type'=>'AUTO',
+                    'assignment_type'=>$assignmentType,
                     'queue_id'=>$queueId,
                     'user_id'=>$userId,
                 ],
