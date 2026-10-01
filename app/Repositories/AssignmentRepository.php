@@ -214,6 +214,40 @@ final class AssignmentRepository
         return (bool)$st->fetchColumn();
     }
 
+    /** @return list<int> */
+    public function caseIdsOutsideActiveShift(int $limit = 100): array
+    {
+        if (!$this->requireShift()) {
+            return [];
+        }
+
+        $st = $this->pdo->prepare(
+            "SELECT c.id
+             FROM cases c
+             JOIN users u ON u.id=c.assigned_user_id
+             JOIN case_assignments ca
+               ON ca.case_id=c.id
+              AND ca.ended_at IS NULL
+             WHERE c.assigned_user_id IS NOT NULL
+               AND c.closed_at IS NULL
+               AND c.current_state NOT IN ('CLOSED','PENDING_ASSIGNMENT')
+               AND NOT EXISTS (
+                    SELECT 1
+                    FROM agent_shifts ash
+                    WHERE ash.user_id=u.id
+                      AND ash.is_active=1
+                      AND ash.starts_at<=NOW(6)
+                      AND ash.ends_at>NOW(6)
+               )
+             ORDER BY COALESCE(c.assigned_at,c.created_at) ASC,c.id ASC
+             LIMIT :limit"
+        );
+        $st->bindValue(':limit', max(1,min(500,$limit)), PDO::PARAM_INT);
+        $st->execute();
+
+        return array_map('intval', $st->fetchAll(PDO::FETCH_COLUMN) ?: []);
+    }
+
     public function isWithinActiveShift(int $queueId, int $userId): bool
     {
         if (!$this->requireShift()) {
