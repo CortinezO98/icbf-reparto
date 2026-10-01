@@ -6,6 +6,8 @@
 /** @var list<array<string,mixed>> $escalations */
 /** @var list<array<string,mixed>> $petitionTypes */
 /** @var bool $canManage */
+/** @var bool $canReassign */
+/** @var list<array<string,mixed>> $reassignmentCandidates */
 /** @var string|null $success */
 /** @var string|null $error */
 
@@ -138,6 +140,37 @@ $elapsedLabel = $elapsedMinutes === null || $elapsedMinutes === ''
 
                     <button class="btn btn-primary" type="submit" style="margin-top:14px"><i class="bi bi-check-circle me-1"></i>Guardar gestión</button>
                 </form>
+            </div>
+        <?php endif; ?>
+
+        <?php if ($canReassign && (string)($case['current_state'] ?? '') !== 'CLOSED'): ?>
+            <div class="case-card" style="margin-top:18px">
+                <h2 style="margin-top:0">Reasignar caso</h2>
+                <p class="muted small">
+                    Solo se muestran agentes disponibles, con capacidad y habilitados para la cola y habilidades del caso.
+                </p>
+                <?php if ($reassignmentCandidates !== []): ?>
+                    <form method="post" action="/cases/<?= (int)$case['id'] ?>/reassign">
+                        <input type="hidden" name="_csrf" value="<?= htmlspecialchars(\App\Auth\Csrf::token(), ENT_QUOTES, 'UTF-8') ?>">
+                        <label class="form-label">Agente destino</label>
+                        <select name="target_user_id" class="form-select" required>
+                            <option value="">Seleccionar...</option>
+                            <?php foreach ($reassignmentCandidates as $candidate): ?>
+                                <option value="<?= (int)$candidate['id'] ?>">
+                                    <?= htmlspecialchars((string)$candidate['full_name'], ENT_QUOTES, 'UTF-8') ?>
+                                    — <?= (int)$candidate['open_cases'] ?>/<?= (int)$candidate['capacity'] ?> casos
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
+                        <button class="btn btn-outline-primary w-100 mt-3" type="submit">
+                            <i class="bi bi-arrow-left-right me-1"></i>Reasignar caso
+                        </button>
+                    </form>
+                <?php else: ?>
+                    <div class="alert alert-warning mb-0">
+                        No hay agentes disponibles con capacidad para recibir este caso en este momento.
+                    </div>
+                <?php endif; ?>
             </div>
         <?php endif; ?>
 
