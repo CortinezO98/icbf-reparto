@@ -94,6 +94,10 @@ final class CasesController
         $escalations = $repo->catalogItems('ESCALATION_CATEGORY');
         $petitionTypes = $repo->catalogItems('PETITION_TYPE');
         $canManage = $repo->canManage($id, $uid);
+        $canReassign = Authorization::hasPermission($this->pdo, $uid, 'CASE_REASSIGN');
+        $reassignmentCandidates = $canReassign && (string)($case['current_state'] ?? '') !== 'CLOSED'
+            ? $repo->reassignmentCandidates($id)
+            : [];
 
         $success = $_SESSION['_flash_success'] ?? null;
         $error = $_SESSION['_flash_error'] ?? null;
@@ -169,6 +173,42 @@ final class CasesController
             }
 
             $_SESSION['_flash_error'] = 'No fue posible registrar la gestión.';
+        }
+
+        header('Location: /cases/' . $id);
+        exit;
+    }
+
+    public function reassign(int $id): void
+    {
+        Authorization::requirePermission($this->pdo, 'CASE_REASSIGN');
+        Csrf::validate($_POST['_csrf'] ?? null);
+
+        $targetUserId = (int)($_POST['target_user_id'] ?? 0);
+
+        if ($targetUserId <= 0) {
+            $this->redirectError($id, 'Selecciona un agente de destino.');
+        }
+
+        try {
+            (new CaseOperationsRepository($this->pdo))->reassignCase(
+                $id,
+                $targetUserId,
+                (int)(Auth::id() ?? 0)
+            );
+
+            (new AuditRepository($this->pdo))->log(
+                Auth::id(),
+                'CASE_REASSIGNED',
+                'CASE',
+                (string)$id,
+                ['new_user_id'=>$targetUserId]
+            );
+
+            $_SESSION['_flash_success'] = 'Caso reasignado correctamente.';
+        } catch (\Throwable $e) {
+            error_log('[CasesController::reassign] ' . $e->getMessage());
+            $_SESSION['_flash_error'] = $e->getMessage();
         }
 
         header('Location: /cases/' . $id);
