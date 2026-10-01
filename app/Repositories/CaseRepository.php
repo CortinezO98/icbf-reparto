@@ -18,11 +18,11 @@ final class CaseRepository
         $st = $this->pdo->prepare(
             "INSERT INTO cases
              (case_number,external_key,queue_id,source_structure_version_id,
-              source_batch_id,source_batch_row_id,petition_type,regional,
+              source_batch_id,source_batch_row_id,petition_type,regional,segment,
               origin_channel,radicated_at,current_state,created_by)
              VALUES
              (:case_number,:external_key,:queue_id,:version_id,:batch_id,:row_id,
-              :petition_type,:regional,:origin_channel,:radicated_at,
+              :petition_type,:regional,:segment,:origin_channel,:radicated_at,
               'PENDING_ASSIGNMENT',:created_by)"
         );
 
@@ -35,6 +35,7 @@ final class CaseRepository
             ':row_id'=>$data['source_batch_row_id'] ?? null,
             ':petition_type'=>$data['petition_type'] ?? null,
             ':regional'=>$data['regional'] ?? null,
+            ':segment'=>$data['segment'] ?? null,
             ':origin_channel'=>$data['origin_channel'] ?? null,
             ':radicated_at'=>$data['radicated_at'] ?? null,
             ':created_by'=>$data['created_by'] ?? null,
