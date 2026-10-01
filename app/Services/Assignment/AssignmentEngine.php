@@ -15,8 +15,18 @@ final class AssignmentEngine
     }
 
     /** @return array{assigned:int,no_agent:int,iterations:int} */
-    public function run(?int $queueId = null, int $maxAssignments = 500): array
+    public function run(
+        ?int $queueId = null,
+        int $maxAssignments = 500,
+        string $assignmentType = 'AUTO'
+    ): array
     {
+        $assignmentType = strtoupper(trim($assignmentType));
+
+        if (!in_array($assignmentType, ['AUTO','REASSIGN'], true)) {
+            throw new \InvalidArgumentException('Tipo de asignación no permitido.');
+        }
+
         $maxAssignments = max(1, min(5000, $maxAssignments));
 
         $assigned = 0;
@@ -27,7 +37,11 @@ final class AssignmentEngine
         while ($assigned < $maxAssignments) {
             $iterations++;
 
-            $result = $this->assignOne($queueId, $blockedQueueIds);
+            $result = $this->assignOne(
+                $queueId,
+                $blockedQueueIds,
+                $assignmentType
+            );
 
             if ($result['status'] === 'NO_CASE') {
                 break;
@@ -59,7 +73,11 @@ final class AssignmentEngine
      * @param array<int,bool> $blockedQueueIds
      * @return array{status:'ASSIGNED'|'NO_AGENT'|'NO_CASE',queue_id:int|null}
      */
-    private function assignOne(?int $queueId, array $blockedQueueIds): array
+    private function assignOne(
+        ?int $queueId,
+        array $blockedQueueIds,
+        string $assignmentType
+    ): array
     {
         $this->pdo->beginTransaction();
 
@@ -111,7 +129,12 @@ final class AssignmentEngine
                     continue;
                 }
 
-                $this->repo->assignCase($caseId, $caseQueueId, $userId);
+                $this->repo->assignCase(
+                    $caseId,
+                    $caseQueueId,
+                    $userId,
+                    $assignmentType
+                );
                 $this->pdo->commit();
 
                 return ['status'=>'ASSIGNED','queue_id'=>$caseQueueId];
