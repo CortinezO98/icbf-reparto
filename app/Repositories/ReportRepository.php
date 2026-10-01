@@ -133,7 +133,7 @@ final class ReportRepository
             'cases' => $this->casesForExport($filters),
             'agents_summary' => $this->productivity($filters),
             'agents_history' => $this->agentHistory($filters),
-            'agents_realtime' => $this->agentRealtime(max(30, $staleSeconds)),
+            'agents_realtime' => $this->agentRealtime(max(30, $staleSeconds), $filters),
             'managements' => $this->managementsForExport($filters),
             'assignments' => $this->assignmentsForExport($filters),
             'volume_time' => $this->volumeTimeForExport($filters),
@@ -168,6 +168,30 @@ final class ReportRepository
         if ($filters['agent_id'] !== null) {
             $where .= ' AND ap.user_id = :history_agent';
             $params[':history_agent'] = $filters['agent_id'];
+        }
+
+        if (($filters['supervisor_id'] ?? null) !== null) {
+            $where .= ' AND EXISTS (
+                SELECT 1
+                FROM users history_agent
+                WHERE history_agent.id=ap.user_id
+                  AND history_agent.supervisor_user_id=:history_supervisor
+            )';
+            $params[':history_supervisor'] = $filters['supervisor_id'];
+        }
+
+        if (($filters['segment'] ?? null) !== null) {
+            $where .= ' AND EXISTS (
+                SELECT 1
+                FROM cases history_case
+                WHERE history_case.assigned_user_id=ap.user_id
+                  AND history_case.segment=:history_segment
+                  AND history_case.created_at>=:history_segment_from
+                  AND history_case.created_at<:history_segment_to
+            )';
+            $params[':history_segment'] = $filters['segment'];
+            $params[':history_segment_from'] = $filters['from'];
+            $params[':history_segment_to'] = $filters['to'];
         }
 
         return $this->rows(
@@ -205,11 +229,69 @@ final class ReportRepository
     }
 
     /** @return list<array<string,mixed>> */
-    private function agentRealtime(int $staleSeconds): array
+    private function agentRealtime(int $staleSeconds, array $filters): array
     {
         $cutoff = (new \DateTimeImmutable())
             ->modify('-' . $staleSeconds . ' seconds')
             ->format('Y-m-d H:i:s.u');
+
+        $agentWhere = 'WHERE u.is_active=1';
+        $agentParams = [];
+
+        if (($filters['agent_id'] ?? null) !== null) {
+            $agentWhere .= ' AND u.id=:realtime_agent';
+            $agentParams[':realtime_agent'] = $filters['agent_id'];
+        }
+
+        if (($filters['supervisor_id'] ?? null) !== null) {
+            $agentWhere .= ' AND u.supervisor_user_id=:realtime_supervisor';
+            $agentParams[':realtime_supervisor'] = $filters['supervisor_id'];
+        }
+
+        if (($filters['queue_id'] ?? null) !== null) {
+            $agentWhere .= ' AND EXISTS (
+                SELECT 1
+                FROM queue_agents realtime_qa
+                WHERE realtime_qa.user_id=u.id
+                  AND realtime_qa.queue_id=:realtime_queue
+                  AND realtime_qa.is_enabled=1
+                  AND realtime_qa.removed_at IS NULL
+            )';
+            $agentParams[':realtime_queue'] = $filters['queue_id'];
+        }
+
+        if (($filters['segment'] ?? null) !== null) {
+            $agentWhere .= ' AND EXISTS (
+                SELECT 1
+                FROM cases realtime_case
+                WHERE realtime_case.assigned_user_id=u.id
+                  AND realtime_case.segment=:realtime_segment
+                  AND realtime_case.closed_at IS NULL
+            )';
+            $agentParams[':realtime_segment'] = $filters['segment'];
+        }
+
+        if (($filters['regional'] ?? null) !== null) {
+            $agentWhere .= ' AND EXISTS (
+                SELECT 1
+                FROM cases realtime_regional_case
+                WHERE realtime_regional_case.assigned_user_id=u.id
+                  AND realtime_regional_case.regional=:realtime_regional
+                  AND realtime_regional_case.closed_at IS NULL
+            )';
+            $agentParams[':realtime_regional'] = $filters['regional'];
+        }
+
+        if (($filters['petition_type'] ?? null) !== null) {
+            $agentWhere .= ' AND EXISTS (
+                SELECT 1
+                FROM cases realtime_petition_case
+                WHERE realtime_petition_case.assigned_user_id=u.id
+                  AND realtime_petition_case.petition_type=:realtime_petition
+                  AND realtime_petition_case.closed_at IS NULL
+            )';
+            $agentParams[':realtime_petition'] = $filters['petition_type'];
+        }
 
         $rows = $this->rows(
             "SELECT
@@ -257,11 +339,12 @@ final class ReportRepository
                ON qa.user_id=u.id
               AND qa.removed_at IS NULL
              LEFT JOIN work_queues q ON q.id=qa.queue_id
-             WHERE u.is_active=1
+             {$agentWhere}
              GROUP BY
                 u.id,u.full_name,u.username,u.is_active,u.assign_enabled,
                 ap.status_code,ci.label,ap.started_at,ap.last_heartbeat_at
-             ORDER BY u.full_name,u.id"
+             ORDER BY u.full_name,u.id",
+            $agentParams
         );
 
         foreach ($rows as &$row) {
