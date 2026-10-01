@@ -72,6 +72,7 @@ $elapsedLabel = $elapsedMinutes === null || $elapsedMinutes === ''
                 <div class="datum"><small>Agente</small><strong><?= htmlspecialchars((string)($case['assigned_user_name'] ?: 'Sin asignar'), ENT_QUOTES, 'UTF-8') ?></strong></div>
                 <div class="datum"><small>Tipo petición</small><strong><?= htmlspecialchars((string)($case['petition_type'] ?: '—'), ENT_QUOTES, 'UTF-8') ?></strong></div>
                 <div class="datum"><small>Regional</small><strong><?= htmlspecialchars((string)($case['regional'] ?: '—'), ENT_QUOTES, 'UTF-8') ?></strong></div>
+                <div class="datum"><small>Segmento</small><strong><?= htmlspecialchars((string)($case['segment'] ?: '—'), ENT_QUOTES, 'UTF-8') ?></strong></div>
                 <div class="datum"><small>Canal origen</small><strong><?= htmlspecialchars((string)($case['origin_channel'] ?: '—'), ENT_QUOTES, 'UTF-8') ?></strong></div>
                 <div class="datum"><small>Radicación</small><strong><?= htmlspecialchars((string)($case['radicated_at'] ?: '—'), ENT_QUOTES, 'UTF-8') ?></strong></div>
                 <div class="datum"><small>Última gestión</small><strong><?= htmlspecialchars((string)($case['current_management_type_code'] ?: 'Sin gestión'), ENT_QUOTES, 'UTF-8') ?></strong></div>
