@@ -595,6 +595,30 @@ final class UserRepository
         return $row ?: null;
     }
 
+    public function findPasswordHash(int $userId): ?string
+    {
+        $st = $this->pdo->prepare(
+            'SELECT password_hash FROM users WHERE id=:id LIMIT 1'
+        );
+        $st->execute([':id'=>$userId]);
+        $hash = $st->fetchColumn();
+
+        return $hash === false ? null : (string)$hash;
+    }
+
+    public function passwordResetRequestsInLastHour(string $email): int
+    {
+        $st = $this->pdo->prepare(
+            "SELECT COUNT(*)
+             FROM password_resets
+             WHERE email=:email
+               AND created_at >= DATE_SUB(NOW(6), INTERVAL 1 HOUR)"
+        );
+        $st->execute([':email'=>trim($email)]);
+
+        return (int)$st->fetchColumn();
+    }
+
     public function updatePasswordHash(int $userId, string $passwordHash): void
     {
         $st = $this->pdo->prepare(
@@ -697,71 +721,3 @@ final class UserRepository
         if ($queueIds === []) {
             return;
         }
-
-        $queueStmt = $this->pdo->prepare(
-            'INSERT INTO queue_agents
-             (queue_id,user_id,capacity_override,priority,is_enabled,assigned_by,assigned_at,removed_at)
-             VALUES(:qid,:uid,NULL,100,1,:actor,NOW(6),NULL)
-             ON DUPLICATE KEY UPDATE
-                is_enabled=1,
-                removed_at=NULL,
-                assigned_by=VALUES(assigned_by),
-                assigned_at=NOW(6)'
-        );
-
-        $skillLookup = $this->pdo->prepare(
-            'SELECT s.id
-             FROM queue_skills qs
-             JOIN skills s ON s.id=qs.skill_id
-             WHERE qs.queue_id=:qid
-               AND qs.is_required=1
-               AND s.is_active=1'
-        );
-
-        $skillStmt = $this->pdo->prepare(
-            'INSERT INTO user_skills
-             (user_id,skill_id,is_active,assigned_by,assigned_at,removed_at)
-             VALUES(:uid,:sid,1,:actor,NOW(6),NULL)
-             ON DUPLICATE KEY UPDATE
-                is_active=1,
-                removed_at=NULL,
-                assigned_by=VALUES(assigned_by),
-                assigned_at=NOW(6)'
-        );
-
-        foreach ($queueIds as $queueId) {
-            $queueStmt->execute([
-                ':qid'=>$queueId,
-                ':uid'=>$userId,
-                ':actor'=>$actorUserId,
-            ]);
-
-            $skillLookup->execute([':qid'=>$queueId]);
-            foreach ($skillLookup->fetchAll(PDO::FETCH_COLUMN) ?: [] as $skillId) {
-                $skillStmt->execute([
-                    ':uid'=>$userId,
-                    ':sid'=>(int)$skillId,
-                    ':actor'=>$actorUserId,
-                ]);
-            }
-        }
-    }
-
-    private function endCurrentPresence(int $userId): void
-    {
-        $this->pdo->prepare(
-            "UPDATE agent_presence
-             SET ended_at=NOW(6),last_heartbeat_at=NOW(6)
-             WHERE user_id=:uid AND ended_at IS NULL"
-        )->execute([':uid'=>$userId]);
-    }
-
-    /** @return list<int> */
-    private function idsForUser(string $sql, int $userId): array
-    {
-        $st = $this->pdo->prepare($sql);
-        $st->execute([':uid'=>$userId]);
-
-        return array_map('intval', $st->fetchAll(PDO::FETCH_COLUMN) ?: []);
-    }
-}
