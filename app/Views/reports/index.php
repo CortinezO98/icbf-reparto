@@ -134,25 +134,33 @@ $exportUrl = static function (string $report, string $format) use ($startDate, $
 .status-yellow{background:#fff4cf;color:#8b6100}
 .status-red{background:#ffe7e7;color:#c52e3d}
 .status-gray{background:#f2f4f7;color:#667085}
-.reports-export-modal .modal-dialog{max-width:920px}
-.reports-export-modal .modal-content{border:0;border-radius:16px;box-shadow:0 20px 60px rgba(16,24,40,.22);overflow:hidden}
-.reports-export-modal .modal-header{padding:17px 20px;border-bottom:1px solid #e4e7ec}
+.reports-export-modal .modal-dialog{max-width:760px}
+.reports-export-modal .modal-content{border:0;border-radius:12px;box-shadow:0 20px 60px rgba(16,24,40,.22)}
+.reports-export-modal .modal-header{padding:16px 18px;border-bottom:1px solid #e4e7ec}
 .reports-export-modal .modal-title{font-size:1.05rem;font-weight:800;color:#172033}
-.reports-export-modal .modal-body{padding:18px}
-.reports-export-intro{font-size:.78rem;line-height:1.55;color:#667085;background:#f8fafb;border:1px solid #e5e7eb;border-radius:10px;padding:11px 13px;margin-bottom:16px}
-.reports-export-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
-.report-export-item{display:grid;grid-template-columns:40px minmax(0,1fr);grid-template-rows:auto auto;align-items:center;column-gap:12px;row-gap:12px;border:1px solid #dfe3e8;border-radius:12px;padding:14px;background:#fff;transition:border-color .15s ease,box-shadow .15s ease}
-.report-export-item:hover{border-color:#cbd5df;box-shadow:0 5px 16px rgba(16,24,40,.06)}
-.report-export-icon{width:40px;height:40px;border-radius:10px;display:grid;place-items:center;background:rgba(76,175,80,.10);color:var(--color-primary);font-size:1.05rem}
+.reports-export-modal .modal-body{padding:16px}
+.reports-export-intro{font-size:.78rem;line-height:1.5;color:#667085;margin-bottom:12px}
+.report-export-item{display:flex;align-items:center;justify-content:space-between;gap:16px;border:1px solid #dfe3e8;border-radius:8px;padding:13px 14px;margin-bottom:9px}
+.report-export-item:last-child{margin-bottom:0}
 .report-export-info{min-width:0}
-.report-export-title{font-size:.88rem;font-weight:800;color:#344054;line-height:1.25}
-.report-export-description{font-size:.73rem;line-height:1.45;color:#667085;margin-top:4px}
-.report-export-actions{grid-column:1 / -1;display:flex;justify-content:flex-end;gap:8px;padding-top:2px;border-top:1px solid #eef0f2}
-.report-export-actions .btn{font-size:.74rem;padding:6px 11px}
+.report-export-title{display:flex;align-items:center;gap:8px;font-size:.88rem;font-weight:700;color:#344054}
+.report-export-title i{color:var(--color-primary)}
+.report-export-description{font-size:.72rem;color:#667085;margin-top:3px}
+.report-export-actions{display:flex;gap:7px;flex-shrink:0}
+.report-export-actions .btn{font-size:.74rem;padding:6px 10px}
 .report-export-actions .btn-excel{border-color:#198754;color:#198754}
 .report-export-actions .btn-excel:hover{background:#198754;color:#fff}
-@media(max-width:767.98px){.reports-export-grid{grid-template-columns:1fr}}
-@media(max-width:575.98px){.report-export-item{grid-template-columns:36px minmax(0,1fr);padding:12px}.report-export-icon{width:36px;height:36px}.report-export-actions{justify-content:stretch}.report-export-actions .btn{flex:1}}
+@media(max-width:575.98px){
+  .report-export-item{align-items:flex-start;flex-direction:column}
+  .report-export-actions{width:100%}
+  .report-export-actions .btn{flex:1}
+}
+@media(max-width:767.98px){
+  .reports-header h1{font-size:1.4rem}
+  .reports-header-actions{width:100%;justify-content:space-between}
+  .report-kpi{min-height:130px}
+  .sla-line{grid-template-columns:72px 1fr 38px}
+}
 </style>
 
 <div class="reports-page">
@@ -169,52 +177,587 @@ $exportUrl = static function (string $report, string $format) use ($startDate, $
             </div>
 
             <?php if (Authorization::hasPermission(Database::connection(), (int)Auth::id(), 'REPORT_EXPORT')): ?>
+                <button
+                    class="btn btn-outline-primary"
+                    type="button"
+                    data-bs-toggle="modal"
+                    data-bs-target="#reportsExportModal"
+                >
+                    <i class="bi bi-download me-1"></i>Exportar
+                </button>
+            <?php endif; ?>
+        </div>
+    </div>
+
+    <form class="reports-filter" method="get" action="/reports">
+        <div class="row g-3 align-items-end">
+            <div class="col-12 col-md-2">
+                <label for="start">Fecha Inicio</label>
+                <div class="input-group">
+                    <span class="input-group-text"><i class="bi bi-calendar"></i></span>
+                    <input class="form-control" type="date" id="start" name="start"
+                           value="<?= htmlspecialchars($startDate, ENT_QUOTES, 'UTF-8') ?>">
+                </div>
+            </div>
+
+            <div class="col-12 col-md-2">
+                <label for="end">Fecha Fin</label>
+                <div class="input-group">
+                    <span class="input-group-text"><i class="bi bi-calendar"></i></span>
+                    <input class="form-control" type="date" id="end" name="end"
+                           value="<?= htmlspecialchars($endDate, ENT_QUOTES, 'UTF-8') ?>">
+                </div>
+            </div>
+
+            <div class="col-12 col-md-2">
+                <label for="queue_id">Cola</label>
+                <select class="form-select" id="queue_id" name="queue_id">
+                    <option value="">Todas</option>
+                    <?php foreach ($filters['queues'] as $queue): ?>
+                        <option value="<?= (int)$queue['id'] ?>"
+                            <?= (int)($selected['queue_id'] ?? 0) === (int)$queue['id'] ? 'selected' : '' ?>>
+                            <?= htmlspecialchars((string)$queue['code'], ENT_QUOTES, 'UTF-8') ?>
+                        </option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+
+            <div class="col-12 col-md-2">
+                <label for="agent_id">Agente</label>
+                <select class="form-select" id="agent_id" name="agent_id">
+                    <option value="">Todos</option>
+                    <?php foreach ($filters['agents'] as $agent): ?>
+                        <option value="<?= (int)$agent['id'] ?>"
+                            <?= (int)($selected['agent_id'] ?? 0) === (int)$agent['id'] ? 'selected' : '' ?>>
+                            <?= htmlspecialchars((string)$agent['full_name'], ENT_QUOTES, 'UTF-8') ?>
+                        </option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+
+            <div class="col-12 col-md-2">
+                <label for="state">Estado</label>
+                <select class="form-select" id="state" name="state">
+                    <option value="">Todos</option>
+                    <?php foreach ([
+                        'PENDING_ASSIGNMENT'=>'Pendiente de asignación',
+                        'ASSIGNED'=>'Asignado',
+                        'CLOSED'=>'Cerrado'
+                    ] as $key=>$label): ?>
+                        <option value="<?= $key ?>"
+                            <?= ($selected['state'] ?? '') === $key ? 'selected' : '' ?>>
+                            <?= $label ?>
+                        </option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+
+            <div class="col-12 col-md-2">
+                <label for="sla">ANS</label>
+                <div class="d-flex gap-2">
+                    <select class="form-select" id="sla" name="sla">
+                        <option value="">Todos</option>
+                        <?php foreach ([
+                            'GREEN'=>'Verde',
+                            'YELLOW'=>'Amarillo',
+                            'RED'=>'Rojo',
+                            'BREACHED'=>'Vencido'
+                        ] as $key=>$label): ?>
+                            <option value="<?= $key ?>"
+                                <?= ($selected['sla'] ?? '') === $key ? 'selected' : '' ?>>
+                                <?= $label ?>
+                            </option>
+                        <?php endforeach; ?>
+                    </select>
+                    <button class="btn btn-primary px-3" type="submit" title="Aplicar filtros">
+                        <i class="bi bi-funnel"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </form>
+
+    <div class="row g-3 mb-3">
+        <div class="col-12 col-xl-3">
+            <div class="report-card report-kpi">
+                <div class="report-card-body">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div>
+                            <div class="kpi-label">Casos Totales</div>
+                            <div class="kpi-value"><?= $fmt($totalCases) ?></div>
+                            <div class="kpi-detail">
+                                <?= $fmt($summary['open_cases'] ?? 0) ?> abiertos
+                                <span class="ms-1">(<?= $totalCases > 0 ? round(((int)($summary['open_cases'] ?? 0) / $totalCases) * 100) : 0 ?>%)</span>
+                            </div>
+                        </div>
+                        <div class="kpi-icon kpi-blue"><i class="bi bi-folder2-open"></i></div>
+                    </div>
+                    <div class="small text-muted mt-3">
+                        Cerrados: <strong><?= $fmt($summary['closed_cases'] ?? 0) ?></strong>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-12 col-xl-3">
+            <div class="report-card report-kpi">
+                <div class="report-card-body">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div>
+                            <div class="kpi-label">Respondidos</div>
+                            <div class="kpi-value"><?= $fmt($managedCases) ?></div>
+                            <div class="kpi-detail">
+                                Tasa de respuesta:
+                                <strong><?= $responseRate === null ? '—' : $responseRate . '%' ?></strong>
+                            </div>
+                        </div>
+                        <div class="kpi-icon kpi-green"><i class="bi bi-check-circle"></i></div>
+                    </div>
+                    <div class="sla-progress mt-3">
+                        <div style="width:<?= min(100, max(0, (float)($responseRate ?? 0))) ?>%;background:#198754"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-12 col-xl-3">
+            <div class="report-card report-kpi">
+                <div class="report-card-body">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div class="w-100">
+                            <div class="kpi-label">Estado SLA</div>
+                            <div class="sla-number">
+                                <?= $fmt($green) ?><span>/</span><?= $fmt($yellow) ?><span>/</span><?= $fmt($red) ?>
+                            </div>
+                            <div class="d-flex gap-2 mt-1">
+                                <span class="sla-pill sla-green">Verde</span>
+                                <span class="sla-pill sla-yellow">Amarillo</span>
+                                <span class="sla-pill sla-red">Rojo</span>
+                            </div>
+                        </div>
+                        <div class="kpi-icon kpi-yellow ms-2"><i class="bi bi-speedometer2"></i></div>
+                    </div>
+
+                    <div class="sla-line">
+                        <span>Verde</span>
+                        <div class="sla-progress"><div style="width:<?= $greenPct ?>%;background:#198754"></div></div>
+                        <strong><?= $greenPct ?>%</strong>
+                    </div>
+                    <div class="sla-line">
+                        <span>Amarillo</span>
+                        <div class="sla-progress"><div style="width:<?= $yellowPct ?>%;background:#f0ad00"></div></div>
+                        <strong><?= $yellowPct ?>%</strong>
+                    </div>
+                    <div class="sla-line">
+                        <span>Rojo</span>
+                        <div class="sla-progress"><div style="width:<?= $redPct ?>%;background:#dc3545"></div></div>
+                        <strong><?= $redPct ?>%</strong>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-12 col-xl-3">
+            <div class="report-card report-kpi">
+                <div class="report-card-body">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div>
+                            <div class="kpi-label">Vencidos</div>
+                            <div class="kpi-value" style="color:#dc3545"><?= $fmt($breached) ?></div>
+                            <div class="kpi-detail">Tasa de vencimiento: <strong><?= $breachRate ?>%</strong></div>
+                        </div>
+                        <div class="kpi-icon kpi-red"><i class="bi bi-exclamation-triangle"></i></div>
+                    </div>
+                    <div class="mt-3 px-2 py-2 rounded-2" style="background:#fff4d6;color:#805f00;font-size:.76rem">
+                        <i class="bi bi-person-dash me-1"></i>
+                        Sin gestión: <strong><?= $fmt($summary['unmanaged_open_cases'] ?? 0) ?></strong>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="report-card mb-3">
+        <div class="report-card-body">
+            <div class="d-flex align-items-center gap-2 mb-3">
+                <i class="bi bi-graph-up-arrow" style="color:var(--color-primary)"></i>
+                <div>
+                    <div class="report-section-title">Serie Diaria - Casos Recibidos</div>
+                    <div class="report-section-subtitle">Cantidad de casos creados por día dentro del periodo seleccionado.</div>
+                </div>
+            </div>
+
+            <?php if ($daily !== []): ?>
+                <div class="report-scroll">
+                    <table class="daily-table">
+                        <thead>
+                            <tr>
+                                <th style="width:18%">Día</th>
+                                <th style="width:15%;text-align:right">Casos recibidos</th>
+                                <th>Tendencia</th>
+                                <th style="width:8%;text-align:right">%</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                        <?php foreach ($daily as $row):
+                            $count = (int)($row['total'] ?? 0);
+                            $trend = round(($count / $maxDaily) * 100);
+                        ?>
+                            <tr>
+                                <td><strong><?= htmlspecialchars(date('d/m/Y', strtotime((string)$row['day'])), ENT_QUOTES, 'UTF-8') ?></strong></td>
+                                <td class="daily-value"><?= $fmt($count) ?></td>
+                                <td>
+                                    <div class="daily-bar">
+                                        <div class="daily-bar-fill" style="width:<?= min(100, $trend) ?>%"></div>
+                                    </div>
+                                </td>
+                                <td class="daily-trend"><?= $trend ?>%</td>
+                            </tr>
+                        <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                </div>
+            <?php else: ?>
+                <div class="report-empty">No hay casos recibidos en el periodo seleccionado.</div>
+            <?php endif; ?>
+        </div>
+    </div>
+
+    <div class="report-card mb-3">
+        <div class="report-card-body">
+            <div class="d-flex justify-content-between align-items-start gap-3 mb-3">
+                <div>
+                    <div class="d-flex align-items-center gap-2">
+                        <i class="bi bi-people" style="color:var(--color-primary)"></i>
+                        <div class="report-section-title">Productividad por Agente</div>
+                    </div>
+                    <div class="report-section-subtitle">Casos asignados, resueltos, vencidos, tiempo de respuesta y cumplimiento ANS.</div>
+                </div>
+                <span class="small text-muted d-none d-md-block">Periodo seleccionado</span>
+            </div>
+
+            <div class="report-scroll">
+                <table class="productivity-table">
+                    <thead>
+                        <tr>
+                            <th>Agente</th>
+                            <th style="text-align:right">Asignados</th>
+                            <th style="text-align:right">Resueltos</th>
+                            <th style="text-align:right">Vencidos</th>
+                            <th style="text-align:right">Tiempo resp. (h)</th>
+                            <th style="text-align:right">% Cumplimiento SLA</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    <?php foreach ($agents as $agent):
+                        $closed = (int)($agent['closed_cases'] ?? 0);
+                        $compliant = (int)($agent['compliant_cases'] ?? 0);
+                        $compliance = $closed > 0 ? round(($compliant / $closed) * 100, 1) : null;
+                    ?>
+                        <tr>
+                            <td>
+                                <div class="agent-name"><?= htmlspecialchars((string)$agent['full_name'], ENT_QUOTES, 'UTF-8') ?></div>
+                                <div class="muted"><?= htmlspecialchars((string)$agent['username'], ENT_QUOTES, 'UTF-8') ?></div>
+                            </td>
+                            <td style="text-align:right"><?= $fmt($agent['assigned_cases'] ?? 0) ?></td>
+                            <td style="text-align:right"><?= $fmt($agent['resolved_cases'] ?? 0) ?></td>
+                            <td style="text-align:right">
+                                <?php if ((int)($agent['breached_cases'] ?? 0) > 0): ?>
+                                    <span class="sla-status-badge status-red"><?= $fmt($agent['breached_cases']) ?></span>
+                                <?php else: ?>
+                                    0
+                                <?php endif; ?>
+                            </td>
+                            <td style="text-align:right"><?= $hours($agent['response_minutes'] ?? null) ?></td>
+                            <td style="text-align:right">
+                                <?php if ($compliance === null): ?>
+                                    —
+                                <?php else: ?>
+                                    <strong><?= $compliance ?>%</strong>
+                                <?php endif; ?>
+                            </td>
+                        </tr>
+                    <?php endforeach; ?>
+
+                    <?php if ($agents === []): ?>
+                        <tr><td colspan="6" class="report-empty">No hay datos de agentes para el periodo seleccionado.</td></tr>
+                    <?php endif; ?>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div class="report-card mb-3">
+        <div class="report-card-body">
+            <div class="d-flex justify-content-between align-items-start gap-3 mb-3">
+                <div>
+                    <div class="d-flex align-items-center gap-2">
+                        <i class="bi bi-clock-history" style="color:var(--color-primary)"></i>
+                        <div>
+                            <div class="report-section-title">Histórico de estados de agentes</div>
+                            <div class="report-section-subtitle">Muestra cada cambio de estado dentro del periodo, incluyendo la desconexión registrada por cierre de sesión o detectada por heartbeat.</div>
+                        </div>
+                    </div>
+                </div>
+                <span class="small text-muted d-none d-md-block"><?= count($presenceHistory) ?> registros</span>
+            </div>
+
+            <div class="report-scroll">
+                <table class="productivity-table">
+                    <thead>
+                        <tr>
+                            <th>Agente</th>
+                            <th>Estado</th>
+                            <th>Inicio</th>
+                            <th>Fin / desconexión</th>
+                            <th>Duración</th>
+                            <th>Origen</th>
+                            <th>Establecido por</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    <?php foreach (array_slice($presenceHistory, 0, 200) as $presence): ?>
+                        <?php
+                            $presenceCode = (string)($presence['status_code'] ?? '');
+                            $presenceLabel = (string)($presence['status_label'] ?? $presenceCode);
+                            $presenceClass = $presenceCode === 'OFFLINE'
+                                ? 'status-gray'
+                                : ($presenceCode === 'AVAILABLE' ? 'status-green' : 'status-blue');
+                            $started = (string)($presence['started_at'] ?? '');
+                            $ended = (string)($presence['ended_at'] ?? '');
+                            $duration = (int)($presence['duration_minutes'] ?? 0);
+                        ?>
+                        <tr>
+                            <td>
+                                <div class="agent-name"><?= htmlspecialchars((string)$presence['full_name'], ENT_QUOTES, 'UTF-8') ?></div>
+                                <div class="muted"><?= htmlspecialchars((string)$presence['username'], ENT_QUOTES, 'UTF-8') ?></div>
+                            </td>
+                            <td>
+                                <span class="sla-status-badge <?= $presenceClass ?>">
+                                    <?= htmlspecialchars($presenceLabel, ENT_QUOTES, 'UTF-8') ?>
+                                </span>
+                            </td>
+                            <td><?= htmlspecialchars($started, ENT_QUOTES, 'UTF-8') ?></td>
+                            <td>
+                                <?= $ended !== ''
+                                    ? htmlspecialchars($ended, ENT_QUOTES, 'UTF-8')
+                                    : '<span class="text-muted">En curso</span>' ?>
+                            </td>
+                            <td><?= $hours($duration) ?></td>
+                            <td><?= htmlspecialchars((string)($presence['source'] ?? ''), ENT_QUOTES, 'UTF-8') ?></td>
+                            <td><?= htmlspecialchars((string)($presence['set_by_name'] ?? 'Sistema'), ENT_QUOTES, 'UTF-8') ?></td>
+                        </tr>
+                    <?php endforeach; ?>
+
+                    <?php if ($presenceHistory === []): ?>
+                        <tr><td colspan="7" class="report-empty">No hay cambios de estado de agentes en el periodo seleccionado.</td></tr>
+                    <?php endif; ?>
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="small text-muted mt-3">
+                Si el agente cierra sesión, la desconexión se registra en ese momento. Si pierde conexión o cierra el navegador sin cerrar sesión, la desconexión se registra cuando el sistema detecta que el heartbeat superó el tiempo configurado.
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-3 mb-3">
+        <div class="col-12 col-xl-6">
+            <div class="report-card">
+                <div class="report-card-body">
+                    <div class="report-section-title">Resumen por Cola</div>
+                    <div class="report-section-subtitle mb-3">Carga y comportamiento de las colas.</div>
+                    <div class="report-scroll">
+                        <table class="productivity-table">
+                            <thead>
+                                <tr>
+                                    <th>Cola</th>
+                                    <th style="text-align:right">Recibidos</th>
+                                    <th style="text-align:right">Abiertos</th>
+                                    <th style="text-align:right">Cerrados</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                            <?php foreach ($queues as $queue): ?>
+                                <tr>
+                                    <td>
+                                        <div class="agent-name"><?= htmlspecialchars((string)$queue['code'], ENT_QUOTES, 'UTF-8') ?></div>
+                                        <div class="muted"><?= htmlspecialchars((string)$queue['name'], ENT_QUOTES, 'UTF-8') ?></div>
+                                    </td>
+                                    <td style="text-align:right"><?= $fmt($queue['received_period'] ?? 0) ?></td>
+                                    <td style="text-align:right"><?= $fmt($queue['open_cases'] ?? 0) ?></td>
+                                    <td style="text-align:right"><?= $fmt($queue['closed_cases'] ?? 0) ?></td>
+                                </tr>
+                            <?php endforeach; ?>
+                            <?php if ($queues === []): ?>
+                                <tr><td colspan="4" class="report-empty">Sin datos.</td></tr>
+                            <?php endif; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-12 col-xl-6">
+            <div class="report-card">
+                <div class="report-card-body">
+                    <div class="report-section-title">Detalle de casos</div>
+                    <div class="report-section-subtitle mb-3">Hasta 200 registros visibles. La exportación permite hasta 5.000.</div>
+                    <div class="report-scroll">
+                        <table class="productivity-table">
+                            <thead>
+                                <tr>
+                                    <th>Caso</th>
+                                    <th>Agente</th>
+                                    <th>Estado</th>
+                                    <th>ANS</th>
+                                    <th></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                            <?php foreach (array_slice($cases, 0, 12) as $row):
+                                $slaStatus = (string)($row['sla_status'] ?? 'PENDING');
+                                $slaClass = match ($slaStatus) {
+                                    'GREEN' => 'status-green',
+                                    'YELLOW' => 'status-yellow',
+                                    'RED','BREACHED' => 'status-red',
+                                    default => 'status-gray',
+                                };
+                            ?>
+                                <tr>
+                                    <td>
+                                        <a href="/cases/<?= (int)$row['id'] ?>" class="agent-name text-decoration-none">
+                                            <?= htmlspecialchars((string)$row['case_number'], ENT_QUOTES, 'UTF-8') ?>
+                                        </a>
+                                        <div class="muted"><?= htmlspecialchars((string)($row['queue_code'] ?: 'Sin cola'), ENT_QUOTES, 'UTF-8') ?></div>
+                                    </td>
+                                    <td><?= htmlspecialchars((string)($row['agent_name'] ?: 'Sin asignar'), ENT_QUOTES, 'UTF-8') ?></td>
+                                    <td>
+                                        <span class="sla-status-badge status-blue">
+                                            <?= htmlspecialchars($stateText($row['current_state']), ENT_QUOTES, 'UTF-8') ?>
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <span class="sla-status-badge <?= $slaClass ?>">
+                                            <?= htmlspecialchars($slaText($slaStatus), ENT_QUOTES, 'UTF-8') ?>
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <a href="/cases/<?= (int)$row['id'] ?>" class="btn btn-sm btn-outline-primary" title="Ver caso">
+                                            <i class="bi bi-eye"></i>
+                                        </a>
+                                    </td>
+                                </tr>
+                            <?php endforeach; ?>
+
+                            <?php if ($cases === []): ?>
+                                <tr><td colspan="5" class="report-empty">No hay casos con los filtros seleccionados.</td></tr>
+                            <?php endif; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="small text-muted mt-2">
+        Los indicadores se calculan sobre la fecha de creación de los casos. El tiempo de respuesta usa la primera gestión registrada y el cumplimiento ANS usa el estado ANS persistido en cada caso.
+    </div>
+</div>
+
+<?php if (Authorization::hasPermission(Database::connection(), (int)Auth::id(), 'REPORT_EXPORT')): ?>
 <div class="modal fade reports-export-modal" id="reportsExportModal" tabindex="-1" aria-labelledby="reportsExportModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered modal-lg">
+    <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
             <div class="modal-header">
-                <h2 class="modal-title" id="reportsExportModalLabel"><i class="bi bi-download me-2"></i>Exportar reportes</h2>
+                <h2 class="modal-title" id="reportsExportModalLabel">
+                    <i class="bi bi-download me-2"></i>Exportar Reportes
+                </h2>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
             </div>
             <div class="modal-body">
                 <div class="reports-export-intro">
-                    <i class="bi bi-info-circle me-1"></i>
-                    Los reportes de <strong>Casos / SLA</strong>, <strong>Resumen de Agentes</strong> e
-                    <strong>Histórico de Agentes</strong> utilizan el periodo seleccionado:
-                    <strong><?= htmlspecialchars($data['period'] ?? '', ENT_QUOTES, 'UTF-8') ?></strong>.
-                    El reporte de <strong>Estado en Tiempo Real</strong> siempre exporta la fotografía actual.
+                    Los reportes de Casos/SLA, Resumen de Agentes e Histórico de Agentes usan el rango de fechas seleccionado arriba
+                    (<?= htmlspecialchars($data['period'] ?? '', ENT_QUOTES, 'UTF-8') ?>).
+                    El Estado en Tiempo Real siempre exporta la fotografía actual, sin rango histórico.
                 </div>
-                <div class="reports-export-grid">
-                    <div class="report-export-item">
-                        <div class="report-export-icon"><i class="bi bi-briefcase"></i></div>
-                        <div class="report-export-info"><div class="report-export-title">Casos / SLA</div><div class="report-export-description">Detalle de casos, tiempos de gestión y cumplimiento ANS.</div></div>
+
+                <div class="report-export-item">
+                    <div class="report-export-info">
+                        <div class="report-export-title">
+                            <i class="bi bi-briefcase"></i>Casos / SLA
+                        </div>
+                        <div class="report-export-description">
+                            Detalle de casos, tiempos y estado de cumplimiento ANS.
+                        </div>
                         <div class="report-export-actions">
-                            <a class="btn btn-outline-secondary" href="<?= htmlspecialchars($exportUrl('cases', 'csv'), ENT_QUOTES, 'UTF-8') ?>"><i class="bi bi-filetype-csv me-1"></i>CSV</a>
-                            <a class="btn btn-outline-success btn-excel" href="<?= htmlspecialchars($exportUrl('cases', 'xlsx'), ENT_QUOTES, 'UTF-8') ?>"><i class="bi bi-file-earmark-excel me-1"></i>Excel</a>
+                            <a class="btn btn-outline-secondary" href="<?= htmlspecialchars($exportUrl('cases', 'csv'), ENT_QUOTES, 'UTF-8') ?>">
+                                <i class="bi bi-filetype-csv me-1"></i>CSV
+                            </a>
+                            <a class="btn btn-outline-success btn-excel" href="<?= htmlspecialchars($exportUrl('cases', 'xlsx'), ENT_QUOTES, 'UTF-8') ?>">
+                                <i class="bi bi-file-earmark-excel me-1"></i>Excel
+                            </a>
                         </div>
                     </div>
+
                     <div class="report-export-item">
-                        <div class="report-export-icon"><i class="bi bi-person-lines-fill"></i></div>
-                        <div class="report-export-info"><div class="report-export-title">Agentes — Resumen</div><div class="report-export-description">Casos asignados, resueltos, vencidos, primera gestión y cumplimiento ANS.</div></div>
+                        <div class="report-export-info">
+                            <div class="report-export-title">
+                                <i class="bi bi-person-lines-fill"></i>Agentes — Resumen
+                            </div>
+                            <div class="report-export-description">
+                                Casos asignados, resueltos, vencidos, tiempo de primera gestión y cumplimiento ANS.
+                            </div>
+                        </div>
                         <div class="report-export-actions">
-                            <a class="btn btn-outline-secondary" href="<?= htmlspecialchars($exportUrl('agents_summary', 'csv'), ENT_QUOTES, 'UTF-8') ?>"><i class="bi bi-filetype-csv me-1"></i>CSV</a>
-                            <a class="btn btn-outline-success btn-excel" href="<?= htmlspecialchars($exportUrl('agents_summary', 'xlsx'), ENT_QUOTES, 'UTF-8') ?>"><i class="bi bi-file-earmark-excel me-1"></i>Excel</a>
+                            <a class="btn btn-outline-secondary" href="<?= htmlspecialchars($exportUrl('agents_summary', 'csv'), ENT_QUOTES, 'UTF-8') ?>">
+                                <i class="bi bi-filetype-csv me-1"></i>CSV
+                            </a>
+                            <a class="btn btn-outline-success btn-excel" href="<?= htmlspecialchars($exportUrl('agents_summary', 'xlsx'), ENT_QUOTES, 'UTF-8') ?>">
+                                <i class="bi bi-file-earmark-excel me-1"></i>Excel
+                            </a>
                         </div>
                     </div>
+
                     <div class="report-export-item">
-                        <div class="report-export-icon"><i class="bi bi-clock-history"></i></div>
-                        <div class="report-export-info"><div class="report-export-title">Agentes — Histórico</div><div class="report-export-description">Transiciones de estado con inicio, fin, duración y origen.</div></div>
+                        <div class="report-export-info">
+                            <div class="report-export-title">
+                                <i class="bi bi-clock-history"></i>Agentes — Histórico Detallado
+                            </div>
+                            <div class="report-export-description">
+                                Cada transición de estado con hora de inicio, fin, duración y origen.
+                            </div>
+                        </div>
                         <div class="report-export-actions">
-                            <a class="btn btn-outline-secondary" href="<?= htmlspecialchars($exportUrl('agents_history', 'csv'), ENT_QUOTES, 'UTF-8') ?>"><i class="bi bi-filetype-csv me-1"></i>CSV</a>
-                            <a class="btn btn-outline-success btn-excel" href="<?= htmlspecialchars($exportUrl('agents_history', 'xlsx'), ENT_QUOTES, 'UTF-8') ?>"><i class="bi bi-file-earmark-excel me-1"></i>Excel</a>
+                            <a class="btn btn-outline-secondary" href="<?= htmlspecialchars($exportUrl('agents_history', 'csv'), ENT_QUOTES, 'UTF-8') ?>">
+                                <i class="bi bi-filetype-csv me-1"></i>CSV
+                            </a>
+                            <a class="btn btn-outline-success btn-excel" href="<?= htmlspecialchars($exportUrl('agents_history', 'xlsx'), ENT_QUOTES, 'UTF-8') ?>">
+                                <i class="bi bi-file-earmark-excel me-1"></i>Excel
+                            </a>
                         </div>
                     </div>
+
                     <div class="report-export-item">
-                        <div class="report-export-icon"><i class="bi bi-broadcast-pin"></i></div>
-                        <div class="report-export-info"><div class="report-export-title">Agentes — Tiempo real</div><div class="report-export-description">Estado actual, disponibilidad, heartbeat, colas y capacidad.</div></div>
+                        <div class="report-export-info">
+                            <div class="report-export-title">
+                                <i class="bi bi-broadcast-pin"></i>Agentes — Estado en Tiempo Real
+                            </div>
+                            <div class="report-export-description">
+                                Estado actual, disponibilidad para reparto, último heartbeat, colas y capacidad.
+                            </div>
+                        </div>
                         <div class="report-export-actions">
-                            <a class="btn btn-outline-secondary" href="<?= htmlspecialchars($exportUrl('agents_realtime', 'csv'), ENT_QUOTES, 'UTF-8') ?>"><i class="bi bi-filetype-csv me-1"></i>CSV</a>
-                            <a class="btn btn-outline-success btn-excel" href="<?= htmlspecialchars($exportUrl('agents_realtime', 'xlsx'), ENT_QUOTES, 'UTF-8') ?>"><i class="bi bi-file-earmark-excel me-1"></i>Excel</a>
+                            <a class="btn btn-outline-secondary" href="<?= htmlspecialchars($exportUrl('agents_realtime', 'csv'), ENT_QUOTES, 'UTF-8') ?>">
+                                <i class="bi bi-filetype-csv me-1"></i>CSV
+                            </a>
+                            <a class="btn btn-outline-success btn-excel" href="<?= htmlspecialchars($exportUrl('agents_realtime', 'xlsx'), ENT_QUOTES, 'UTF-8') ?>">
+                                <i class="bi bi-file-earmark-excel me-1"></i>Excel
+                            </a>
                         </div>
                     </div>
                 </div>
