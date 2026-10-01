@@ -361,7 +361,7 @@ $exportUrl = '/reports/export' . ($exportQuery !== [] ? '?' . http_build_query($
                         <tbody>
                         <?php foreach ($daily as $row):
                             $count = (int)($row['total'] ?? 0);
-                            $trend = $maxDaily > 0 ? round(($count / $maxDaily) * 100) : 0;
+                            $trend = round(($count / $maxDaily) * 100);
                         ?>
                             <tr>
                                 <td><strong><?= htmlspecialchars(date('d/m/Y', strtotime((string)$row['day'])), ENT_QUOTES, 'UTF-8') ?></strong></td>
