@@ -6,6 +6,8 @@
 /** @var list<array<string,mixed>> $escalations */
 /** @var list<array<string,mixed>> $petitionTypes */
 /** @var bool $canManage */
+/** @var bool $canReassign */
+/** @var list<array{id:int,full_name:string,username:string,capacity:int,open_cases:int,free_capacity:int}> $reassignmentCandidates */
 /** @var string|null $success */
 /** @var string|null $error */
 
@@ -138,6 +140,53 @@ $elapsedLabel = $elapsedMinutes === null || $elapsedMinutes === ''
 
                     <button class="btn btn-primary" type="submit" style="margin-top:14px"><i class="bi bi-check-circle me-1"></i>Guardar gestión</button>
                 </form>
+            </div>
+        <?php endif; ?>
+
+        <?php if ($canReassign && (int)($case['assigned_user_id'] ?? 0) > 0 && (string)($case['current_state'] ?? '') === 'ASSIGNED' && $case['closed_at'] === null): ?>
+            <div class="case-card" style="margin-top:18px">
+                <h2 style="margin-top:0"><i class="bi bi-arrow-left-right me-1"></i>Reasignar caso</h2>
+                <p class="muted" style="font-size:.85rem">
+                    Selecciona un agente destino que esté habilitado, disponible, dentro de turno,
+                    con las habilidades requeridas y con capacidad libre.
+                </p>
+
+                <?php if ($reassignmentCandidates !== []): ?>
+                    <form method="post" action="/cases/<?= (int)$case['id'] ?>/reassign" id="reassignmentForm">
+                        <input type="hidden" name="_csrf" value="<?= htmlspecialchars(\App\Auth\Csrf::token(), ENT_QUOTES, 'UTF-8') ?>">
+
+                        <label>Agente destino *</label>
+                        <select name="new_user_id" required>
+                            <option value="">Seleccionar agente...</option>
+                            <?php foreach ($reassignmentCandidates as $candidate): ?>
+                                <option value="<?= (int)$candidate['id'] ?>">
+                                    <?= htmlspecialchars((string)$candidate['full_name'], ENT_QUOTES, 'UTF-8') ?>
+                                    (<?= htmlspecialchars((string)$candidate['username'], ENT_QUOTES, 'UTF-8') ?>)
+                                    · <?= (int)$candidate['free_capacity'] ?> cupos libres
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
+
+                        <label>Motivo de reasignación *</label>
+                        <textarea
+                            name="reason"
+                            rows="4"
+                            maxlength="500"
+                            required
+                            placeholder="Indica por qué se realiza la reasignación."
+                            style="width:100%;padding:10px;border:1px solid #cbd5e1;border-radius:8px"
+                        ></textarea>
+
+                        <button class="btn btn-primary" type="submit" style="margin-top:14px">
+                            <i class="bi bi-arrow-repeat me-1"></i>Reasignar caso
+                        </button>
+                    </form>
+                <?php else: ?>
+                    <div class="alert alert-warning mb-0">
+                        No hay agentes elegibles disponibles para recibir este caso en este momento.
+                        El caso permanece con el agente actual.
+                    </div>
+                <?php endif; ?>
             </div>
         <?php endif; ?>
 
