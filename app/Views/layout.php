@@ -19,6 +19,7 @@ $canViewUsers = false;
 $canViewStructures = false;
 $canViewQueues = false;
 $canViewReports = false;
+$canViewShifts = false;
 
 if (Auth::check() && Auth::id() !== null) {
     $pdo = Database::connection();
@@ -31,6 +32,7 @@ if (Auth::check() && Auth::id() !== null) {
     $canViewStructures = Authorization::hasPermission($pdo, $uid, 'STRUCTURE_VIEW');
     $canViewQueues = Authorization::hasPermission($pdo, $uid, 'QUEUE_VIEW');
     $canViewReports = Authorization::hasPermission($pdo, $uid, 'REPORT_VIEW');
+    $canViewShifts = Authorization::hasPermission($pdo, $uid, 'SHIFT_VIEW');
 }
 
 $isActive = static function (string $prefix) use ($path): bool {
@@ -128,7 +130,7 @@ $rolesLabel = $currentUserRoles !== [] ? implode(', ', $currentUserRoles) : '';
                     </li>
                 <?php endif; ?>
 
-                <?php if ($canViewUsers || $canViewStructures || $canViewQueues): ?>
+                <?php if ($canViewUsers || $canViewStructures || $canViewQueues || $canViewShifts): ?>
                     <li class="nav-item dropdown">
                         <a class="nav-link dropdown-toggle <?= $isActive('/admin') ? 'active' : '' ?>"
                            href="#"
@@ -156,6 +158,13 @@ $rolesLabel = $currentUserRoles !== [] ? implode(', ', $currentUserRoles) : '';
                                 <li>
                                     <a class="dropdown-item" href="/admin/queues">
                                         <i class="bi bi-diagram-2 me-2" aria-hidden="true"></i>Colas
+                                    </a>
+                                </li>
+                            <?php endif; ?>
+                            <?php if ($canViewShifts): ?>
+                                <li>
+                                    <a class="dropdown-item" href="/admin/shifts">
+                                        <i class="bi bi-calendar3 me-2" aria-hidden="true"></i>Turnos y cronograma
                                     </a>
                                 </li>
                             <?php endif; ?>
@@ -347,32 +356,3 @@ $rolesLabel = $currentUserRoles !== [] ? implode(', ', $currentUserRoles) : '';
             if (data.ok) applyPresence(data.presence);
         } catch (_) {}
     };
-
-    const loadCurrent = async () => {
-        try {
-            const response = await fetch('/agent/presence', {
-                headers:{'Accept':'application/json'},
-                credentials:'same-origin',
-                cache:'no-store'
-            });
-
-            if (!response.ok) return;
-
-            const data = await response.json();
-            if (!data.ok) return;
-
-            heartbeatSeconds = Math.max(10, Number(data.heartbeat_seconds || 30));
-            renderStatuses(data.statuses || []);
-            applyPresence(data.presence);
-
-            if (heartbeatTimer !== null) window.clearInterval(heartbeatTimer);
-            heartbeatTimer = window.setInterval(heartbeat, heartbeatSeconds * 1000);
-        } catch (_) {}
-    };
-
-    loadCurrent();
-})();
-</script>
-<?php endif; ?>
-</body>
-</html>
