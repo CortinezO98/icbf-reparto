@@ -192,7 +192,8 @@ final class UsersController
         $roles = $repo->roles();
         $queues = $repo->queues();
         $error = $_SESSION['_flash_error'] ?? null;
-        unset($_SESSION['_flash_error']);
+        $success = $_SESSION['_flash_success'] ?? null;
+        unset($_SESSION['_flash_error'], $_SESSION['_flash_success']);
 
         $view = dirname(__DIR__) . '/Views/users/edit.php';
         require dirname(__DIR__) . '/Views/layout.php';
