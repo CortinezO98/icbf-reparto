@@ -113,7 +113,9 @@ final class UsersController
         }
 
         $password = trim((string)($_POST['password'] ?? ''));
-        if ($password === '') {
+        $temporaryPassword = $password === '';
+
+        if ($temporaryPassword) {
             $password = TemporaryPasswordGenerator::generate();
         }
 
@@ -134,6 +136,7 @@ final class UsersController
         }
 
         $data['password_hash'] = PasswordPolicy::hash($password);
+        $data['must_change_password'] = $temporaryPassword ? 1 : 0;
         $data['created_by'] = (int)(Auth::id() ?? 0);
 
         try {
@@ -148,12 +151,14 @@ final class UsersController
                     'roles'=>$roleCodes,
                     'queue_ids'=>$queueIds,
                     'assign_enabled'=>(int)$data['assign_enabled'],
+                    'temporary_password'=>$temporaryPassword,
                 ]
             );
 
             unset($_SESSION['_old_user_form']);
-            $_SESSION['_flash_success'] =
-                'Usuario creado correctamente. Contraseña temporal: ' . $password;
+            $_SESSION['_flash_success'] = $temporaryPassword
+                ? 'Usuario creado correctamente. Contraseña temporal: ' . $password
+                : 'Usuario creado correctamente.';
             header('Location: /admin/users');
             exit;
         } catch (\Throwable $e) {
@@ -239,12 +244,15 @@ final class UsersController
         }
 
         $password = trim((string)($_POST['password'] ?? ''));
-        if ($password !== '') {
+        $temporaryPassword = $password !== '';
+
+        if ($temporaryPassword) {
             $errors = PasswordPolicy::validate($password);
             if ($errors !== []) {
                 $this->fail(implode(' ', $errors), "/admin/users/{$id}/edit");
             }
             $data['password_hash'] = PasswordPolicy::hash($password);
+            $data['must_change_password'] = 1;
         }
 
         try {
@@ -266,10 +274,13 @@ final class UsersController
                     'queue_ids'=>$queueIds,
                     'assign_enabled'=>(int)$data['assign_enabled'],
                     'password_changed'=>$password !== '',
+                    'temporary_password'=>$temporaryPassword,
                 ]
             );
 
-            $_SESSION['_flash_success'] = 'Usuario actualizado correctamente.';
+            $_SESSION['_flash_success'] = $temporaryPassword
+                ? 'Usuario actualizado. Contraseña temporal: ' . $password
+                : 'Usuario actualizado correctamente.';
             header('Location: /admin/users');
             exit;
         } catch (\Throwable $e) {
@@ -518,8 +529,3 @@ final class UsersController
 
     private function fail(string $message, string $redirect): never
     {
-        $_SESSION['_flash_error'] = $message;
-        header('Location: ' . $redirect);
-        exit;
-    }
-}
