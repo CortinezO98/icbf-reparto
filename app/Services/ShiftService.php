@@ -47,42 +47,50 @@ final class ShiftService
                     continue;
                 }
 
-                $this->repository->markAgentOfflineAtShiftEnd($userId);
+                $this->repository->markAgentOfflineAtShiftEnd($userId, $now);
 
-                $releasedCases = $this->repository->releaseCasesForShiftEnd(
+                $releasedCaseIds = $this->repository->releaseCasesForShiftEnd(
                     $userId,
                     $queueId
-                );
-
-                $this->repository->finishShiftEndRun(
-                    $scheduleId,
-                    $date,
-                    $releasedCases,
-                    $releasedCases
                 );
 
                 $this->pdo->commit();
 
                 $processed++;
-                $released += $releasedCases;
+                $released += count($releasedCaseIds);
                 $queues[$queueId] = true;
+
+                $engine = new \App\Services\Assignment\AssignmentEngine(
+                    $this->pdo,
+                    new AssignmentRepository($this->pdo)
+                );
+                $engine->run($queueId, 500, 'REASSIGN');
+
+                $pendingCases = $this->repository->pendingForCaseIds(
+                    $releasedCaseIds
+                );
+
+                $this->pdo->beginTransaction();
+                try {
+                    $this->repository->finishShiftEndRun(
+                        $scheduleId,
+                        $date,
+                        count($releasedCaseIds),
+                        $pendingCases
+                    );
+                    $this->pdo->commit();
+                } catch (\Throwable $e) {
+                    if ($this->pdo->inTransaction()) {
+                        $this->pdo->rollBack();
+                    }
+                    throw $e;
+                }
             } catch (\Throwable $e) {
                 if ($this->pdo->inTransaction()) {
                     $this->pdo->rollBack();
                 }
 
                 throw $e;
-            }
-        }
-
-        if ($queues !== []) {
-            $engine = new \App\Services\Assignment\AssignmentEngine(
-                $this->pdo,
-                new AssignmentRepository($this->pdo)
-            );
-
-            foreach (array_keys($queues) as $queueId) {
-                $engine->run((int)$queueId, 500, 'REASSIGN');
             }
         }
 
