@@ -29,6 +29,12 @@ return static function(Router $router,PDO $pdo): void {
  $router->get('/login',fn()=>(new AuthController($pdo))->showLogin());
  $router->post('/login',fn()=>(new AuthController($pdo))->login());
  $router->post('/logout',fn()=>(new AuthController($pdo))->logout());
+ $router->get('/forgot-password',fn()=>(new AuthController($pdo))->showForgotPassword());
+ $router->post('/forgot-password',fn()=>(new AuthController($pdo))->forgotPassword());
+ $router->get('/reset-password',fn()=>(new AuthController($pdo))->showResetPassword());
+ $router->post('/reset-password',fn()=>(new AuthController($pdo))->resetPassword());
+ $router->get('/change-password',fn()=>(new AuthController($pdo))->showChangePassword());
+ $router->post('/change-password',fn()=>(new AuthController($pdo))->changePassword());
 
  $router->get('/admin/users',fn()=>(new UsersController($pdo))->index());
  $router->get('/admin/users/create',fn()=>(new UsersController($pdo))->createForm());
