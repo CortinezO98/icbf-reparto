@@ -111,6 +111,152 @@ final class ReportRepository
      * @param array{
      *   from:?string,to:?string,queue_id:?int,agent_id:?int,state:?string,sla:?string
      * } $filters
+     * @return list<array<string,mixed>>
+     */
+    public function reportRows(string $report, array $filters, int $staleSeconds = 90): array
+    {
+        return match ($report) {
+            'cases' => $this->casesForExport($filters),
+            'agents_summary' => $this->productivity($filters),
+            'agents_history' => $this->agentHistory($filters),
+            'agents_realtime' => $this->agentRealtime(max(30, $staleSeconds)),
+            default => throw new \\InvalidArgumentException('Tipo de reporte no permitido.'),
+        };
+    }
+
+    /** @return list<array<string,mixed>> */
+    private function agentHistory(array $filters): array
+    {
+        if ($filters['from'] === null || $filters['to'] === null) {
+            return [];
+        }
+
+        $where = "ap.started_at < :history_to\n"
+            . " AND (ap.ended_at IS NULL OR ap.ended_at >= :history_from)";
+        $params = [
+            ':history_from' => $filters['from'],
+            ':history_to' => $filters['to'],
+        ];
+
+        if ($filters['agent_id'] !== null) {
+            $where .= ' AND ap.user_id = :history_agent';
+            $params[':history_agent'] = $filters['agent_id'];
+        }
+
+        return $this->rows(
+            "SELECT
+                u.full_name,
+                u.username,
+                ap.status_code,
+                COALESCE(ci.label,ap.status_code) status_label,
+                ap.started_at,
+                ap.ended_at,
+                ap.last_heartbeat_at,
+                ap.source,
+                setter.full_name set_by_name,
+                GREATEST(
+                    0,
+                    TIMESTAMPDIFF(
+                        MINUTE,
+                        GREATEST(ap.started_at,:history_from),
+                        LEAST(COALESCE(ap.ended_at,NOW(6)),:history_to)
+                    )
+                ) duration_minutes
+             FROM agent_presence ap
+             JOIN users u ON u.id=ap.user_id
+             LEFT JOIN users setter ON setter.id=ap.set_by
+             LEFT JOIN catalogs cat ON cat.code='AGENT_PRESENCE_STATUS'
+             LEFT JOIN catalog_items ci
+               ON ci.catalog_id=cat.id
+              AND ci.code=ap.status_code
+             WHERE {$where}
+             ORDER BY ap.started_at DESC,ap.id DESC",
+            $params
+        );
+    }
+
+    /** @return list<array<string,mixed>> */
+    private function agentRealtime(int $staleSeconds): array
+    {
+        $cutoff = (new \\DateTimeImmutable())
+            ->modify('-' . $staleSeconds . ' seconds')
+            ->format('Y-m-d H:i:s.u');
+
+        $rows = $this->rows(
+            "SELECT
+                u.id,
+                u.full_name,
+                u.username,
+                u.is_active,
+                u.assign_enabled,
+                COALESCE(ap.status_code,'OFFLINE') status_code,
+                COALESCE(ci.label,'Desconectado') status_label,
+                ap.started_at,
+                ap.last_heartbeat_at,
+                GROUP_CONCAT(DISTINCT q.code ORDER BY q.code SEPARATOR ', ') queue_codes,
+                COALESCE(SUM(DISTINCT CASE
+                    WHEN qa.is_enabled=1 AND qa.removed_at IS NULL
+                    THEN COALESCE(qa.capacity_override,q.default_capacity)
+                    ELSE 0 END),0) configured_capacity,
+                (
+                    SELECT COUNT(*)
+                    FROM cases c2
+                    WHERE c2.assigned_user_id=u.id
+                      AND c2.closed_at IS NULL
+                      AND c2.current_state<>'PENDING_ASSIGNMENT'
+                ) open_cases
+             FROM users u
+             JOIN user_roles ur ON ur.user_id=u.id
+             JOIN roles r
+               ON r.id=ur.role_id
+              AND r.code='AGENTE'
+              AND r.is_active=1
+             LEFT JOIN agent_presence ap
+               ON ap.id=(
+                    SELECT ap2.id
+                    FROM agent_presence ap2
+                    WHERE ap2.user_id=u.id
+                      AND ap2.ended_at IS NULL
+                    ORDER BY ap2.id DESC
+                    LIMIT 1
+               )
+             LEFT JOIN catalogs cat ON cat.code='AGENT_PRESENCE_STATUS'
+             LEFT JOIN catalog_items ci
+               ON ci.catalog_id=cat.id
+              AND ci.code=ap.status_code
+             LEFT JOIN queue_agents qa
+               ON qa.user_id=u.id
+              AND qa.removed_at IS NULL
+             LEFT JOIN work_queues q ON q.id=qa.queue_id
+             WHERE u.is_active=1
+             GROUP BY
+                u.id,u.full_name,u.username,u.is_active,u.assign_enabled,
+                ap.status_code,ci.label,ap.started_at,ap.last_heartbeat_at
+             ORDER BY u.full_name,u.id"
+        );
+
+        foreach ($rows as &$row) {
+            $heartbeatFresh = !empty($row['last_heartbeat_at'])
+                && (string)$row['last_heartbeat_at'] >= $cutoff;
+            $available = (string)$row['status_code'] === 'AVAILABLE'
+                && $heartbeatFresh
+                && (int)$row['assign_enabled'] === 1;
+
+            $row['effective_status'] = $available ? 'Disponible' : (string)$row['status_label'];
+            $row['effective_available'] = $available ? 1 : 0;
+            $row['free_capacity'] = $available
+                ? max(0, (int)$row['configured_capacity'] - (int)$row['open_cases'])
+                : 0;
+        }
+        unset($row);
+
+        return $rows;
+    }
+
+    /**
+     * @param array{
+     *   from:?string,to:?string,queue_id:?int,agent_id:?int,state:?string,sla:?string
+     * } $filters
      */
     private function where(array $filters): string
     {
