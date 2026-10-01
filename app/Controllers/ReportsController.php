@@ -489,9 +489,15 @@ final class ReportsController
             return null;
         }
 
-        $value = strtoupper(trim((string)$value));
+        $value = trim((string)$value);
 
-        return in_array($value, $allowed, true) ? $value : null;
+        foreach ($allowed as $candidate) {
+            if (strcasecmp($value, $candidate) === 0) {
+                return $candidate;
+            }
+        }
+
+        return null;
     }
 
     /** @param array{start_date:string,end_date:string} $filters */
