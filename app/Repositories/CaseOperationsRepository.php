@@ -168,6 +168,25 @@ final class CaseOperationsRepository
     }
 
     /** @return list<array<string,mixed>> */
+    public function assignments(int $caseId): array
+    {
+        $st = $this->pdo->prepare(
+            "SELECT
+                ca.*,
+                u.full_name user_name,
+                ab.full_name assigned_by_name
+             FROM case_assignments ca
+             JOIN users u ON u.id=ca.user_id
+             LEFT JOIN users ab ON ab.id=ca.assigned_by
+             WHERE ca.case_id=:id
+             ORDER BY ca.assigned_at DESC,ca.id DESC"
+        );
+        $st->execute([':id'=>$caseId]);
+
+        return $st->fetchAll() ?: [];
+    }
+
+    /** @return list<array<string,mixed>> */
     public function events(int $caseId): array
     {
         $st = $this->pdo->prepare(
