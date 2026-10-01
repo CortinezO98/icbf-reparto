@@ -131,8 +131,8 @@ final class ReportRepository
             return [];
         }
 
-        $where = "ap.started_at < :history_to\n"
-            . " AND (ap.ended_at IS NULL OR ap.ended_at >= :history_from)";
+        $where = "ap.started_at < :history_to_where\n"
+            . " AND (ap.ended_at IS NULL OR ap.ended_at >= :history_from_where)";
         $params = [
             ':history_from_where' => $filters['from'],
             ':history_to_where' => $filters['to'],
