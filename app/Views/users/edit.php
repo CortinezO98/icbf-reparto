@@ -141,7 +141,7 @@ $allQueuesSelected = $activeQueueIds !== []
                         <?php endforeach; ?>
                     </select>
 
-                    <div class="mt-3">
+                    <div class="mt-3" id="supervisorBlock">
                         <label for="supervisor_user_id" class="form-label">Supervisor del agente</label>
                         <select class="form-select" id="supervisor_user_id" name="supervisor_user_id">
                             <option value="">Sin supervisor asignado</option>
@@ -203,6 +203,8 @@ $allQueuesSelected = $activeQueueIds !== []
     const allQueuesHidden = document.getElementById('allQueuesHidden');
     const assignBlock = document.getElementById('assignBlock');
     const assignEnabled = document.getElementById('assign_enabled');
+    const supervisorBlock = document.getElementById('supervisorBlock');
+    const supervisorSelect = document.getElementById('supervisor_user_id');
 
     const selectedRoleCodes = () =>
         [...rolesSelect.selectedOptions].map(o => o.dataset.roleCode || '');
@@ -211,10 +213,15 @@ $allQueuesSelected = $activeQueueIds !== []
         const agent = selectedRoleCodes().includes('AGENTE');
         queueSection.style.display = agent ? '' : 'none';
         assignBlock.style.display = agent ? '' : 'none';
+        if (supervisorBlock) supervisorBlock.style.display = agent ? '' : 'none';
         queuesSelect.disabled = !agent;
         assignEnabled.disabled = !agent;
+        if (supervisorSelect) supervisorSelect.disabled = !agent;
 
-        if (!agent) assignEnabled.checked = false;
+        if (!agent) {
+            assignEnabled.checked = false;
+            if (supervisorSelect) supervisorSelect.value = '';
+        }
     };
 
     const syncAll = () => {
