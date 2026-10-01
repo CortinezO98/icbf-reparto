@@ -627,7 +627,7 @@ final class ReportRepository
      * @param array<string,mixed> $filters
      * @return list<array<string,mixed>>
      */
-    private function directedForExport(array $filters): array
+        private function directedForExport(array $filters): array
     {
         $params = [];
         $where = "WHERE cm.management_type_code='DIRECTED'";
@@ -646,23 +646,35 @@ final class ReportRepository
 
         return $this->rows(
             "SELECT
-                c.case_number,
-                cm.created_at directed_at,
+                DATE_FORMAT(cm.created_at,'%Y-%m') month_key,
+                DATE(cm.created_at) day,
+                HOUR(cm.created_at) hour,
                 actor.full_name agent_name,
                 supervisor.full_name supervisor_name,
-                q.code queue_code,
                 c.regional,
                 c.segment,
                 c.petition_type,
-                cm.observation,
-                c.current_state
+                q.code queue_code,
+                COUNT(*) total_directed
              FROM case_managements cm
              JOIN cases c ON c.id=cm.case_id
              JOIN users actor ON actor.id=cm.actor_user_id
              LEFT JOIN users supervisor ON supervisor.id=actor.supervisor_user_id
              LEFT JOIN work_queues q ON q.id=c.queue_id
              {$where}
-             ORDER BY cm.created_at DESC,cm.id DESC
+             GROUP BY
+                DATE_FORMAT(cm.created_at,'%Y-%m'),
+                DATE(cm.created_at),
+                HOUR(cm.created_at),
+                actor.id,
+                actor.full_name,
+                supervisor.id,
+                supervisor.full_name,
+                c.regional,
+                c.segment,
+                c.petition_type,
+                q.code
+             ORDER BY month_key ASC,day ASC,hour ASC,agent_name ASC
              LIMIT 5000",
             $params
         );
