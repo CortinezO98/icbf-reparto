@@ -54,6 +54,7 @@ return static function(Router $router,PDO $pdo): void {
  $router->get('/cases',fn()=>(new CasesController($pdo))->index());
  $router->get('/cases/{id}',fn(int $id)=>(new CasesController($pdo))->show($id));
  $router->post('/cases/{id}/manage',fn(int $id)=>(new CasesController($pdo))->manage($id));
+ $router->post('/cases/{id}/reassign',fn(int $id)=>(new CasesController($pdo))->reassign($id));
 
  $router->get('/admin/structures',fn()=>(new ImportStructuresController($pdo))->index());
  $router->get('/admin/structures/create',fn()=>(new ImportStructuresController($pdo))->createForm());
