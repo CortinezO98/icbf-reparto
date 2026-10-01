@@ -1,6 +1,7 @@
 <?php
 /** @var list<array<string,mixed>> $roles */
 /** @var list<array<string,mixed>> $queues */
+/** @var list<array<string,mixed>> $supervisors */
 /** @var string|null $error */
 /** @var array<string,mixed> $old */
 
@@ -8,6 +9,7 @@ $old = is_array($old ?? null) ? $old : [];
 $oldRoles = array_map('intval', (array)($old['role_ids'] ?? []));
 $oldQueues = array_map('intval', (array)($old['queue_ids'] ?? []));
 $oldAllQueues = (int)($old['all_queues'] ?? 0) === 1;
+$oldSupervisor = (int)($old['supervisor_user_id'] ?? 0);
 $oldActive = !array_key_exists('is_active', $old) || (int)($old['is_active'] ?? 0) === 1;
 $oldAssign = (int)($old['assign_enabled'] ?? 0) === 1;
 ?>
@@ -285,6 +287,21 @@ $oldAssign = (int)($old['assign_enabled'] ?? 0) === 1;
 
                     <div class="form-text">
                         Ctrl (Cmd en Mac) para seleccionar múltiples.
+                    </div>
+
+                    <div class="mt-3">
+                        <label for="supervisor_user_id" class="form-label">
+                            <i class="bi bi-person-check me-1"></i>Supervisor del agente
+                        </label>
+                        <select class="form-select" id="supervisor_user_id" name="supervisor_user_id">
+                            <option value="">Sin supervisor asignado</option>
+                            <?php foreach ($supervisors as $supervisor): ?>
+                                <option value="<?= (int)$supervisor['id'] ?>" <?= $oldSupervisor === (int)$supervisor['id'] ? 'selected' : '' ?>>
+                                    <?= htmlspecialchars((string)$supervisor['full_name'], ENT_QUOTES, 'UTF-8') ?>
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
+                        <div class="form-text">Se utiliza para organizar el equipo y filtrar la reportería.</div>
                     </div>
 
                     <div class="mt-2 d-flex flex-wrap gap-2">
