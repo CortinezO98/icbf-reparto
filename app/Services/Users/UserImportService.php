@@ -190,6 +190,7 @@ final class UserImportService
                     'password_hash'=>PasswordPolicy::hash($password),
                     'is_active'=>$active,
                     'assign_enabled'=>$assignEnabled,
+                    'must_change_password'=>$password === trim((string)($row['password'] ?? '')) ? 0 : 1,
                     'created_by'=>$actorUserId,
                 ], $roleIds, $queueIds);
 
