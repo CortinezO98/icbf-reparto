@@ -113,7 +113,8 @@ final class UsersController
         }
 
         $password = trim((string)($_POST['password'] ?? ''));
-        if ($password === '') {
+        $passwordWasGenerated = $password === '';
+        if ($passwordWasGenerated) {
             $password = TemporaryPasswordGenerator::generate();
         }
 
@@ -134,6 +135,7 @@ final class UsersController
         }
 
         $data['password_hash'] = PasswordPolicy::hash($password);
+        $data['password_must_change'] = $passwordWasGenerated ? 1 : 0;
         $data['created_by'] = (int)(Auth::id() ?? 0);
 
         try {
@@ -239,12 +241,14 @@ final class UsersController
         }
 
         $password = trim((string)($_POST['password'] ?? ''));
-        if ($password !== '') {
+        $passwordChanged = $password !== '';
+        if ($passwordChanged) {
             $errors = PasswordPolicy::validate($password);
             if ($errors !== []) {
                 $this->fail(implode(' ', $errors), "/admin/users/{$id}/edit");
             }
             $data['password_hash'] = PasswordPolicy::hash($password);
+            $data['password_must_change'] = 1;
         }
 
         try {
@@ -265,7 +269,7 @@ final class UsersController
                     'roles'=>$roleCodes,
                     'queue_ids'=>$queueIds,
                     'assign_enabled'=>(int)$data['assign_enabled'],
-                    'password_changed'=>$password !== '',
+                    'password_changed'=>$passwordChanged,
                 ]
             );
 
