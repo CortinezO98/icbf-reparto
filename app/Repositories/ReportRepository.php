@@ -5,6 +5,18 @@ namespace App\Repositories;
 
 use PDO;
 
+    /** @phpstan-type ReportFilters array{
+     *   from:?string,
+     *   to:?string,
+     *   queue_id:?int,
+     *   agent_id:?int,
+     *   state:?string,
+     *   sla:?string,
+     *   regional?:?string,
+     *   petition_type?:?string,
+     *   management_type?:?string
+     * } */
+
 final class ReportRepository
 {
     public function __construct(private PDO $pdo)
@@ -12,9 +24,7 @@ final class ReportRepository
     }
 
     /**
-     * @param array{
-     *   from:?string,to:?string,queue_id:?int,agent_id:?int,state:?string,sla:?string
-     * } $filters
+     * @param ReportFilters $filters
      * @return array<string,mixed>
      */
     public function data(array $filters): array
@@ -95,9 +105,7 @@ final class ReportRepository
     }
 
     /**
-     * @param array{
-     *   from:?string,to:?string,queue_id:?int,agent_id:?int,state:?string,sla:?string
-     * } $filters
+     * @param ReportFilters $filters
      * @return list<array<string,mixed>>
      */
     public function casesForExport(array $filters): array
@@ -112,9 +120,7 @@ final class ReportRepository
     }
 
     /**
-     * @param array{
-     *   from:?string,to:?string,queue_id:?int,agent_id:?int,state:?string,sla:?string
-     * } $filters
+     * @param ReportFilters $filters
      * @return list<array<string,mixed>>
      */
     public function reportRows(string $report, array $filters, int $staleSeconds = 90): array
@@ -133,9 +139,7 @@ final class ReportRepository
     }
 
     /**
-     * @param array{
-     *   from:?string,to:?string,queue_id:?int,agent_id:?int,state:?string,sla:?string
-     * } $filters
+     * @param ReportFilters $filters
      * @return list<array<string,mixed>>
      */
     private function agentHistory(array $filters): array
@@ -274,9 +278,7 @@ final class ReportRepository
     }
 
     /**
-     * @param array{
-     *   from:?string,to:?string,queue_id:?int,agent_id:?int,state:?string,sla:?string
-     * } $filters
+     * @param ReportFilters $filters
      */
 
     /**
@@ -541,17 +543,7 @@ final class ReportRepository
     }
 
     /**
-     * @param array{
-     *   from:?string,
-     *   to:?string,
-     *   queue_id:?int,
-     *   agent_id:?int,
-     *   state:?string,
-     *   sla:?string,
-     *   regional:?string,
-     *   petition_type:?string,
-     *   management_type:?string
-     * } $filters
+     * @param ReportFilters $filters
      */
     private function where(array $filters): string
     {
@@ -597,17 +589,7 @@ final class ReportRepository
     }
 
     /**
-     * @param array{
-     *   from:?string,
-     *   to:?string,
-     *   queue_id:?int,
-     *   agent_id:?int,
-     *   state:?string,
-     *   sla:?string,
-     *   regional:?string,
-     *   petition_type:?string,
-     *   management_type:?string
-     * } $filters
+     * @param ReportFilters $filters
      * @return array<string,mixed>
      */
     private function params(array $filters): array
@@ -707,9 +689,7 @@ final class ReportRepository
     /**
      * Serie diaria para el rango seleccionado.
      *
-     * @param array{
-     *   from:?string,to:?string,queue_id:?int,agent_id:?int,state:?string,sla:?string
-     * } $filters
+     * @param ReportFilters $filters
      * @return list<array<string,mixed>>
      */
     private function daily(array $filters): array
@@ -735,9 +715,7 @@ final class ReportRepository
      * primera gestión. El cumplimiento ANS se calcula sobre los casos
      * cerrados que terminaron dentro del objetivo registrado.
      *
-     * @param array{
-     *   from:?string,to:?string,queue_id:?int,agent_id:?int,state:?string,sla:?string
-     * } $filters
+     * @param ReportFilters $filters
      * @return list<array<string,mixed>>
      */
     private function productivity(array $filters): array
@@ -840,9 +818,7 @@ final class ReportRepository
     }
 
     /**
-     * @param array{
-     *   from:?string,to:?string,queue_id:?int,agent_id:?int,state:?string,sla:?string
-     * } $filters
+     * @param ReportFilters $filters
      * @return list<array<string,mixed>>
      */
     private function queues(array $filters): array
@@ -877,9 +853,7 @@ final class ReportRepository
     }
 
     /**
-     * @param array{
-     *   from:?string,to:?string,queue_id:?int,agent_id:?int,state:?string,sla:?string
-     * } $filters
+     * @param ReportFilters $filters
      * @return list<array<string,mixed>>
      */
     private function states(array $filters): array
@@ -899,9 +873,7 @@ final class ReportRepository
     }
 
     /**
-     * @param array{
-     *   from:?string,to:?string,queue_id:?int,agent_id:?int,state:?string,sla:?string
-     * } $filters
+     * @param ReportFilters $filters
      * @return list<array<string,mixed>>
      */
     private function sla(array $filters): array
@@ -924,9 +896,7 @@ final class ReportRepository
     }
 
     /**
-     * @param array{
-     *   from:?string,to:?string,queue_id:?int,agent_id:?int,state:?string,sla:?string
-     * } $filters
+     * @param ReportFilters $filters
      * @return array{0:string,1:array<string,mixed>}
      */
     private function periodCondition(array $filters, string $prefix): array
