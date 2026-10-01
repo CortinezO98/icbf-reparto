@@ -36,7 +36,7 @@ final class ReportsController
 
         $report = $this->allowed(
             $_GET['report'] ?? 'cases',
-            ['cases', 'agents_summary', 'agents_history', 'agents_realtime']
+            ['cases', 'agents_summary', 'agents_history', 'agents_realtime', 'managements', 'assignments', 'volume_time', 'monthly']
         ) ?? 'cases';
 
         $format = strtolower(trim((string)($_GET['format'] ?? 'csv')));
@@ -289,6 +289,101 @@ final class ReportsController
                         (int)($row['configured_capacity'] ?? 0),
                         (int)($row['open_cases'] ?? 0),
                         (int)($row['free_capacity'] ?? 0),
+                    ],
+                    $rows
+                ),
+            ],
+            'managements' => [
+                'title' => 'Gestiones de Casos',
+                'filename' => 'reporte_gestiones_casos_' . $stamp,
+                'headers' => [
+                    'Caso','Fecha gestión','Agente','Usuario','Tipo gestión',
+                    'Escalamiento','Tipo petición seleccionado','Tipo petición anterior',
+                    'Tipo petición nuevo','Observación','Soporte','Creado caso',
+                    'Estado actual','ANS'
+                ],
+                'data' => array_map(
+                    static fn(array $row): array => [
+                        $row['case_number'] ?? '',
+                        $row['management_created_at'] ?? '',
+                        $row['actor_name'] ?? '',
+                        $row['actor_username'] ?? '',
+                        $row['management_type_label'] ?? $row['management_type_code'] ?? '',
+                        $row['escalation_label'] ?? $row['escalation_category_code'] ?? '',
+                        $row['petition_type_selected'] ?? '',
+                        $row['previous_petition_type'] ?? '',
+                        $row['new_petition_type'] ?? '',
+                        $row['observation'] ?? '',
+                        $row['support_path'] ?? '',
+                        $row['case_created_at'] ?? '',
+                        $row['current_state'] ?? '',
+                        $row['sla_status'] ?? '',
+                    ],
+                    $rows
+                ),
+            ],
+            'assignments' => [
+                'title' => 'Asignaciones y Reasignaciones',
+                'filename' => 'reporte_asignaciones_reasignaciones_' . $stamp,
+                'headers' => [
+                    'Caso','Cola','Agente','Usuario','Tipo asignación',
+                    'Asignado por','Fecha asignación','Fin asignación',
+                    'Motivo cierre','Motivo reasignación','Estado actual'
+                ],
+                'data' => array_map(
+                    static fn(array $row): array => [
+                        $row['case_number'] ?? '',
+                        $row['queue_code'] ?? '',
+                        $row['agent_name'] ?? '',
+                        $row['agent_username'] ?? '',
+                        $row['assignment_type'] ?? '',
+                        $row['assigned_by_name'] ?? '',
+                        $row['assigned_at'] ?? '',
+                        $row['ended_at'] ?? '',
+                        $row['end_reason'] ?? '',
+                        $row['reassignment_reason'] ?? '',
+                        $row['current_state'] ?? '',
+                    ],
+                    $rows
+                ),
+            ],
+            'volume_time' => [
+                'title' => 'Volumen por Día y Hora',
+                'filename' => 'reporte_volumen_dia_hora_' . $stamp,
+                'headers' => [
+                    'Fecha','Hora','Cola','Regional','Tipo petición','Casos'
+                ],
+                'data' => array_map(
+                    static fn(array $row): array => [
+                        $row['day'] ?? '',
+                        isset($row['hour']) ? str_pad((string)$row['hour'], 2, '0', STR_PAD_LEFT) . ':00' : '',
+                        $row['queue_code'] ?? '',
+                        $row['regional'] ?? '',
+                        $row['petition_type'] ?? '',
+                        (int)($row['total_cases'] ?? 0),
+                    ],
+                    $rows
+                ),
+            ],
+            'monthly' => [
+                'title' => 'Consolidado Mensual',
+                'filename' => 'reporte_consolidado_mensual_' . $stamp,
+                'headers' => [
+                    'Mes','Casos','Abiertos','Cerrados','Gestionados',
+                    'Vencidos','Tiempo promedio primera gestión (min)',
+                    'Tiempo promedio resolución (min)','Cumplimiento ANS (%)'
+                ],
+                'data' => array_map(
+                    static fn(array $row): array => [
+                        $row['month_label'] ?? '',
+                        (int)($row['total_cases'] ?? 0),
+                        (int)($row['open_cases'] ?? 0),
+                        (int)($row['closed_cases'] ?? 0),
+                        (int)($row['managed_cases'] ?? 0),
+                        (int)($row['breached_cases'] ?? 0),
+                        $row['avg_response_minutes'] ?? '',
+                        $row['avg_resolution_minutes'] ?? '',
+                        $row['sla_compliance_percent'] ?? '',
                     ],
                     $rows
                 ),
