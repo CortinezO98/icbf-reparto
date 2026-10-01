@@ -120,7 +120,7 @@ final class ReportRepository
             'agents_summary' => $this->productivity($filters),
             'agents_history' => $this->agentHistory($filters),
             'agents_realtime' => $this->agentRealtime(max(30, $staleSeconds)),
-            default => throw new \\InvalidArgumentException('Tipo de reporte no permitido.'),
+            default => throw new \InvalidArgumentException('Tipo de reporte no permitido.'),
         };
     }
 
@@ -134,8 +134,10 @@ final class ReportRepository
         $where = "ap.started_at < :history_to\n"
             . " AND (ap.ended_at IS NULL OR ap.ended_at >= :history_from)";
         $params = [
-            ':history_from' => $filters['from'],
-            ':history_to' => $filters['to'],
+            ':history_from_where' => $filters['from'],
+            ':history_to_where' => $filters['to'],
+            ':history_from_calc' => $filters['from'],
+            ':history_to_calc' => $filters['to'],
         ];
 
         if ($filters['agent_id'] !== null) {
@@ -178,7 +180,7 @@ final class ReportRepository
     /** @return list<array<string,mixed>> */
     private function agentRealtime(int $staleSeconds): array
     {
-        $cutoff = (new \\DateTimeImmutable())
+        $cutoff = (new \DateTimeImmutable())
             ->modify('-' . $staleSeconds . ' seconds')
             ->format('Y-m-d H:i:s.u');
 
