@@ -8,6 +8,7 @@ use App\Auth\Authorization;
 use App\Auth\Csrf;
 use App\Repositories\AuditRepository;
 use App\Repositories\CaseOperationsRepository;
+use App\Repositories\AssignmentRepository;
 use App\Services\Cases\CaseManagementRules;
 use App\Services\Cases\CaseSupportStorage;
 use App\Services\Sla\SlaService;
@@ -173,6 +174,97 @@ final class CasesController
 
         header('Location: /cases/' . $id);
         exit;
+    }
+
+    public function reassignmentOptions(int $id): void
+    {
+        Authorization::requirePermission($this->pdo, 'CASE_REASSIGN');
+
+        $repo = new CaseOperationsRepository($this->pdo);
+        $case = $repo->findCase($id);
+
+        if (!$case) {
+            http_response_code(404);
+            echo 'Caso no encontrado.';
+            return;
+        }
+
+        $currentUserId = (int)($case['assigned_user_id'] ?? 0);
+
+        if (
+            (int)($case['closed_at'] !== null)
+            || (string)($case['current_state'] ?? '') === 'CLOSED'
+        ) {
+            $this->json([
+                'ok'=>false,
+                'message'=>'El caso está cerrado y no puede ser reasignado.',
+            ], 409);
+            return;
+        }
+
+        $candidates = (new AssignmentRepository($this->pdo))
+            ->reassignmentCandidates($id, $currentUserId);
+
+        $this->json([
+            'ok'=>true,
+            'candidates'=>$candidates,
+        ]);
+    }
+
+    public function reassign(int $id): void
+    {
+        Authorization::requirePermission($this->pdo, 'CASE_REASSIGN');
+        Csrf::validate($_POST['_csrf'] ?? null);
+
+        $actorUserId = (int)(Auth::id() ?? 0);
+        $newUserId = (int)($_POST['new_user_id'] ?? 0);
+        $reason = trim((string)($_POST['reason'] ?? ''));
+
+        if ($newUserId <= 0) {
+            $this->redirectError($id, 'Selecciona el agente destino.');
+        }
+
+        if ($reason === '') {
+            $this->redirectError($id, 'La razón de reasignación es obligatoria.');
+        }
+
+        try {
+            $result = (new AssignmentRepository($this->pdo))
+                ->reassignCase($id, $newUserId, $actorUserId, $reason);
+
+            (new AuditRepository($this->pdo))->log(
+                $actorUserId,
+                'CASE_REASSIGNED',
+                'CASE',
+                (string)$id,
+                [
+                    'queue_id'=>$result['queue_id'],
+                    'from_user_id'=>$result['from_user_id'],
+                    'to_user_id'=>$result['to_user_id'],
+                    'reason'=>$reason,
+                ]
+            );
+
+            $_SESSION['_flash_success'] = 'Caso reasignado correctamente.';
+        } catch (\Throwable $e) {
+            error_log('[CasesController::reassign] ' . $e->getMessage());
+            $_SESSION['_flash_error'] = $e instanceof \InvalidArgumentException
+                ? $e->getMessage()
+                : $e->getMessage();
+        }
+
+        header('Location: /cases/' . $id);
+        exit;
+    }
+
+    private function json(array $payload, int $status = 200): void
+    {
+        http_response_code($status);
+        header('Content-Type: application/json; charset=UTF-8');
+        echo json_encode(
+            $payload,
+            JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES
+        );
     }
 
     private function redirectError(int $id, string $message): never
