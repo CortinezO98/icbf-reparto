@@ -710,7 +710,39 @@ final class ReportRepository
                 SUM(c.current_state <> 'CLOSED' AND c.closed_at IS NULL) open_cases,
                 SUM(c.closed_at IS NOT NULL OR c.current_state='CLOSED') closed_cases,
                 SUM(c.first_management_at IS NOT NULL) managed_cases,
+                SUM(c.closed_at IS NULL AND c.current_state<>'CLOSED') pending_cases,
                 SUM(c.sla_status='BREACHED') breached_cases,
+                SUM(EXISTS(
+                    SELECT 1
+                    FROM case_managements cm_dir
+                    WHERE cm_dir.case_id=c.id
+                      AND cm_dir.management_type_code='DIRECTED'
+                )) directed_cases,
+                SUM(EXISTS(
+                    SELECT 1
+                    FROM case_managements cm_pol
+                    WHERE cm_pol.case_id=c.id
+                      AND cm_pol.management_type_code='POLICE_REPORT'
+                )) police_reports,
+                SUM(EXISTS(
+                    SELECT 1
+                    FROM case_managements cm_ext
+                    WHERE cm_ext.case_id=c.id
+                      AND cm_ext.management_type_code='POLICE_REPORT'
+                      AND cm_ext.escalation_category_code='EXTENSION'
+                )) police_extensions,
+                SUM(EXISTS(
+                    SELECT 1
+                    FROM case_managements cm_esc
+                    WHERE cm_esc.case_id=c.id
+                      AND cm_esc.management_type_code='ESCALATED'
+                )) escalations,
+                SUM((
+                    SELECT COUNT(*)
+                    FROM case_assignments ca_re
+                    WHERE ca_re.case_id=c.id
+                      AND ca_re.assignment_type='REASSIGN'
+                )) reassignments,
                 ROUND(AVG(CASE
                     WHEN c.first_management_at IS NOT NULL
                     THEN TIMESTAMPDIFF(
