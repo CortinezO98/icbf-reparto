@@ -1050,6 +1050,14 @@ final class ReportRepository
         $condition = '1=1';
         $params = [];
 
+        $presenceFrom = $filters['from'] ?? '1970-01-01 00:00:00';
+        $presenceTo = $filters['to'] ?? date('Y-m-d H:i:s');
+
+        $params[':agent_presence_to_filter'] = $presenceTo;
+        $params[':agent_presence_from_filter'] = $presenceFrom;
+        $params[':agent_presence_from'] = $presenceFrom;
+        $params[':agent_presence_to'] = $presenceTo;
+
         if ($filters['from'] !== null) {
             $condition .= ' AND c.created_at >= :agent_from';
             $params[':agent_from'] = $filters['from'];
@@ -1058,10 +1066,6 @@ final class ReportRepository
         if ($filters['to'] !== null) {
             $condition .= ' AND c.created_at < :agent_to';
             $params[':agent_to'] = $filters['to'];
-            $params[':agent_presence_to_filter'] = $filters['to'];
-            $params[':agent_presence_from_filter'] = $filters['from'];
-            $params[':agent_presence_from'] = $filters['from'];
-            $params[':agent_presence_to'] = $filters['to'];
         }
 
         if ($filters['queue_id'] !== null) {
