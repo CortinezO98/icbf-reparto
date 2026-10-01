@@ -142,6 +142,13 @@ final class AuthController
             exit;
         }
 
+        $rateLimit = $this->passwordResetRateLimit($identifier);
+        if (!$rateLimit['allowed']) {
+            $_SESSION['_flash_error'] = (string)$rateLimit['message'];
+            header('Location: /forgot-password');
+            exit;
+        }
+
         $repo = new UserRepository($this->pdo);
         $user = $repo->findActiveByIdentifier($identifier);
 
@@ -379,6 +386,57 @@ final class AuthController
         Auth::logout();
         header('Location: /login');
         exit;
+    }
+
+    /**
+     * Limita solicitudes de recuperación por IP + identificador.
+     * 3 solicitudes por ventana de 60 minutos.
+     *
+     * @return array{allowed:bool,attempts:int,message?:string}
+     */
+    private function passwordResetRateLimit(string $identifier): array
+    {
+        $ip = (string)($_SERVER['REMOTE_ADDR'] ?? 'unknown');
+        $key = '_password_reset_rate_' . hash(
+            'sha256',
+            mb_strtolower($ip . '|' . trim($identifier))
+        );
+
+        $now = time();
+        $limit = 3;
+        $window = 3600;
+
+        $data = $_SESSION[$key] ?? ['count'=>0,'first'=>$now];
+
+        if (!is_array($data)) {
+            $data = ['count'=>0,'first'=>$now];
+        }
+
+        $first = (int)($data['first'] ?? $now);
+        $count = (int)($data['count'] ?? 0);
+
+        if (($now - $first) >= $window) {
+            $data = ['count'=>1,'first'=>$now];
+            $_SESSION[$key] = $data;
+
+            return ['allowed'=>true,'attempts'=>1];
+        }
+
+        $count++;
+        $data['count'] = $count;
+        $_SESSION[$key] = $data;
+
+        if ($count > $limit) {
+            $minutesLeft = max(1, (int)ceil(($window - ($now - $first)) / 60));
+
+            return [
+                'allowed'=>false,
+                'attempts'=>$count,
+                'message'=>"Has superado el límite de solicitudes. Intenta nuevamente en {$minutesLeft} minutos.",
+            ];
+        }
+
+        return ['allowed'=>true,'attempts'=>$count];
     }
 
     private function sendPasswordResetEmail(
