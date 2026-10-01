@@ -9,6 +9,7 @@ use App\Controllers\AgentPresenceController;
 use App\Controllers\AgentStatusController;
 use App\Controllers\CasesController;
 use App\Controllers\SlaController;
+use App\Controllers\ShiftsController;
 use App\Controllers\ReportsController;
 use App\Auth\Auth;
 use App\Auth\Authorization;
@@ -77,4 +78,7 @@ return static function(Router $router,PDO $pdo): void {
 
  $router->get('/supervisor/agents',fn()=>(new AgentStatusController($pdo))->index());
  $router->get('/supervisor/agents/data',fn()=>(new AgentStatusController($pdo))->data());
+ $router->get('/admin/shifts',fn()=>(new ShiftsController($pdo))->index());
+ $router->post('/admin/shifts',fn()=>(new ShiftsController($pdo))->create());
+ $router->post('/admin/shifts/{id}/deactivate',fn(int $id)=>(new ShiftsController($pdo))->deactivate($id));
 };
