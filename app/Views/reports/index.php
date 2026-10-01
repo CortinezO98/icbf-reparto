@@ -43,6 +43,8 @@ $slaText = static fn(mixed $value): string => match ((string)$value) {
 
 $startDate = (string)($selected['start_date'] ?? '');
 $endDate = (string)($selected['end_date'] ?? '');
+$selectedRegional = (string)($selected['regional'] ?? '');
+$selectedPetitionType = (string)($selected['petition_type'] ?? '');
 
 $green = (int)($summary['sla_green'] ?? 0);
 $yellow = (int)($summary['sla_yellow'] ?? 0);
@@ -72,7 +74,7 @@ $exportUrl = static function (string $report, string $format) use ($startDate, $
         'end' => $endDate,
     ];
 
-    foreach (['queue_id', 'agent_id', 'state', 'sla'] as $key) {
+    foreach (['queue_id', 'agent_id', 'state', 'sla', 'regional', 'petition_type'] as $key) {
         if (($selected[$key] ?? null) !== null && ($selected[$key] ?? '') !== '') {
             $query[$key] = $selected[$key];
         }
@@ -138,7 +140,10 @@ $exportUrl = static function (string $report, string $format) use ($startDate, $
 .reports-export-modal .modal-content{border:0;border-radius:16px;box-shadow:0 20px 60px rgba(16,24,40,.22);overflow:hidden}
 .reports-export-modal .modal-header{padding:18px 20px;border-bottom:1px solid #e4e7ec}
 .reports-export-modal .modal-title{font-size:1.05rem;font-weight:800;color:#172033}
-.reports-export-modal .modal-body{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;padding:18px}
+.reports-export-modal .modal-body{display:flex;flex-direction:column;align-items:center;gap:12px;padding:18px}
+.reports-export-modal .reports-export-intro{width:100%}
+.report-export-grid{width:100%;max-width:760px;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.report-export-grid .report-export-item{width:100%}
 .reports-export-intro{grid-column:1 / -1;font-size:.77rem;line-height:1.55;color:#667085;background:#f8fafb;border:1px solid #e5e7eb;border-radius:10px;padding:11px 13px;margin:0 0 2px}
 .report-export-item{display:grid;grid-template-rows:auto 1fr auto;gap:12px;border:1px solid #dfe3e8;border-radius:12px;padding:15px;background:#fff;margin:0;min-width:0;min-height:150px;transition:border-color .15s ease,box-shadow .15s ease}
 .report-export-item:hover{border-color:#cbd5df;box-shadow:0 5px 16px rgba(16,24,40,.06)}
@@ -162,6 +167,7 @@ $exportUrl = static function (string $report, string $format) use ($startDate, $
   .report-export-actions .btn{flex:1}
 }
 @media(max-width:767.98px){
+  .report-export-grid{grid-template-columns:1fr;max-width:100%}
   .reports-header h1{font-size:1.4rem}
   .reports-header-actions{width:100%;justify-content:space-between}
   .report-kpi{min-height:130px}
@@ -197,8 +203,8 @@ $exportUrl = static function (string $report, string $format) use ($startDate, $
 
     <form class="reports-filter" method="get" action="/reports">
         <div class="row g-3 align-items-end">
-            <div class="col-12 col-md-2">
-                <label for="start">Fecha Inicio</label>
+            <div class="col-12 col-md-3">
+                <label for="start">Fecha inicio</label>
                 <div class="input-group">
                     <span class="input-group-text"><i class="bi bi-calendar"></i></span>
                     <input class="form-control" type="date" id="start" name="start"
@@ -206,8 +212,8 @@ $exportUrl = static function (string $report, string $format) use ($startDate, $
                 </div>
             </div>
 
-            <div class="col-12 col-md-2">
-                <label for="end">Fecha Fin</label>
+            <div class="col-12 col-md-3">
+                <label for="end">Fecha fin</label>
                 <div class="input-group">
                     <span class="input-group-text"><i class="bi bi-calendar"></i></span>
                     <input class="form-control" type="date" id="end" name="end"
@@ -215,10 +221,10 @@ $exportUrl = static function (string $report, string $format) use ($startDate, $
                 </div>
             </div>
 
-            <div class="col-12 col-md-2">
+            <div class="col-12 col-md-3">
                 <label for="queue_id">Cola</label>
                 <select class="form-select" id="queue_id" name="queue_id">
-                    <option value="">Todas</option>
+                    <option value="">Todas las colas</option>
                     <?php foreach ($filters['queues'] as $queue): ?>
                         <option value="<?= (int)$queue['id'] ?>"
                             <?= (int)($selected['queue_id'] ?? 0) === (int)$queue['id'] ? 'selected' : '' ?>>
@@ -228,10 +234,10 @@ $exportUrl = static function (string $report, string $format) use ($startDate, $
                 </select>
             </div>
 
-            <div class="col-12 col-md-2">
+            <div class="col-12 col-md-3">
                 <label for="agent_id">Agente</label>
                 <select class="form-select" id="agent_id" name="agent_id">
-                    <option value="">Todos</option>
+                    <option value="">Todos los agentes</option>
                     <?php foreach ($filters['agents'] as $agent): ?>
                         <option value="<?= (int)$agent['id'] ?>"
                             <?= (int)($selected['agent_id'] ?? 0) === (int)$agent['id'] ? 'selected' : '' ?>>
@@ -241,10 +247,36 @@ $exportUrl = static function (string $report, string $format) use ($startDate, $
                 </select>
             </div>
 
-            <div class="col-12 col-md-2">
+            <div class="col-12 col-md-3">
+                <label for="regional">Regional</label>
+                <select class="form-select" id="regional" name="regional">
+                    <option value="">Todas las regionales</option>
+                    <?php foreach (($filters['regionals'] ?? []) as $regional): ?>
+                        <option value="<?= htmlspecialchars((string)$regional['regional'], ENT_QUOTES, 'UTF-8') ?>"
+                            <?= $selectedRegional === (string)$regional['regional'] ? 'selected' : '' ?>>
+                            <?= htmlspecialchars((string)$regional['regional'], ENT_QUOTES, 'UTF-8') ?>
+                        </option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+
+            <div class="col-12 col-md-3">
+                <label for="petition_type">Tipo de petición</label>
+                <select class="form-select" id="petition_type" name="petition_type">
+                    <option value="">Todos los tipos</option>
+                    <?php foreach (($filters['petition_types'] ?? []) as $petition): ?>
+                        <option value="<?= htmlspecialchars((string)$petition['petition_type'], ENT_QUOTES, 'UTF-8') ?>"
+                            <?= $selectedPetitionType === (string)$petition['petition_type'] ? 'selected' : '' ?>>
+                            <?= htmlspecialchars((string)$petition['petition_type'], ENT_QUOTES, 'UTF-8') ?>
+                        </option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+
+            <div class="col-12 col-md-3">
                 <label for="state">Estado</label>
                 <select class="form-select" id="state" name="state">
-                    <option value="">Todos</option>
+                    <option value="">Todos los estados</option>
                     <?php foreach ([
                         'PENDING_ASSIGNMENT'=>'Pendiente de asignación',
                         'ASSIGNED'=>'Asignado',
@@ -258,11 +290,11 @@ $exportUrl = static function (string $report, string $format) use ($startDate, $
                 </select>
             </div>
 
-            <div class="col-12 col-md-2">
+            <div class="col-12 col-md-3">
                 <label for="sla">ANS</label>
                 <div class="d-flex gap-2">
                     <select class="form-select" id="sla" name="sla">
-                        <option value="">Todos</option>
+                        <option value="">Todos los estados ANS</option>
                         <?php foreach ([
                             'GREEN'=>'Verde',
                             'YELLOW'=>'Amarillo',
@@ -693,82 +725,95 @@ $exportUrl = static function (string $report, string $format) use ($startDate, $
                     El Estado en Tiempo Real siempre exporta la fotografía actual, sin rango histórico.
                 </div>
 
-                <div class="report-export-item">
-                    <div class="report-export-info">
-                        <div class="report-export-title">
-                            <i class="bi bi-briefcase"></i>Casos / SLA
+                <div class="report-export-grid">
+                    <div class="report-export-item">
+                        <div class="report-export-info">
+                            <div class="report-export-title"><i class="bi bi-briefcase"></i>Casos / SLA</div>
+                            <div class="report-export-description">Detalle de casos, ANS, tiempos, estados, agente, regional, tipo de petición y trazabilidad básica.</div>
                         </div>
-                        <div class="report-export-description">
-                            Detalle de casos, tiempos y estado de cumplimiento ANS.
+                        <div class="report-export-actions">
+                            <a class="btn btn-outline-secondary" href="<?= htmlspecialchars($exportUrl('cases', 'csv'), ENT_QUOTES, 'UTF-8') ?>"><i class="bi bi-filetype-csv me-1"></i>CSV</a>
+                            <a class="btn btn-outline-success btn-excel" href="<?= htmlspecialchars($exportUrl('cases', 'xlsx'), ENT_QUOTES, 'UTF-8') ?>"><i class="bi bi-file-earmark-excel me-1"></i>Excel</a>
                         </div>
                     </div>
-                    <div class="report-export-actions">
-                        <a class="btn btn-outline-secondary" href="<?= htmlspecialchars($exportUrl('cases', 'csv'), ENT_QUOTES, 'UTF-8') ?>">
-                            <i class="bi bi-filetype-csv me-1"></i>CSV
-                        </a>
-                        <a class="btn btn-outline-success btn-excel" href="<?= htmlspecialchars($exportUrl('cases', 'xlsx'), ENT_QUOTES, 'UTF-8') ?>">
-                            <i class="bi bi-file-earmark-excel me-1"></i>Excel
-                        </a>
-                    </div>
-                </div>
 
-                <div class="report-export-item">
-                    <div class="report-export-info">
-                        <div class="report-export-title">
-                            <i class="bi bi-person-lines-fill"></i>Agentes — Resumen
+                    <div class="report-export-item">
+                        <div class="report-export-info">
+                            <div class="report-export-title"><i class="bi bi-person-lines-fill"></i>Productividad de Agentes</div>
+                            <div class="report-export-description">Asignados, pendientes, resueltos, vencidos, tiempo de primera gestión y cumplimiento ANS.</div>
                         </div>
-                        <div class="report-export-description">
-                            Casos asignados, resueltos, vencidos, tiempo de primera gestión y cumplimiento ANS.
+                        <div class="report-export-actions">
+                            <a class="btn btn-outline-secondary" href="<?= htmlspecialchars($exportUrl('agents_summary', 'csv'), ENT_QUOTES, 'UTF-8') ?>"><i class="bi bi-filetype-csv me-1"></i>CSV</a>
+                            <a class="btn btn-outline-success btn-excel" href="<?= htmlspecialchars($exportUrl('agents_summary', 'xlsx'), ENT_QUOTES, 'UTF-8') ?>"><i class="bi bi-file-earmark-excel me-1"></i>Excel</a>
                         </div>
                     </div>
-                    <div class="report-export-actions">
-                        <a class="btn btn-outline-secondary" href="<?= htmlspecialchars($exportUrl('agents_summary', 'csv'), ENT_QUOTES, 'UTF-8') ?>">
-                            <i class="bi bi-filetype-csv me-1"></i>CSV
-                        </a>
-                        <a class="btn btn-outline-success btn-excel" href="<?= htmlspecialchars($exportUrl('agents_summary', 'xlsx'), ENT_QUOTES, 'UTF-8') ?>">
-                            <i class="bi bi-file-earmark-excel me-1"></i>Excel
-                        </a>
-                    </div>
-                </div>
 
-                <div class="report-export-item">
-                    <div class="report-export-info">
-                        <div class="report-export-title">
-                            <i class="bi bi-clock-history"></i>Agentes — Histórico Detallado
+                    <div class="report-export-item">
+                        <div class="report-export-info">
+                            <div class="report-export-title"><i class="bi bi-list-check"></i>Gestiones de Casos</div>
+                            <div class="report-export-description">Cerrados, direccionamientos, escalamientos, cambios de tipo, reportes a Policía, observaciones y soportes.</div>
                         </div>
-                        <div class="report-export-description">
-                            Cada transición de estado con hora de inicio, fin, duración y origen.
+                        <div class="report-export-actions">
+                            <a class="btn btn-outline-secondary" href="<?= htmlspecialchars($exportUrl('managements', 'csv'), ENT_QUOTES, 'UTF-8') ?>"><i class="bi bi-filetype-csv me-1"></i>CSV</a>
+                            <a class="btn btn-outline-success btn-excel" href="<?= htmlspecialchars($exportUrl('managements', 'xlsx'), ENT_QUOTES, 'UTF-8') ?>"><i class="bi bi-file-earmark-excel me-1"></i>Excel</a>
                         </div>
                     </div>
-                    <div class="report-export-actions">
-                        <a class="btn btn-outline-secondary" href="<?= htmlspecialchars($exportUrl('agents_history', 'csv'), ENT_QUOTES, 'UTF-8') ?>">
-                            <i class="bi bi-filetype-csv me-1"></i>CSV
-                        </a>
-                        <a class="btn btn-outline-success btn-excel" href="<?= htmlspecialchars($exportUrl('agents_history', 'xlsx'), ENT_QUOTES, 'UTF-8') ?>">
-                            <i class="bi bi-file-earmark-excel me-1"></i>Excel
-                        </a>
-                    </div>
-                </div>
 
-                <div class="report-export-item">
-                    <div class="report-export-info">
-                        <div class="report-export-title">
-                            <i class="bi bi-broadcast-pin"></i>Agentes — Estado en Tiempo Real
+                    <div class="report-export-item">
+                        <div class="report-export-info">
+                            <div class="report-export-title"><i class="bi bi-arrow-left-right"></i>Asignaciones y Reasignaciones</div>
+                            <div class="report-export-description">Agente origen/destino, tipo de asignación, responsable, fechas y motivo de reasignación.</div>
                         </div>
-                        <div class="report-export-description">
-                            Estado actual, disponibilidad para reparto, último heartbeat, colas y capacidad.
+                        <div class="report-export-actions">
+                            <a class="btn btn-outline-secondary" href="<?= htmlspecialchars($exportUrl('assignments', 'csv'), ENT_QUOTES, 'UTF-8') ?>"><i class="bi bi-filetype-csv me-1"></i>CSV</a>
+                            <a class="btn btn-outline-success btn-excel" href="<?= htmlspecialchars($exportUrl('assignments', 'xlsx'), ENT_QUOTES, 'UTF-8') ?>"><i class="bi bi-file-earmark-excel me-1"></i>Excel</a>
                         </div>
                     </div>
-                    <div class="report-export-actions">
-                        <a class="btn btn-outline-secondary" href="<?= htmlspecialchars($exportUrl('agents_realtime', 'csv'), ENT_QUOTES, 'UTF-8') ?>">
-                            <i class="bi bi-filetype-csv me-1"></i>CSV
-                        </a>
-                        <a class="btn btn-outline-success btn-excel" href="<?= htmlspecialchars($exportUrl('agents_realtime', 'xlsx'), ENT_QUOTES, 'UTF-8') ?>">
-                            <i class="bi bi-file-earmark-excel me-1"></i>Excel
-                        </a>
+
+                    <div class="report-export-item">
+                        <div class="report-export-info">
+                            <div class="report-export-title"><i class="bi bi-bar-chart-line"></i>Volumen por Día y Hora</div>
+                            <div class="report-export-description">Distribución de casos por fecha, hora, cola, regional y tipo de petición.</div>
+                        </div>
+                        <div class="report-export-actions">
+                            <a class="btn btn-outline-secondary" href="<?= htmlspecialchars($exportUrl('volume_time', 'csv'), ENT_QUOTES, 'UTF-8') ?>"><i class="bi bi-filetype-csv me-1"></i>CSV</a>
+                            <a class="btn btn-outline-success btn-excel" href="<?= htmlspecialchars($exportUrl('volume_time', 'xlsx'), ENT_QUOTES, 'UTF-8') ?>"><i class="bi bi-file-earmark-excel me-1"></i>Excel</a>
+                        </div>
                     </div>
-                </div>
-            </div>
+
+                    <div class="report-export-item">
+                        <div class="report-export-info">
+                            <div class="report-export-title"><i class="bi bi-calendar3"></i>Consolidado Mensual</div>
+                            <div class="report-export-description">Comparativo mensual de volumen, abiertos, cerrados, gestionados, vencidos y tiempos operativos.</div>
+                        </div>
+                        <div class="report-export-actions">
+                            <a class="btn btn-outline-secondary" href="<?= htmlspecialchars($exportUrl('monthly', 'csv'), ENT_QUOTES, 'UTF-8') ?>"><i class="bi bi-filetype-csv me-1"></i>CSV</a>
+                            <a class="btn btn-outline-success btn-excel" href="<?= htmlspecialchars($exportUrl('monthly', 'xlsx'), ENT_QUOTES, 'UTF-8') ?>"><i class="bi bi-file-earmark-excel me-1"></i>Excel</a>
+                        </div>
+                    </div>
+
+                    <div class="report-export-item">
+                        <div class="report-export-info">
+                            <div class="report-export-title"><i class="bi bi-clock-history"></i>Histórico de Agentes</div>
+                            <div class="report-export-description">Cada transición de estado con inicio, fin, duración, heartbeat, origen y usuario que estableció el estado.</div>
+                        </div>
+                        <div class="report-export-actions">
+                            <a class="btn btn-outline-secondary" href="<?= htmlspecialchars($exportUrl('agents_history', 'csv'), ENT_QUOTES, 'UTF-8') ?>"><i class="bi bi-filetype-csv me-1"></i>CSV</a>
+                            <a class="btn btn-outline-success btn-excel" href="<?= htmlspecialchars($exportUrl('agents_history', 'xlsx'), ENT_QUOTES, 'UTF-8') ?>"><i class="bi bi-file-earmark-excel me-1"></i>Excel</a>
+                        </div>
+                    </div>
+
+                    <div class="report-export-item">
+                        <div class="report-export-info">
+                            <div class="report-export-title"><i class="bi bi-broadcast-pin"></i>Agentes en Tiempo Real</div>
+                            <div class="report-export-description">Fotografía actual: estado efectivo, disponibilidad, heartbeat, colas, capacidad y casos abiertos.</div>
+                        </div>
+                        <div class="report-export-actions">
+                            <a class="btn btn-outline-secondary" href="<?= htmlspecialchars($exportUrl('agents_realtime', 'csv'), ENT_QUOTES, 'UTF-8') ?>"><i class="bi bi-filetype-csv me-1"></i>CSV</a>
+                            <a class="btn btn-outline-success btn-excel" href="<?= htmlspecialchars($exportUrl('agents_realtime', 'xlsx'), ENT_QUOTES, 'UTF-8') ?>"><i class="bi bi-file-earmark-excel me-1"></i>Excel</a>
+                        </div>
+                    </div>
+                </div>            </div>
         </div>
     </div>
 </div>
