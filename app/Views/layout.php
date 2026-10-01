@@ -356,3 +356,32 @@ $rolesLabel = $currentUserRoles !== [] ? implode(', ', $currentUserRoles) : '';
             if (data.ok) applyPresence(data.presence);
         } catch (_) {}
     };
+
+    const loadCurrent = async () => {
+        try {
+            const response = await fetch('/agent/presence', {
+                headers:{'Accept':'application/json'},
+                credentials:'same-origin',
+                cache:'no-store'
+            });
+
+            if (!response.ok) return;
+
+            const data = await response.json();
+            if (!data.ok) return;
+
+            heartbeatSeconds = Math.max(10, Number(data.heartbeat_seconds || 30));
+            renderStatuses(data.statuses || []);
+            applyPresence(data.presence);
+
+            if (heartbeatTimer !== null) window.clearInterval(heartbeatTimer);
+            heartbeatTimer = window.setInterval(heartbeat, heartbeatSeconds * 1000);
+        } catch (_) {}
+    };
+
+    loadCurrent();
+})();
+</script>
+<?php endif; ?>
+</body>
+</html>
