@@ -89,6 +89,7 @@ final class ReportRepository
                 'agents' => $this->activeAgents(),
                 'regionals' => $this->activeRegionals(),
                 'petition_types' => $this->activePetitionTypes(),
+                'management_types' => $this->activeManagementTypes(),
             ],
         ];
     }
@@ -300,6 +301,11 @@ final class ReportRepository
         }
 
         $this->appendCaseFilter($where, $params, $filters, 'management');
+
+        if (($filters['management_type'] ?? null) !== null) {
+            $where .= ' AND cm.management_type_code = :management_type_filter';
+            $params[':management_type_filter'] = $filters['management_type'];
+        }
 
         return $this->rows(
             "SELECT
@@ -527,6 +533,11 @@ final class ReportRepository
             $where .= " AND c.petition_type = :{$prefix}_petition_type";
             $params[":{$prefix}_petition_type"] = $filters['petition_type'];
         }
+
+        if (($filters['management_type'] ?? null) !== null) {
+            $where .= " AND c.current_management_type_code = :{$prefix}_management_type";
+            $params[":{$prefix}_management_type"] = $filters['management_type'];
+        }
     }
 
     private function where(array $filters): string
@@ -563,6 +574,10 @@ final class ReportRepository
 
         if (($filters['petition_type'] ?? null) !== null) {
             $where .= ' AND c.petition_type = :petition_type';
+        }
+
+        if (($filters['management_type'] ?? null) !== null) {
+            $where .= ' AND c.current_management_type_code = :management_type';
         }
 
         return $where;
@@ -608,6 +623,10 @@ final class ReportRepository
 
         if (($filters['petition_type'] ?? null) !== null) {
             $params[':petition_type'] = $filters['petition_type'];
+        }
+
+        if (($filters['management_type'] ?? null) !== null) {
+            $params[':management_type'] = $filters['management_type'];
         }
 
         return $params;
@@ -743,6 +762,11 @@ final class ReportRepository
         if (($filters['petition_type'] ?? null) !== null) {
             $condition .= ' AND c.petition_type = :agent_petition_type';
             $params[':agent_petition_type'] = $filters['petition_type'];
+        }
+
+        if (($filters['management_type'] ?? null) !== null) {
+            $condition .= ' AND c.current_management_type_code = :agent_management_type';
+            $params[':agent_management_type'] = $filters['management_type'];
         }
 
         return $this->rows(
@@ -953,6 +977,20 @@ final class ReportRepository
              FROM cases
              WHERE petition_type IS NOT NULL AND TRIM(petition_type)<>''
              ORDER BY petition_type"
+        );
+    }
+
+    /** @return list<array<string,mixed>> */
+    private function activeManagementTypes(): array
+    {
+        return $this->rows(
+            "SELECT ci.code,ci.label
+             FROM catalog_items ci
+             JOIN catalogs c ON c.id=ci.catalog_id
+             WHERE c.code='CASE_MANAGEMENT_TYPE'
+               AND c.is_active=1
+               AND ci.is_active=1
+             ORDER BY ci.sort_order,ci.id"
         );
     }
 
