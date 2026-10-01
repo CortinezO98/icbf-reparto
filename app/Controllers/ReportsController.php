@@ -20,8 +20,7 @@ final class ReportsController
         $filters = $this->filters();
         $data = (new ReportRepository($this->pdo))->data($filters);
 
-        $period = $this->periodLabel($filters);
-        $data['period'] = $period;
+        $data['period'] = $this->periodLabel($filters);
         $data['selected'] = $filters;
 
         $view = dirname(__DIR__) . '/Views/reports/index.php';
@@ -83,65 +82,109 @@ final class ReportsController
         exit;
     }
 
-    /** @return array{from:?string,to:?string,queue_id:?int,agent_id:?int,state:?string,sla:?string} */
+    /**
+     * Los reportes trabajan con un rango inclusivo de fechas.
+     * Internamente el límite superior se maneja como el día siguiente a
+     * las 00:00 para no perder registros del último día seleccionado.
+     *
+     * @return array{
+     *   period:string,
+     *   from:?string,
+     *   to:?string,
+     *   start_date:string,
+     *   end_date:string,
+     *   queue_id:?int,
+     *   agent_id:?int,
+     *   state:?string,
+     *   sla:?string
+     * }
+     */
     private function filters(): array
     {
-        $period = trim((string)($_GET['period'] ?? 'today'));
         $tz = new \DateTimeZone('America/Bogota');
         $today = new \DateTimeImmutable('today', $tz);
 
-        $from = null;
-        $to = null;
+        $defaultStart = $today->modify('-6 days');
+        $startRaw = trim((string)($_GET['start'] ?? $defaultStart->format('Y-m-d')));
+        $endRaw = trim((string)($_GET['end'] ?? $today->format('Y-m-d')));
 
-        if ($period === '7d') {
-            $from = $today->modify('-6 days')->format('Y-m-d 00:00:00');
-            $to = $today->modify('+1 day')->format('Y-m-d 00:00:00');
-        } elseif ($period === 'month') {
-            $from = $today->modify('first day of this month')->format('Y-m-d 00:00:00');
-            $to = $today->modify('+1 day')->format('Y-m-d 00:00:00');
-        } elseif ($period === 'all') {
-            $from = null;
-            $to = null;
-        } else {
-            $period = 'today';
-            $from = $today->format('Y-m-d 00:00:00');
-            $to = $today->modify('+1 day')->format('Y-m-d 00:00:00');
+        $start = \DateTimeImmutable::createFromFormat('!Y-m-d', $startRaw, $tz);
+        $end = \DateTimeImmutable::createFromFormat('!Y-m-d', $endRaw, $tz);
+
+        if (!$start || $start->format('Y-m-d') !== $startRaw) {
+            $start = $defaultStart;
         }
 
+        if (!$end || $end->format('Y-m-d') !== $endRaw) {
+            $end = $today;
+        }
+
+        if ($start > $end) {
+            [$start, $end] = [$end, $start];
+        }
+
+        $endExclusive = $end->modify('+1 day');
+
         return [
-            'period'=>$period,
-            'from'=>$from,
-            'to'=>$to,
-            'queue_id'=>$this->positiveInt($_GET['queue_id'] ?? null),
-            'agent_id'=>$this->positiveInt($_GET['agent_id'] ?? null),
-            'state'=>$this->allowed($_GET['state'] ?? null, ['PENDING_ASSIGNMENT','ASSIGNED','CLOSED']),
-            'sla'=>$this->allowed($_GET['sla'] ?? null, ['GREEN','YELLOW','RED','BREACHED']),
+            'period' => 'range',
+            'from' => $start->format('Y-m-d 00:00:00'),
+            'to' => $endExclusive->format('Y-m-d 00:00:00'),
+            'start_date' => $start->format('Y-m-d'),
+            'end_date' => $end->format('Y-m-d'),
+            'queue_id' => $this->positiveInt($_GET['queue_id'] ?? null),
+            'agent_id' => $this->positiveInt($_GET['agent_id'] ?? null),
+            'state' => $this->allowed(
+                $_GET['state'] ?? null,
+                ['PENDING_ASSIGNMENT', 'ASSIGNED', 'CLOSED']
+            ),
+            'sla' => $this->allowed(
+                $_GET['sla'] ?? null,
+                ['GREEN', 'YELLOW', 'RED', 'BREACHED']
+            ),
         ];
     }
 
     private function positiveInt(mixed $value): ?int
     {
-        if ($value === null || $value === '' || !is_scalar($value)) return null;
+        if ($value === null || $value === '' || !is_scalar($value)) {
+            return null;
+        }
+
         $value = (int)$value;
+
         return $value > 0 ? $value : null;
     }
 
     /** @param list<string> $allowed */
     private function allowed(mixed $value, array $allowed): ?string
     {
-        if ($value === null || !is_scalar($value)) return null;
+        if ($value === null || !is_scalar($value)) {
+            return null;
+        }
+
         $value = strtoupper(trim((string)$value));
+
         return in_array($value, $allowed, true) ? $value : null;
     }
 
-    /** @param array{from:?string,to:?string,queue_id:?int,agent_id:?int,state:?string,sla:?string} $filters */
+    /** @param array{start_date:string,end_date:string} $filters */
     private function periodLabel(array $filters): string
     {
-        if ($filters['from'] === null) return 'Histórico';
-        if (str_ends_with($filters['from'], '-01 00:00:00')) return 'Mes actual';
-        $today = new \DateTimeImmutable('today', new \DateTimeZone('America/Bogota'));
-        return $filters['from'] === $today->format('Y-m-d 00:00:00')
-            ? 'Hoy'
-            : 'Últimos 7 días';
+        $start = \DateTimeImmutable::createFromFormat(
+            '!Y-m-d',
+            $filters['start_date'],
+            new \DateTimeZone('America/Bogota')
+        );
+        $end = \DateTimeImmutable::createFromFormat(
+            '!Y-m-d',
+            $filters['end_date'],
+            new \DateTimeZone('America/Bogota')
+        );
+
+        if (!$start || !$end) {
+            return 'Periodo seleccionado';
+        }
+
+        return $start->format('d/m/Y') . ' - ' . $end->format('d/m/Y');
     }
 }
