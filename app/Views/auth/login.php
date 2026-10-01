@@ -26,6 +26,13 @@ $year = date('Y');
                     </div>
                 <?php endif; ?>
 
+                <?php if (!empty($success)): ?>
+                    <div class="alert alert-success py-2 mb-3" role="alert">
+                        <i class="bi bi-check-circle me-1"></i>
+                        <?= htmlspecialchars((string)$success, ENT_QUOTES, 'UTF-8') ?>
+                    </div>
+                <?php endif; ?>
+
                 <form method="post" action="/login" autocomplete="off">
                     <input type="hidden"
                            name="_csrf"
@@ -59,6 +66,12 @@ $year = date('Y');
                         </button>
                     </div>
                 </form>
+
+                <div class="text-center mt-3">
+                    <a href="/forgot-password" class="small text-decoration-none">
+                        ¿Olvidaste tu contraseña?
+                    </a>
+                </div>
             </div>
         </div>
 
