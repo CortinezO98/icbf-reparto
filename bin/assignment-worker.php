@@ -14,7 +14,7 @@ $batchSize = max(1, min(500, (int)($_ENV['ASSIGNMENT_WORKER_BATCH_SIZE'] ?? 100)
 
 $pdo = Database::connection();
 
-while (true) {
+for (;;) {
     try {
         $assignmentRepo = new AssignmentRepository($pdo);
         $caseRepo = new CaseOperationsRepository($pdo);
