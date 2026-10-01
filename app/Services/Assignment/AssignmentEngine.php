@@ -135,7 +135,7 @@ final class AssignmentEngine
 
                     $this->pdo->commit();
                     $assigned++;
-                } catch (Throwable $e) {
+                } catch (\Throwable $e) {
                     if ($this->pdo->inTransaction()) {
                         $this->pdo->rollBack();
                     }
