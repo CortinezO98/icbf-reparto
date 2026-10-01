@@ -27,7 +27,7 @@ $forced = (bool)($forced ?? false);
                 <?php endif; ?>
 
                 <form method="post" action="/change-password" autocomplete="off">
-                    <input type="hidden" name="_csrf" value="<?= htmlspecialchars(AppAuthCsrf::token(), ENT_QUOTES, 'UTF-8') ?>">
+                    <input type="hidden" name="_csrf" value="<?= htmlspecialchars(\App\Auth\Csrf::token(), ENT_QUOTES, 'UTF-8') ?>">
 
                     <div class="mb-3">
                         <label for="password" class="form-label">Nueva contraseña</label>
