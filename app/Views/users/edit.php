@@ -3,6 +3,7 @@
 /** @var list<array<string,mixed>> $roles */
 /** @var list<array<string,mixed>> $queues */
 /** @var string|null $error */
+/** @var string|null $success */
 
 $selectedRoles = array_map('intval', (array)($editUser['role_ids'] ?? []));
 $selectedQueues = array_map('intval', (array)($editUser['queue_ids'] ?? []));
@@ -38,6 +39,11 @@ $allQueuesSelected = $activeQueueIds !== []
     <?php if ($error): ?>
         <div class="alert alert-danger admin-user-form">
             <?= htmlspecialchars($error, ENT_QUOTES, 'UTF-8') ?>
+        </div>
+    <?php endif; ?>
+    <?php if ($success): ?>
+        <div class="alert alert-success admin-user-form">
+            <?= htmlspecialchars($success, ENT_QUOTES, 'UTF-8') ?>
         </div>
     <?php endif; ?>
 
@@ -77,6 +83,20 @@ $allQueuesSelected = $activeQueueIds !== []
                             <input class="form-control" name="full_name" maxlength="180" required
                                    value="<?= htmlspecialchars((string)$editUser['full_name'], ENT_QUOTES, 'UTF-8') ?>">
                         </div>
+                    </div>
+
+                    <div class="alert alert-warning d-flex justify-content-between align-items-center gap-3 mt-3">
+                        <div class="small">
+                            <strong>Restablecer con contraseña temporal</strong><br>
+                            Genera una contraseña nueva, invalida los tokens de recuperación pendientes y obliga al usuario a cambiarla al iniciar sesión.
+                        </div>
+                        <form method="post" action="/admin/users/<?= (int)$editUser['id'] ?>/reset-password" class="flex-shrink-0"
+                              onsubmit="return confirm('¿Deseas generar una nueva contraseña temporal para este usuario?');">
+                            <input type="hidden" name="_csrf" value="<?= htmlspecialchars(\App\Auth\Csrf::token(), ENT_QUOTES, 'UTF-8') ?>">
+                            <button type="submit" class="btn btn-warning">
+                                <i class="bi bi-key-fill me-1"></i>Generar temporal
+                            </button>
+                        </form>
                     </div>
 
                     <h6 class="form-section-title mt-4">
