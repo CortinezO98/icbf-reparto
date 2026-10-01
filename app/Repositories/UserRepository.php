@@ -17,7 +17,7 @@ final class UserRepository
         $identifier = trim($identifier);
 
         $st = $this->pdo->prepare(
-            'SELECT id,document_number,username,email,full_name,password_hash,is_active
+            'SELECT id,document_number,username,email,full_name,password_hash,password_must_change,is_active
              FROM users
              WHERE username=:u OR email=:e
              LIMIT 1'
@@ -162,7 +162,7 @@ final class UserRepository
     public function findById(int $id): ?array
     {
         $st = $this->pdo->prepare(
-            'SELECT id,document_number,username,email,full_name,is_active,assign_enabled,last_assigned_at
+            'SELECT id,document_number,username,email,full_name,password_must_change,is_active,assign_enabled,last_assigned_at
              FROM users WHERE id=:id LIMIT 1'
         );
         $st->execute([':id'=>$id]);
@@ -338,9 +338,9 @@ final class UserRepository
         try {
             $st = $this->pdo->prepare(
                 'INSERT INTO users
-                 (document_number,username,email,full_name,password_hash,is_active,assign_enabled,created_at,updated_at)
+                 (document_number,username,email,full_name,password_hash,password_must_change,is_active,assign_enabled,created_at,updated_at)
                  VALUES
-                 (:document,:username,:email,:full_name,:password_hash,:active,:assign_enabled,NOW(6),NOW(6))'
+                 (:document,:username,:email,:full_name,:password_hash,:password_must_change,:active,:assign_enabled,NOW(6),NOW(6))'
             );
             $st->execute([
                 ':document'=>$data['document_number'],
@@ -348,6 +348,7 @@ final class UserRepository
                 ':email'=>$data['email'],
                 ':full_name'=>$data['full_name'],
                 ':password_hash'=>$data['password_hash'],
+                ':password_must_change'=>(int)($data['password_must_change'] ?? 0),
                 ':active'=>(int)$data['is_active'],
                 ':assign_enabled'=>(int)$data['assign_enabled'],
             ]);
@@ -408,8 +409,9 @@ final class UserRepository
             ];
 
             if (!empty($data['password_hash'])) {
-                $sql .= ', password_hash=:password_hash';
+                $sql .= ', password_hash=:password_hash, password_must_change=:password_must_change';
                 $params[':password_hash'] = $data['password_hash'];
+                $params[':password_must_change'] = (int)($data['password_must_change'] ?? 1);
             }
 
             $sql .= ' WHERE id=:id';
@@ -431,6 +433,88 @@ final class UserRepository
             }
             throw $e;
         }
+    }
+
+    public function updatePassword(int $userId, string $passwordHash, bool $mustChange = false): void
+    {
+        $st = $this->pdo->prepare(
+            'UPDATE users
+             SET password_hash=:password_hash,
+                 password_must_change=:must_change,
+                 updated_at=NOW(6)
+             WHERE id=:id'
+        );
+        $st->execute([
+            ':password_hash'=>$passwordHash,
+            ':must_change'=>$mustChange ? 1 : 0,
+            ':id'=>$userId,
+        ]);
+    }
+
+    public function createPasswordResetToken(int $userId, string $tokenHash, string $expiresAt): void
+    {
+        $this->pdo->prepare(
+            'UPDATE password_reset_tokens
+             SET used_at=NOW(6)
+             WHERE user_id=:user_id
+               AND used_at IS NULL'
+        )->execute([':user_id'=>$userId]);
+
+        $st = $this->pdo->prepare(
+            'INSERT INTO password_reset_tokens
+             (user_id,token_hash,expires_at,created_at)
+             VALUES(:user_id,:token_hash,:expires_at,NOW(6))'
+        );
+        $st->execute([
+            ':user_id'=>$userId,
+            ':token_hash'=>$tokenHash,
+            ':expires_at'=>$expiresAt,
+        ]);
+    }
+
+    /** @return array<string,mixed>|null */
+    public function findValidPasswordResetByTokenHash(string $tokenHash): ?array
+    {
+        $st = $this->pdo->prepare(
+            'SELECT pr.id,pr.user_id,pr.expires_at,u.email,u.username,u.full_name
+             FROM password_reset_tokens pr
+             JOIN users u ON u.id=pr.user_id
+             WHERE pr.token_hash=:token_hash
+               AND pr.used_at IS NULL
+               AND pr.expires_at>NOW(6)
+               AND u.is_active=1
+             LIMIT 1'
+        );
+        $st->execute([':token_hash'=>$tokenHash]);
+        $row = $st->fetch();
+
+        return $row ?: null;
+    }
+
+    public function markPasswordResetUsed(int $resetId): void
+    {
+        $this->pdo->prepare(
+            'UPDATE password_reset_tokens
+             SET used_at=NOW(6)
+             WHERE id=:id
+               AND used_at IS NULL'
+        )->execute([':id'=>$resetId]);
+    }
+
+    /** @return array<string,mixed>|null */
+    public function findActiveByIdentifier(string $identifier): ?array
+    {
+        $st = $this->pdo->prepare(
+            'SELECT id,email,username,full_name
+             FROM users
+             WHERE is_active=1
+               AND (username=:identifier OR email=:identifier)
+             LIMIT 1'
+        );
+        $st->execute([':identifier'=>trim($identifier)]);
+        $row = $st->fetch();
+
+        return $row ?: null;
     }
 
     public function toggleActive(int $userId): int
