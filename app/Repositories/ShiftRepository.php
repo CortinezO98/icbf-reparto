@@ -538,6 +538,7 @@ final class ShiftRepository
         return $releasedIds;
     }
 
+    /** @param list<int> $caseIds */
     public function pendingForCaseIds(array $caseIds): int
     {
         $caseIds = array_values(array_unique(array_filter(
