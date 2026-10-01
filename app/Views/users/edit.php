@@ -41,6 +41,12 @@ $allQueuesSelected = $activeQueueIds !== []
         </div>
     <?php endif; ?>
 
+    <?php if (!empty($success)): ?>
+        <div class="alert alert-success admin-user-form">
+            <?= htmlspecialchars((string)$success, ENT_QUOTES, 'UTF-8') ?>
+        </div>
+    <?php endif; ?>
+
     <div class="admin-user-form">
         <div class="card shadow-sm">
             <div class="card-header bg-light">
