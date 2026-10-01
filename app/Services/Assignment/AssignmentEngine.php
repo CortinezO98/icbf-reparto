@@ -70,6 +70,93 @@ final class AssignmentEngine
     }
 
     /**
+     * Reparte inmediatamente a un agente que acaba de pasar a AVAILABLE.
+     *
+     * La operación queda limitada a las colas en las que el agente es elegible
+     * en este momento y respeta la capacidad configurada por cola. El worker
+     * continúa funcionando como mecanismo de respaldo para nuevos casos,
+     * cambios de presencia y concurrencia.
+     *
+     * @return array{assigned:int,no_agent:int,iterations:int}
+     */
+    public function runForAgent(
+        int $userId,
+        int $maxAssignments = 500
+    ): array {
+        $maxAssignments = max(1, min(5000, $maxAssignments));
+
+        $assigned = 0;
+        $iterations = 0;
+
+        $queueIds = $this->repo->eligibleQueueIdsForAgent($userId);
+
+        foreach ($queueIds as $queueId) {
+            while ($assigned < $maxAssignments) {
+                $iterations++;
+
+                $this->pdo->beginTransaction();
+
+                try {
+                    $lockedUser = $this->repo->lockUser($userId);
+
+                    if (
+                        !$lockedUser
+                        || (int)$lockedUser['is_active'] !== 1
+                        || (int)$lockedUser['assign_enabled'] !== 1
+                        || !$this->repo->isAvailableNow($userId)
+                        || !$this->repo->isOnShiftForQueue($queueId, $userId)
+                        || !$this->repo->isEligibleForQueue($queueId, $userId)
+                    ) {
+                        $this->pdo->commit();
+                        break;
+                    }
+
+                    $capacity = $this->repo->capacityForQueue($queueId, $userId);
+                    $openCases = $this->repo->openCaseCount($queueId, $userId);
+
+                    if ($capacity <= 0 || $openCases >= $capacity) {
+                        $this->pdo->commit();
+                        break;
+                    }
+
+                    $case = $this->repo->nextPendingCaseForUpdate($queueId);
+
+                    if ($case === null) {
+                        $this->pdo->commit();
+                        break;
+                    }
+
+                    $this->repo->assignCase(
+                        (int)$case['id'],
+                        $queueId,
+                        $userId,
+                        'AUTO'
+                    );
+
+                    $this->pdo->commit();
+                    $assigned++;
+                } catch (Throwable $e) {
+                    if ($this->pdo->inTransaction()) {
+                        $this->pdo->rollBack();
+                    }
+
+                    throw $e;
+                }
+            }
+
+            if ($assigned >= $maxAssignments) {
+                break;
+            }
+        }
+
+        return [
+            'assigned'=>$assigned,
+            'no_agent'=>0,
+            'iterations'=>$iterations,
+        ];
+    }
+
+    /**
      * @param array<int,bool> $blockedQueueIds
      * @return array{status:'ASSIGNED'|'NO_AGENT'|'NO_CASE',queue_id:int|null}
      */
