@@ -694,3 +694,75 @@ $exportUrl = static function (string $report, string $format) use ($startDate, $
                         <div class="report-export-description">
                             Detalle de casos, tiempos y estado de cumplimiento ANS.
                         </div>
+                        <div class="report-export-actions">
+                            <a class="btn btn-outline-secondary" href="<?= htmlspecialchars($exportUrl('cases', 'csv'), ENT_QUOTES, 'UTF-8') ?>">
+                                <i class="bi bi-filetype-csv me-1"></i>CSV
+                            </a>
+                            <a class="btn btn-outline-success btn-excel" href="<?= htmlspecialchars($exportUrl('cases', 'xlsx'), ENT_QUOTES, 'UTF-8') ?>">
+                                <i class="bi bi-file-earmark-excel me-1"></i>Excel
+                            </a>
+                        </div>
+                    </div>
+
+                    <div class="report-export-item">
+                        <div class="report-export-info">
+                            <div class="report-export-title">
+                                <i class="bi bi-person-lines-fill"></i>Agentes — Resumen
+                            </div>
+                            <div class="report-export-description">
+                                Casos asignados, resueltos, vencidos, tiempo de primera gestión y cumplimiento ANS.
+                            </div>
+                        </div>
+                        <div class="report-export-actions">
+                            <a class="btn btn-outline-secondary" href="<?= htmlspecialchars($exportUrl('agents_summary', 'csv'), ENT_QUOTES, 'UTF-8') ?>">
+                                <i class="bi bi-filetype-csv me-1"></i>CSV
+                            </a>
+                            <a class="btn btn-outline-success btn-excel" href="<?= htmlspecialchars($exportUrl('agents_summary', 'xlsx'), ENT_QUOTES, 'UTF-8') ?>">
+                                <i class="bi bi-file-earmark-excel me-1"></i>Excel
+                            </a>
+                        </div>
+                    </div>
+
+                    <div class="report-export-item">
+                        <div class="report-export-info">
+                            <div class="report-export-title">
+                                <i class="bi bi-clock-history"></i>Agentes — Histórico Detallado
+                            </div>
+                            <div class="report-export-description">
+                                Cada transición de estado con hora de inicio, fin, duración y origen.
+                            </div>
+                        </div>
+                        <div class="report-export-actions">
+                            <a class="btn btn-outline-secondary" href="<?= htmlspecialchars($exportUrl('agents_history', 'csv'), ENT_QUOTES, 'UTF-8') ?>">
+                                <i class="bi bi-filetype-csv me-1"></i>CSV
+                            </a>
+                            <a class="btn btn-outline-success btn-excel" href="<?= htmlspecialchars($exportUrl('agents_history', 'xlsx'), ENT_QUOTES, 'UTF-8') ?>">
+                                <i class="bi bi-file-earmark-excel me-1"></i>Excel
+                            </a>
+                        </div>
+                    </div>
+
+                    <div class="report-export-item">
+                        <div class="report-export-info">
+                            <div class="report-export-title">
+                                <i class="bi bi-broadcast-pin"></i>Agentes — Estado en Tiempo Real
+                            </div>
+                            <div class="report-export-description">
+                                Estado actual, disponibilidad para reparto, último heartbeat, colas y capacidad.
+                            </div>
+                        </div>
+                        <div class="report-export-actions">
+                            <a class="btn btn-outline-secondary" href="<?= htmlspecialchars($exportUrl('agents_realtime', 'csv'), ENT_QUOTES, 'UTF-8') ?>">
+                                <i class="bi bi-filetype-csv me-1"></i>CSV
+                            </a>
+                            <a class="btn btn-outline-success btn-excel" href="<?= htmlspecialchars($exportUrl('agents_realtime', 'xlsx'), ENT_QUOTES, 'UTF-8') ?>">
+                                <i class="bi bi-file-earmark-excel me-1"></i>Excel
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+<?php endif; ?>
