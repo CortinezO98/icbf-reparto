@@ -45,6 +45,11 @@ final class AgentPresenceController
 
         try {
             $repo = new PresenceRepository($this->pdo);
+            $previousPresence = $repo->currentForUser($uid);
+            $wasAvailable = $previousPresence !== null
+                && (string)$previousPresence['status_code'] === 'AVAILABLE'
+                && !empty($previousPresence['last_heartbeat_at']);
+
             $repo->setSelectableStatus($uid, $status, $uid, 'USER');
 
             $assignment = [
@@ -74,6 +79,7 @@ final class AgentPresenceController
                 (string)$uid,
                 [
                     'status_code'=>$status,
+                    'previous_status'=>$previousPresence['status_code'] ?? null,
                     'assigned_after_available'=>$assignment['assigned'],
                 ]
             );
