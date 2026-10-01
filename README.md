@@ -159,3 +159,17 @@ Variables configurables:
 WORKER_INTERVAL_SECONDS=10
 SLA_WORKER_INTERVAL_SECONDS=300
 ```
+
+## Reasignación de casos
+
+Los perfiles con permiso `CASE_REASSIGN` pueden reasignar un caso abierto desde su detalle.
+
+La operación exige un motivo y valida nuevamente el agente destino antes de confirmar:
+
+- agente activo y habilitado para reparto;
+- presencia y heartbeat vigentes;
+- turno vigente;
+- cola y skills;
+- capacidad disponible.
+
+La asignación anterior se cierra con `MANUAL_REASSIGN`, la nueva se registra como `REASSIGN` y el usuario que ejecutó la operación queda en `assigned_by`. El evento `CASE_REASSIGNED` conserva origen, destino y motivo.
