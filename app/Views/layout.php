@@ -10,7 +10,7 @@ use App\Config\Database;
 /** @var string $view */
 
 $path = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?: '/';
-$isAuthPage = $path === '/login';
+$isAuthPage = in_array($path, ['/login','/forgot-password','/reset-password','/change-password'], true);
 
 $currentUserRoles = [];
 $isAgent = false;
