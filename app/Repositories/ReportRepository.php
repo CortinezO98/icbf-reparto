@@ -214,31 +214,40 @@ final class ReportRepository
     {
         $receivedPeriod = '1=1';
         $closedPeriod = '1=1';
+        $managedPeriod = '1=1';
         $params = [];
 
         if ($filters['from'] !== null) {
             $receivedPeriod .= ' AND c.created_at >= :ag_received_from';
             $closedPeriod .= ' AND c.created_at >= :ag_closed_from';
+            $managedPeriod .= ' AND c.created_at >= :ag_managed_from';
             $params[':ag_received_from'] = $filters['from'];
             $params[':ag_closed_from'] = $filters['from'];
+            $params[':ag_managed_from'] = $filters['from'];
         }
         if ($filters['to'] !== null) {
             $receivedPeriod .= ' AND c.created_at < :ag_received_to';
             $closedPeriod .= ' AND c.created_at < :ag_closed_to';
+            $managedPeriod .= ' AND c.created_at < :ag_managed_to';
             $params[':ag_received_to'] = $filters['to'];
             $params[':ag_closed_to'] = $filters['to'];
+            $params[':ag_managed_to'] = $filters['to'];
         }
         if ($filters['queue_id'] !== null) {
             $receivedPeriod .= ' AND c.queue_id = :ag_received_queue';
             $closedPeriod .= ' AND c.queue_id = :ag_closed_queue';
+            $managedPeriod .= ' AND c.queue_id = :ag_managed_queue';
             $params[':ag_received_queue'] = $filters['queue_id'];
             $params[':ag_closed_queue'] = $filters['queue_id'];
+            $params[':ag_managed_queue'] = $filters['queue_id'];
         }
         if ($filters['agent_id'] !== null) {
             $receivedPeriod .= ' AND c.assigned_user_id = :ag_received_agent';
             $closedPeriod .= ' AND c.assigned_user_id = :ag_closed_agent';
+            $managedPeriod .= ' AND c.assigned_user_id = :ag_managed_agent';
             $params[':ag_received_agent'] = $filters['agent_id'];
             $params[':ag_closed_agent'] = $filters['agent_id'];
+            $params[':ag_managed_agent'] = $filters['agent_id'];
         }
 
         return $this->rows(
@@ -247,7 +256,7 @@ final class ReportRepository
                 COUNT(DISTINCT CASE WHEN c.closed_at IS NULL AND c.current_state <> 'CLOSED' THEN c.id END) open_cases,
                 COUNT(DISTINCT CASE WHEN {$receivedPeriod} THEN c.id END) received_period,
                 COUNT(DISTINCT CASE WHEN {$closedPeriod} AND (c.closed_at IS NOT NULL OR c.current_state='CLOSED') THEN c.id END) closed_period,
-                COUNT(DISTINCT CASE WHEN {$receivedPeriod} AND c.first_management_at IS NOT NULL THEN c.id END) managed_period
+                COUNT(DISTINCT CASE WHEN {$managedPeriod} AND c.first_management_at IS NOT NULL THEN c.id END) managed_period
              FROM users u
              JOIN user_roles ur ON ur.user_id=u.id
              JOIN roles r ON r.id=ur.role_id AND r.code='AGENTE' AND r.is_active=1
