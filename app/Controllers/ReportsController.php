@@ -477,21 +477,21 @@ final class ReportsController
                 'title' => 'Direccionamientos',
                 'filename' => 'reporte_direccionamientos_' . $stamp,
                 'headers' => [
-                    'Caso','Fecha direccionamiento','Agente','Supervisor','Cola',
-                    'Regional','Segmento','Tipo petición','Observación','Estado'
+                    'Mes','Fecha','Hora','Agente','Supervisor','Regional','Segmento',
+                    'Tipo petición','Cola','Direccionamientos'
                 ],
                 'data' => array_map(
                     static fn(array $row): array => [
-                        $row['case_number'] ?? '',
-                        $row['directed_at'] ?? '',
+                        $row['month_key'] ?? '',
+                        $row['day'] ?? '',
+                        isset($row['hour']) ? str_pad((string)$row['hour'], 2, '0', STR_PAD_LEFT) . ':00' : '',
                         $row['agent_name'] ?? '',
                         $row['supervisor_name'] ?? '',
-                        $row['queue_code'] ?? '',
                         $row['regional'] ?? '',
                         $row['segment'] ?? '',
                         $row['petition_type'] ?? '',
-                        $row['observation'] ?? '',
-                        $row['current_state'] ?? '',
+                        $row['queue_code'] ?? '',
+                        (int)($row['total_directed'] ?? 0),
                     ],
                     $rows
                 ),
