@@ -89,7 +89,9 @@ $allQueuesSelected = $activeQueueIds !== []
                             <input class="form-control" type="password" name="password"
                                    maxlength="128" autocomplete="new-password"
                                    placeholder="Vacía para conservar la actual">
-                            <div class="form-text">Déjala vacía si no deseas cambiarla.</div>
+                            <div class="form-text">
+                                Si defines una nueva contraseña desde administración, se tratará como temporal y el usuario deberá cambiarla al ingresar.
+                            </div>
                         </div>
 
                         <div class="col-md-6">
