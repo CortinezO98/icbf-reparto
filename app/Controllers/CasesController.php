@@ -95,6 +95,13 @@ final class CasesController
         $escalations = $repo->catalogItems('ESCALATION_CATEGORY');
         $petitionTypes = $repo->catalogItems('PETITION_TYPE');
         $canManage = $repo->canManage($id, $uid);
+        $canReassign = Authorization::hasPermission($this->pdo, $uid, 'CASE_REASSIGN');
+        $reassignmentCandidates = $canReassign
+            ? (new AssignmentRepository($this->pdo))->reassignmentCandidates(
+                $id,
+                (int)($case['assigned_user_id'] ?? 0)
+            )
+            : [];
 
         $success = $_SESSION['_flash_success'] ?? null;
         $error = $_SESSION['_flash_error'] ?? null;
@@ -192,7 +199,7 @@ final class CasesController
         $currentUserId = (int)($case['assigned_user_id'] ?? 0);
 
         if (
-            (int)($case['closed_at'] !== null)
+            $case['closed_at'] !== null
             || (string)($case['current_state'] ?? '') === 'CLOSED'
         ) {
             $this->json([
