@@ -134,25 +134,31 @@ $exportUrl = static function (string $report, string $format) use ($startDate, $
 .status-yellow{background:#fff4cf;color:#8b6100}
 .status-red{background:#ffe7e7;color:#c52e3d}
 .status-gray{background:#f2f4f7;color:#667085}
-.reports-export-modal .modal-dialog{max-width:760px}
-.reports-export-modal .modal-content{border:0;border-radius:12px;box-shadow:0 20px 60px rgba(16,24,40,.22)}
-.reports-export-modal .modal-header{padding:16px 18px;border-bottom:1px solid #e4e7ec}
+.reports-export-modal .modal-dialog{max-width:920px}
+.reports-export-modal .modal-content{border:0;border-radius:16px;box-shadow:0 20px 60px rgba(16,24,40,.22);overflow:hidden}
+.reports-export-modal .modal-header{padding:18px 20px;border-bottom:1px solid #e4e7ec}
 .reports-export-modal .modal-title{font-size:1.05rem;font-weight:800;color:#172033}
-.reports-export-modal .modal-body{padding:16px}
-.reports-export-intro{font-size:.78rem;line-height:1.5;color:#667085;margin-bottom:12px}
-.report-export-item{display:flex;align-items:center;justify-content:space-between;gap:16px;border:1px solid #dfe3e8;border-radius:8px;padding:13px 14px;margin-bottom:9px}
-.report-export-item:last-child{margin-bottom:0}
+.reports-export-modal .modal-body{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;padding:18px}
+.reports-export-intro{grid-column:1 / -1;font-size:.77rem;line-height:1.55;color:#667085;background:#f8fafb;border:1px solid #e5e7eb;border-radius:10px;padding:11px 13px;margin:0 0 2px}
+.report-export-item{display:grid;grid-template-rows:auto 1fr auto;gap:12px;border:1px solid #dfe3e8;border-radius:12px;padding:15px;background:#fff;margin:0;min-width:0;min-height:150px;transition:border-color .15s ease,box-shadow .15s ease}
+.report-export-item:hover{border-color:#cbd5df;box-shadow:0 5px 16px rgba(16,24,40,.06)}
 .report-export-info{min-width:0}
-.report-export-title{display:flex;align-items:center;gap:8px;font-size:.88rem;font-weight:700;color:#344054}
-.report-export-title i{color:var(--color-primary)}
-.report-export-description{font-size:.72rem;color:#667085;margin-top:3px}
-.report-export-actions{display:flex;gap:7px;flex-shrink:0}
-.report-export-actions .btn{font-size:.74rem;padding:6px 10px}
+.report-export-title{display:flex;align-items:center;gap:9px;font-size:.9rem;font-weight:800;color:#344054;line-height:1.3}
+.report-export-title i{display:inline-grid;place-items:center;flex:0 0 36px;width:36px;height:36px;border-radius:10px;background:#eef8ef;color:var(--color-primary);font-size:1rem}
+.report-export-description{font-size:.73rem;line-height:1.5;color:#667085;margin-top:6px;padding-left:45px}
+.report-export-actions{display:flex;justify-content:flex-end;gap:8px;padding-top:11px;border-top:1px solid #eef0f2}
+.report-export-actions .btn{font-size:.74rem;padding:6px 11px;min-width:70px}
 .report-export-actions .btn-excel{border-color:#198754;color:#198754}
 .report-export-actions .btn-excel:hover{background:#198754;color:#fff}
+@media(max-width:767.98px){
+  .reports-export-modal .modal-body{grid-template-columns:1fr}
+}
 @media(max-width:575.98px){
-  .report-export-item{align-items:flex-start;flex-direction:column}
-  .report-export-actions{width:100%}
+  .reports-export-modal .modal-body{padding:12px}
+  .report-export-item{padding:12px;min-height:0}
+  .report-export-title i{flex-basis:34px;width:34px;height:34px}
+  .report-export-description{padding-left:0}
+  .report-export-actions{justify-content:stretch}
   .report-export-actions .btn{flex:1}
 }
 @media(max-width:767.98px){
@@ -679,6 +685,7 @@ $exportUrl = static function (string $report, string $format) use ($startDate, $
                 </h2>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
             </div>
+
             <div class="modal-body">
                 <div class="reports-export-intro">
                     Los reportes de Casos/SLA, Resumen de Agentes e Histórico de Agentes usan el rango de fechas seleccionado arriba
@@ -694,71 +701,71 @@ $exportUrl = static function (string $report, string $format) use ($startDate, $
                         <div class="report-export-description">
                             Detalle de casos, tiempos y estado de cumplimiento ANS.
                         </div>
-                        <div class="report-export-actions">
-                            <a class="btn btn-outline-secondary" href="<?= htmlspecialchars($exportUrl('cases', 'csv'), ENT_QUOTES, 'UTF-8') ?>">
-                                <i class="bi bi-filetype-csv me-1"></i>CSV
-                            </a>
-                            <a class="btn btn-outline-success btn-excel" href="<?= htmlspecialchars($exportUrl('cases', 'xlsx'), ENT_QUOTES, 'UTF-8') ?>">
-                                <i class="bi bi-file-earmark-excel me-1"></i>Excel
-                            </a>
+                    </div>
+                    <div class="report-export-actions">
+                        <a class="btn btn-outline-secondary" href="<?= htmlspecialchars($exportUrl('cases', 'csv'), ENT_QUOTES, 'UTF-8') ?>">
+                            <i class="bi bi-filetype-csv me-1"></i>CSV
+                        </a>
+                        <a class="btn btn-outline-success btn-excel" href="<?= htmlspecialchars($exportUrl('cases', 'xlsx'), ENT_QUOTES, 'UTF-8') ?>">
+                            <i class="bi bi-file-earmark-excel me-1"></i>Excel
+                        </a>
+                    </div>
+                </div>
+
+                <div class="report-export-item">
+                    <div class="report-export-info">
+                        <div class="report-export-title">
+                            <i class="bi bi-person-lines-fill"></i>Agentes — Resumen
+                        </div>
+                        <div class="report-export-description">
+                            Casos asignados, resueltos, vencidos, tiempo de primera gestión y cumplimiento ANS.
                         </div>
                     </div>
+                    <div class="report-export-actions">
+                        <a class="btn btn-outline-secondary" href="<?= htmlspecialchars($exportUrl('agents_summary', 'csv'), ENT_QUOTES, 'UTF-8') ?>">
+                            <i class="bi bi-filetype-csv me-1"></i>CSV
+                        </a>
+                        <a class="btn btn-outline-success btn-excel" href="<?= htmlspecialchars($exportUrl('agents_summary', 'xlsx'), ENT_QUOTES, 'UTF-8') ?>">
+                            <i class="bi bi-file-earmark-excel me-1"></i>Excel
+                        </a>
+                    </div>
+                </div>
 
-                    <div class="report-export-item">
-                        <div class="report-export-info">
-                            <div class="report-export-title">
-                                <i class="bi bi-person-lines-fill"></i>Agentes — Resumen
-                            </div>
-                            <div class="report-export-description">
-                                Casos asignados, resueltos, vencidos, tiempo de primera gestión y cumplimiento ANS.
-                            </div>
+                <div class="report-export-item">
+                    <div class="report-export-info">
+                        <div class="report-export-title">
+                            <i class="bi bi-clock-history"></i>Agentes — Histórico Detallado
                         </div>
-                        <div class="report-export-actions">
-                            <a class="btn btn-outline-secondary" href="<?= htmlspecialchars($exportUrl('agents_summary', 'csv'), ENT_QUOTES, 'UTF-8') ?>">
-                                <i class="bi bi-filetype-csv me-1"></i>CSV
-                            </a>
-                            <a class="btn btn-outline-success btn-excel" href="<?= htmlspecialchars($exportUrl('agents_summary', 'xlsx'), ENT_QUOTES, 'UTF-8') ?>">
-                                <i class="bi bi-file-earmark-excel me-1"></i>Excel
-                            </a>
+                        <div class="report-export-description">
+                            Cada transición de estado con hora de inicio, fin, duración y origen.
                         </div>
                     </div>
+                    <div class="report-export-actions">
+                        <a class="btn btn-outline-secondary" href="<?= htmlspecialchars($exportUrl('agents_history', 'csv'), ENT_QUOTES, 'UTF-8') ?>">
+                            <i class="bi bi-filetype-csv me-1"></i>CSV
+                        </a>
+                        <a class="btn btn-outline-success btn-excel" href="<?= htmlspecialchars($exportUrl('agents_history', 'xlsx'), ENT_QUOTES, 'UTF-8') ?>">
+                            <i class="bi bi-file-earmark-excel me-1"></i>Excel
+                        </a>
+                    </div>
+                </div>
 
-                    <div class="report-export-item">
-                        <div class="report-export-info">
-                            <div class="report-export-title">
-                                <i class="bi bi-clock-history"></i>Agentes — Histórico Detallado
-                            </div>
-                            <div class="report-export-description">
-                                Cada transición de estado con hora de inicio, fin, duración y origen.
-                            </div>
+                <div class="report-export-item">
+                    <div class="report-export-info">
+                        <div class="report-export-title">
+                            <i class="bi bi-broadcast-pin"></i>Agentes — Estado en Tiempo Real
                         </div>
-                        <div class="report-export-actions">
-                            <a class="btn btn-outline-secondary" href="<?= htmlspecialchars($exportUrl('agents_history', 'csv'), ENT_QUOTES, 'UTF-8') ?>">
-                                <i class="bi bi-filetype-csv me-1"></i>CSV
-                            </a>
-                            <a class="btn btn-outline-success btn-excel" href="<?= htmlspecialchars($exportUrl('agents_history', 'xlsx'), ENT_QUOTES, 'UTF-8') ?>">
-                                <i class="bi bi-file-earmark-excel me-1"></i>Excel
-                            </a>
+                        <div class="report-export-description">
+                            Estado actual, disponibilidad para reparto, último heartbeat, colas y capacidad.
                         </div>
                     </div>
-
-                    <div class="report-export-item">
-                        <div class="report-export-info">
-                            <div class="report-export-title">
-                                <i class="bi bi-broadcast-pin"></i>Agentes — Estado en Tiempo Real
-                            </div>
-                            <div class="report-export-description">
-                                Estado actual, disponibilidad para reparto, último heartbeat, colas y capacidad.
-                            </div>
-                        </div>
-                        <div class="report-export-actions">
-                            <a class="btn btn-outline-secondary" href="<?= htmlspecialchars($exportUrl('agents_realtime', 'csv'), ENT_QUOTES, 'UTF-8') ?>">
-                                <i class="bi bi-filetype-csv me-1"></i>CSV
-                            </a>
-                            <a class="btn btn-outline-success btn-excel" href="<?= htmlspecialchars($exportUrl('agents_realtime', 'xlsx'), ENT_QUOTES, 'UTF-8') ?>">
-                                <i class="bi bi-file-earmark-excel me-1"></i>Excel
-                            </a>
-                        </div>
+                    <div class="report-export-actions">
+                        <a class="btn btn-outline-secondary" href="<?= htmlspecialchars($exportUrl('agents_realtime', 'csv'), ENT_QUOTES, 'UTF-8') ?>">
+                            <i class="bi bi-filetype-csv me-1"></i>CSV
+                        </a>
+                        <a class="btn btn-outline-success btn-excel" href="<?= htmlspecialchars($exportUrl('agents_realtime', 'xlsx'), ENT_QUOTES, 'UTF-8') ?>">
+                            <i class="bi bi-file-earmark-excel me-1"></i>Excel
+                        </a>
                     </div>
                 </div>
             </div>
