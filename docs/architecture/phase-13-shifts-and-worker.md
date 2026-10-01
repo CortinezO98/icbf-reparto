@@ -62,13 +62,33 @@ Variables:
 
 El worker utiliza un GET_LOCK de MariaDB para evitar dos instancias activas simultáneamente.
 
+## Reasignación manual
+
+El permiso existente `CASE_REASSIGN` habilita la operación para los perfiles autorizados, actualmente Administrador y Supervisor.
+
+Desde el detalle de un caso asignado se puede seleccionar un agente destino. El sistema vuelve a validar:
+
+- agente activo;
+- reparto habilitado;
+- rol AGENTE;
+- presencia Disponible;
+- heartbeat vigente;
+- turno vigente para la cola;
+- pertenencia a la cola;
+- skills requeridas;
+- capacidad libre.
+
+La operación exige un motivo y se ejecuta dentro de una transacción.
+
 ## Trazabilidad
 
 Las asignaciones normales usan assignment_type=AUTO.
 
-Las reasignaciones producidas por fin de turno usan assignment_type=REASSIGN.
+Las reasignaciones manuales y las producidas por fin de turno usan assignment_type=REASSIGN.
 
-El historial conserva la asignación anterior con ended_at y end_reason=SHIFT_END, mientras el nuevo ciclo queda registrado en case_assignments y case_events.
+Una reasignación manual conserva la asignación anterior con end_reason=MANUAL_REASSIGN y registra assigned_by con el usuario que ejecutó la operación. El caso también registra CASE_REASSIGNED con origen, destino y motivo.
+
+El historial conserva cada asignación en case_assignments y cada cambio operativo en case_events.
 
 ## Administración
 
