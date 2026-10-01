@@ -44,6 +44,8 @@ $slaText = static fn(mixed $value): string => match ((string)$value) {
 $startDate = (string)($selected['start_date'] ?? '');
 $endDate = (string)($selected['end_date'] ?? '');
 $selectedRegional = (string)($selected['regional'] ?? '');
+$selectedSupervisorId = (int)($selected['supervisor_id'] ?? 0);
+$selectedSegment = (string)($selected['segment'] ?? '');
 $selectedPetitionType = (string)($selected['petition_type'] ?? '');
 $selectedManagementType = (string)($selected['management_type'] ?? '');
 
@@ -75,7 +77,7 @@ $exportUrl = static function (string $report, string $format) use ($startDate, $
         'end' => $endDate,
     ];
 
-    foreach (['queue_id', 'agent_id', 'state', 'sla', 'regional', 'petition_type', 'management_type'] as $key) {
+    foreach (['queue_id', 'agent_id', 'supervisor_id', 'state', 'sla', 'regional', 'segment', 'petition_type', 'management_type'] as $key) {
         if (($selected[$key] ?? null) !== null && ($selected[$key] ?? '') !== '') {
             $query[$key] = $selected[$key];
         }
@@ -246,6 +248,19 @@ $exportUrl = static function (string $report, string $format) use ($startDate, $
             </div>
 
             <div class="col-12 col-md-3">
+                <label for="supervisor_id">Supervisor</label>
+                <select class="form-select" id="supervisor_id" name="supervisor_id">
+                    <option value="">Todos los supervisores</option>
+                    <?php foreach (($filters['supervisors'] ?? []) as $supervisor): ?>
+                        <option value="<?= (int)$supervisor['id'] ?>"
+                            <?= $selectedSupervisorId === (int)$supervisor['id'] ? 'selected' : '' ?>>
+                            <?= htmlspecialchars((string)$supervisor['full_name'], ENT_QUOTES, 'UTF-8') ?>
+                        </option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+
+            <div class="col-12 col-md-3">
                 <label for="regional">Regional</label>
                 <select class="form-select" id="regional" name="regional">
                     <option value="">Todas las regionales</option>
@@ -253,6 +268,19 @@ $exportUrl = static function (string $report, string $format) use ($startDate, $
                         <option value="<?= htmlspecialchars((string)$regional['regional'], ENT_QUOTES, 'UTF-8') ?>"
                             <?= $selectedRegional === (string)$regional['regional'] ? 'selected' : '' ?>>
                             <?= htmlspecialchars((string)$regional['regional'], ENT_QUOTES, 'UTF-8') ?>
+                        </option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+
+            <div class="col-12 col-md-3">
+                <label for="segment">Segmento</label>
+                <select class="form-select" id="segment" name="segment">
+                    <option value="">Todos los segmentos</option>
+                    <?php foreach (($filters['segments'] ?? []) as $segment): ?>
+                        <option value="<?= htmlspecialchars((string)$segment['segment'], ENT_QUOTES, 'UTF-8') ?>"
+                            <?= $selectedSegment === (string)$segment['segment'] ? 'selected' : '' ?>>
+                            <?= htmlspecialchars((string)$segment['segment'], ENT_QUOTES, 'UTF-8') ?>
                         </option>
                     <?php endforeach; ?>
                 </select>
@@ -491,10 +519,11 @@ $exportUrl = static function (string $report, string $format) use ($startDate, $
                         <tr>
                             <th>Agente</th>
                             <th style="text-align:right">Asignados</th>
+                            <th style="text-align:right">Gestionados</th>
+                            <th style="text-align:right">Pendientes</th>
                             <th style="text-align:right">Resueltos</th>
-                            <th style="text-align:right">Vencidos</th>
-                            <th style="text-align:right">Tiempo resp. (h)</th>
-                            <th style="text-align:right">% Cumplimiento SLA</th>
+                            <th style="text-align:right">Peticiones/h</th>
+                            <th style="text-align:right">% ANS</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -509,15 +538,10 @@ $exportUrl = static function (string $report, string $format) use ($startDate, $
                                 <div class="muted"><?= htmlspecialchars((string)$agent['username'], ENT_QUOTES, 'UTF-8') ?></div>
                             </td>
                             <td style="text-align:right"><?= $fmt($agent['assigned_cases'] ?? 0) ?></td>
+                            <td style="text-align:right"><?= $fmt($agent['managed_cases'] ?? 0) ?></td>
+                            <td style="text-align:right"><?= $fmt($agent['pending_cases'] ?? 0) ?></td>
                             <td style="text-align:right"><?= $fmt($agent['resolved_cases'] ?? 0) ?></td>
-                            <td style="text-align:right">
-                                <?php if ((int)($agent['breached_cases'] ?? 0) > 0): ?>
-                                    <span class="sla-status-badge status-red"><?= $fmt($agent['breached_cases']) ?></span>
-                                <?php else: ?>
-                                    0
-                                <?php endif; ?>
-                            </td>
-                            <td style="text-align:right"><?= $hours($agent['response_minutes'] ?? null) ?></td>
+                            <td style="text-align:right"><?= $agent['productivity_per_hour'] !== null ? number_format((float)$agent['productivity_per_hour'], 2, ',', '.') : '—' ?></td>
                             <td style="text-align:right">
                                 <?php if ($compliance === null): ?>
                                     —
@@ -529,7 +553,7 @@ $exportUrl = static function (string $report, string $format) use ($startDate, $
                     <?php endforeach; ?>
 
                     <?php if ($agents === []): ?>
-                        <tr><td colspan="6" class="report-empty">No hay datos de agentes para el periodo seleccionado.</td></tr>
+                        <tr><td colspan="7" class="report-empty">No hay datos de agentes para el periodo seleccionado.</td></tr>
                     <?php endif; ?>
                     </tbody>
                 </table>
@@ -800,6 +824,50 @@ $exportUrl = static function (string $report, string $format) use ($startDate, $
                         <div class="report-export-actions">
                             <a class="btn btn-outline-secondary" href="<?= htmlspecialchars($exportUrl('monthly', 'csv'), ENT_QUOTES, 'UTF-8') ?>"><i class="bi bi-filetype-csv me-1"></i>CSV</a>
                             <a class="btn btn-outline-success btn-excel" href="<?= htmlspecialchars($exportUrl('monthly', 'xlsx'), ENT_QUOTES, 'UTF-8') ?>"><i class="bi bi-file-earmark-excel me-1"></i>Excel</a>
+                        </div>
+                    </div>
+
+                    <div class="report-export-item">
+                        <div class="report-export-info">
+                            <div class="report-export-title"><i class="bi bi-shield-exclamation"></i>Reportes a Policía</div>
+                            <div class="report-export-description">Conteo y detalle de reportes a Policía, incluyendo ampliaciones, por agente, supervisor y periodo.</div>
+                        </div>
+                        <div class="report-export-actions">
+                            <a class="btn btn-outline-secondary" href="<?= htmlspecialchars($exportUrl('police', 'csv'), ENT_QUOTES, 'UTF-8') ?>"><i class="bi bi-filetype-csv me-1"></i>CSV</a>
+                            <a class="btn btn-outline-success btn-excel" href="<?= htmlspecialchars($exportUrl('police', 'xlsx'), ENT_QUOTES, 'UTF-8') ?>"><i class="bi bi-file-earmark-excel me-1"></i>Excel</a>
+                        </div>
+                    </div>
+
+                    <div class="report-export-item">
+                        <div class="report-export-info">
+                            <div class="report-export-title"><i class="bi bi-exclamation-diamond"></i>Escalamientos</div>
+                            <div class="report-export-description">Cantidad, motivo y tiempo transcurrido hasta la resolución o cierre.</div>
+                        </div>
+                        <div class="report-export-actions">
+                            <a class="btn btn-outline-secondary" href="<?= htmlspecialchars($exportUrl('escalations', 'csv'), ENT_QUOTES, 'UTF-8') ?>"><i class="bi bi-filetype-csv me-1"></i>CSV</a>
+                            <a class="btn btn-outline-success btn-excel" href="<?= htmlspecialchars($exportUrl('escalations', 'xlsx'), ENT_QUOTES, 'UTF-8') ?>"><i class="bi bi-file-earmark-excel me-1"></i>Excel</a>
+                        </div>
+                    </div>
+
+                    <div class="report-export-item">
+                        <div class="report-export-info">
+                            <div class="report-export-title"><i class="bi bi-arrow-left-right"></i>Reasignaciones</div>
+                            <div class="report-export-description">Origen, destino, responsable, fecha y motivo de cada reasignación.</div>
+                        </div>
+                        <div class="report-export-actions">
+                            <a class="btn btn-outline-secondary" href="<?= htmlspecialchars($exportUrl('reassignments', 'csv'), ENT_QUOTES, 'UTF-8') ?>"><i class="bi bi-filetype-csv me-1"></i>CSV</a>
+                            <a class="btn btn-outline-success btn-excel" href="<?= htmlspecialchars($exportUrl('reassignments', 'xlsx'), ENT_QUOTES, 'UTF-8') ?>"><i class="bi bi-file-earmark-excel me-1"></i>Excel</a>
+                        </div>
+                    </div>
+
+                    <div class="report-export-item">
+                        <div class="report-export-info">
+                            <div class="report-export-title"><i class="bi bi-signpost-split"></i>Direccionamientos</div>
+                            <div class="report-export-description">Peticiones direccionadas por agente, día, regional, tipo y periodo.</div>
+                        </div>
+                        <div class="report-export-actions">
+                            <a class="btn btn-outline-secondary" href="<?= htmlspecialchars($exportUrl('directed', 'csv'), ENT_QUOTES, 'UTF-8') ?>"><i class="bi bi-filetype-csv me-1"></i>CSV</a>
+                            <a class="btn btn-outline-success btn-excel" href="<?= htmlspecialchars($exportUrl('directed', 'xlsx'), ENT_QUOTES, 'UTF-8') ?>"><i class="bi bi-file-earmark-excel me-1"></i>Excel</a>
                         </div>
                     </div>
 
