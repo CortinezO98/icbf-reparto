@@ -586,3 +586,8 @@ final class UsersController
 
     private function fail(string $message, string $redirect): never
     {
+        $_SESSION['_flash_error'] = $message;
+        header('Location: ' . $redirect);
+        exit;
+    }
+}
