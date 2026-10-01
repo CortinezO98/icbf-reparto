@@ -69,6 +69,8 @@ docker compose logs -f app
 docker compose logs -f db
 docker compose exec app php bin/migrate.php
 docker compose exec app composer test
+docker compose exec app composer analyse
+docker compose logs -f worker
 docker compose down
 ```
 
@@ -131,3 +133,29 @@ Nuevas rutas:
 
 - `/admin/structures`
 - `/admin/queues`
+
+## Automatización operativa
+
+El servicio `worker` ejecuta de forma continua el reparto de casos, el procesamiento de fin de turno y la evaluación de ANS.
+
+Después de actualizar el código:
+
+```powershell
+docker compose up -d --build
+docker compose exec app php bin/migrate.php
+docker compose ps
+docker compose logs -f worker
+```
+
+La administración de turnos está disponible en:
+
+```text
+http://localhost:8088/admin/shifts
+```
+
+Variables configurables:
+
+```text
+WORKER_INTERVAL_SECONDS=10
+SLA_WORKER_INTERVAL_SECONDS=300
+```
