@@ -22,19 +22,27 @@ final class AssignmentEngine
         $assigned = 0;
         $noAgent = 0;
         $iterations = 0;
+        $blockedQueueIds = [];
 
         while ($assigned < $maxAssignments) {
             $iterations++;
 
-            $result = $this->assignOne($queueId);
+            $result = $this->assignOne($queueId, $blockedQueueIds);
 
-            if ($result === 'NO_CASE') {
+            if ($result['status'] === 'NO_CASE') {
                 break;
             }
 
-            if ($result === 'NO_AGENT') {
+            if ($result['status'] === 'NO_AGENT') {
                 $noAgent++;
-                break;
+
+                if ($result['queue_id'] !== null) {
+                    $blockedQueueIds[$result['queue_id']] = true;
+                }
+
+                // No detenemos todo el proceso por una cola sin agente:
+                // otras colas pueden tener agentes elegibles.
+                continue;
             }
 
             $assigned++;
@@ -47,17 +55,21 @@ final class AssignmentEngine
         ];
     }
 
-    /** @return 'ASSIGNED'|'NO_AGENT'|'NO_CASE' */
-    private function assignOne(?int $queueId): string
+    /**
+     * @param array<int,bool> $blockedQueueIds
+     * @return array{status:'ASSIGNED'|'NO_AGENT'|'NO_CASE',queue_id:int|null}
+     */
+    private function assignOne(?int $queueId, array $blockedQueueIds): array
     {
         $this->pdo->beginTransaction();
 
         try {
-            $case = $this->repo->nextPendingCaseForUpdate($queueId);
+            $excludedQueueIds = array_keys($blockedQueueIds);
+            $case = $this->repo->nextPendingCaseForUpdate($queueId, $excludedQueueIds);
 
             if (!$case) {
                 $this->pdo->commit();
-                return 'NO_CASE';
+                return ['status'=>'NO_CASE','queue_id'=>null];
             }
 
             $caseId = (int)$case['id'];
@@ -102,12 +114,12 @@ final class AssignmentEngine
                 $this->repo->assignCase($caseId, $caseQueueId, $userId);
                 $this->pdo->commit();
 
-                return 'ASSIGNED';
+                return ['status'=>'ASSIGNED','queue_id'=>$caseQueueId];
             }
 
             $this->pdo->commit();
 
-            return 'NO_AGENT';
+            return ['status'=>'NO_AGENT','queue_id'=>$caseQueueId];
         } catch (\Throwable $e) {
             if ($this->pdo->inTransaction()) {
                 $this->pdo->rollBack();
