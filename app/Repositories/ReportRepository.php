@@ -735,6 +735,16 @@ final class ReportRepository
             $params[':agent_sla'] = $filters['sla'];
         }
 
+        if (($filters['regional'] ?? null) !== null) {
+            $condition .= ' AND c.regional = :agent_regional';
+            $params[':agent_regional'] = $filters['regional'];
+        }
+
+        if (($filters['petition_type'] ?? null) !== null) {
+            $condition .= ' AND c.petition_type = :agent_petition_type';
+            $params[':agent_petition_type'] = $filters['petition_type'];
+        }
+
         return $this->rows(
             "SELECT
                 u.id,
