@@ -124,7 +124,12 @@ final class ReportRepository
         };
     }
 
-    /** @return list<array<string,mixed>> */
+    /**
+     * @param array{
+     *   from:?string,to:?string,queue_id:?int,agent_id:?int,state:?string,sla:?string
+     * } $filters
+     * @return list<array<string,mixed>>
+     */
     private function agentHistory(array $filters): array
     {
         if ($filters['from'] === null || $filters['to'] === null) {
