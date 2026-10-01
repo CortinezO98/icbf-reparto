@@ -451,7 +451,20 @@ final class ReportsController
                 $_GET['sla'] ?? null,
                 ['GREEN', 'YELLOW', 'RED', 'BREACHED']
             ),
+            'regional' => $this->optionalText($_GET['regional'] ?? null),
+            'petition_type' => $this->optionalText($_GET['petition_type'] ?? null),
         ];
+    }
+
+    private function optionalText(mixed $value): ?string
+    {
+        if ($value === null || !is_scalar($value)) {
+            return null;
+        }
+
+        $value = trim((string)$value);
+
+        return $value !== '' ? mb_substr($value, 0, 255) : null;
     }
 
     private function positiveInt(mixed $value): ?int
