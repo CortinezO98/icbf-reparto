@@ -361,7 +361,7 @@ final class ReportsController
                 'title' => 'Volumen por Día y Hora',
                 'filename' => 'reporte_volumen_dia_hora_' . $stamp,
                 'headers' => [
-                    'Fecha','Hora','Cola','Regional','Tipo petición','Casos'
+                    'Fecha','Hora','Cola','Regional','Segmento','Tipo petición','Casos'
                 ],
                 'data' => array_map(
                     static fn(array $row): array => [
@@ -369,6 +369,7 @@ final class ReportsController
                         isset($row['hour']) ? str_pad((string)$row['hour'], 2, '0', STR_PAD_LEFT) . ':00' : '',
                         $row['queue_code'] ?? '',
                         $row['regional'] ?? '',
+                        $row['segment'] ?? '',
                         $row['petition_type'] ?? '',
                         (int)($row['total_cases'] ?? 0),
                     ],
