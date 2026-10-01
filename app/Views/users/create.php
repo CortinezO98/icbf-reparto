@@ -289,7 +289,7 @@ $oldAssign = (int)($old['assign_enabled'] ?? 0) === 1;
                         Ctrl (Cmd en Mac) para seleccionar múltiples.
                     </div>
 
-                    <div class="mt-3">
+                    <div class="mt-3" id="supervisorBlock">
                         <label for="supervisor_user_id" class="form-label">
                             <i class="bi bi-person-check me-1"></i>Supervisor del agente
                         </label>
@@ -409,6 +409,8 @@ $oldAssign = (int)($old['assign_enabled'] ?? 0) === 1;
     const allQueuesHidden = document.getElementById('allQueuesHidden');
     const assignBlock = document.getElementById('assignBlock');
     const assignEnabled = document.getElementById('assign_enabled');
+    const supervisorBlock = document.getElementById('supervisorBlock');
+    const supervisorSelect = document.getElementById('supervisor_user_id');
     const activeYes = document.getElementById('activeYes');
     const activeNo = document.getElementById('activeNo');
     const activeHidden = document.getElementById('is_active_hidden');
@@ -423,11 +425,14 @@ $oldAssign = (int)($old['assign_enabled'] ?? 0) === 1;
         const agent = isAgent();
         queueSection.style.display = agent ? '' : 'none';
         assignBlock.style.display = agent ? '' : 'none';
+        if (supervisorBlock) supervisorBlock.style.display = agent ? '' : 'none';
         queuesSelect.disabled = !agent;
         assignEnabled.disabled = !agent;
+        if (supervisorSelect) supervisorSelect.disabled = !agent;
 
         if (!agent) {
             assignEnabled.checked = false;
+            if (supervisorSelect) supervisorSelect.value = '';
         }
     };
 
