@@ -9,6 +9,7 @@ use App\Controllers\AgentPresenceController;
 use App\Controllers\AgentStatusController;
 use App\Controllers\CasesController;
 use App\Controllers\SlaController;
+use App\Controllers\ShiftsController;
 use App\Controllers\ReportsController;
 use App\Auth\Auth;
 use App\Auth\Authorization;
@@ -29,6 +30,12 @@ return static function(Router $router,PDO $pdo): void {
  $router->get('/login',fn()=>(new AuthController($pdo))->showLogin());
  $router->post('/login',fn()=>(new AuthController($pdo))->login());
  $router->post('/logout',fn()=>(new AuthController($pdo))->logout());
+ $router->get('/forgot-password',fn()=>(new AuthController($pdo))->showForgotPassword());
+ $router->post('/forgot-password',fn()=>(new AuthController($pdo))->forgotPassword());
+ $router->get('/reset-password',fn()=>(new AuthController($pdo))->showResetPassword());
+ $router->post('/reset-password',fn()=>(new AuthController($pdo))->resetPassword());
+ $router->get('/change-password',fn()=>(new AuthController($pdo))->showChangePassword());
+ $router->post('/change-password',fn()=>(new AuthController($pdo))->changePassword());
 
  $router->get('/admin/users',fn()=>(new UsersController($pdo))->index());
  $router->get('/admin/users/create',fn()=>(new UsersController($pdo))->createForm());
@@ -47,6 +54,7 @@ return static function(Router $router,PDO $pdo): void {
  $router->get('/cases',fn()=>(new CasesController($pdo))->index());
  $router->get('/cases/{id}',fn(int $id)=>(new CasesController($pdo))->show($id));
  $router->post('/cases/{id}/manage',fn(int $id)=>(new CasesController($pdo))->manage($id));
+ $router->post('/cases/{id}/reassign',fn(int $id)=>(new CasesController($pdo))->reassign($id));
 
  $router->get('/admin/structures',fn()=>(new ImportStructuresController($pdo))->index());
  $router->get('/admin/structures/create',fn()=>(new ImportStructuresController($pdo))->createForm());
@@ -71,4 +79,7 @@ return static function(Router $router,PDO $pdo): void {
 
  $router->get('/supervisor/agents',fn()=>(new AgentStatusController($pdo))->index());
  $router->get('/supervisor/agents/data',fn()=>(new AgentStatusController($pdo))->data());
+ $router->get('/admin/shifts',fn()=>(new ShiftsController($pdo))->index());
+ $router->post('/admin/shifts',fn()=>(new ShiftsController($pdo))->create());
+ $router->post('/admin/shifts/{id}/deactivate',fn(int $id)=>(new ShiftsController($pdo))->deactivate($id));
 };

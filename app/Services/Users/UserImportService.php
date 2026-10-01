@@ -170,7 +170,8 @@ final class UserImportService
                 }
 
                 $password = trim((string)($row['password'] ?? ''));
-                if ($password === '') {
+                $passwordWasGenerated = $password === '';
+                if ($passwordWasGenerated) {
                     $password = TemporaryPasswordGenerator::generate();
                     $generated[] = ['username'=>$username, 'password'=>$password];
                 }
@@ -188,6 +189,7 @@ final class UserImportService
                     'email'=>$email,
                     'full_name'=>$fullName,
                     'password_hash'=>PasswordPolicy::hash($password),
+                    'password_must_change'=>$passwordWasGenerated ? 1 : 0,
                     'is_active'=>$active,
                     'assign_enabled'=>$assignEnabled,
                     'created_by'=>$actorUserId,

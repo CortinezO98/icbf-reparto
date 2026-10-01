@@ -10,7 +10,7 @@ use App\Config\Database;
 /** @var string $view */
 
 $path = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?: '/';
-$isAuthPage = $path === '/login';
+$isAuthPage = in_array($path, ['/login','/forgot-password','/reset-password','/change-password'], true);
 
 $currentUserRoles = [];
 $isAgent = false;
@@ -156,6 +156,11 @@ $rolesLabel = $currentUserRoles !== [] ? implode(', ', $currentUserRoles) : '';
                                 <li>
                                     <a class="dropdown-item" href="/admin/queues">
                                         <i class="bi bi-diagram-2 me-2" aria-hidden="true"></i>Colas
+                                    </a>
+                                </li>
+                                <li>
+                                    <a class="dropdown-item" href="/admin/shifts">
+                                        <i class="bi bi-calendar3 me-2" aria-hidden="true"></i>Cronograma de agentes
                                     </a>
                                 </li>
                             <?php endif; ?>

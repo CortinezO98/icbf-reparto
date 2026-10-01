@@ -113,7 +113,8 @@ final class UsersController
         }
 
         $password = trim((string)($_POST['password'] ?? ''));
-        if ($password === '') {
+        $passwordWasGenerated = $password === '';
+        if ($passwordWasGenerated) {
             $password = TemporaryPasswordGenerator::generate();
         }
 
@@ -134,6 +135,7 @@ final class UsersController
         }
 
         $data['password_hash'] = PasswordPolicy::hash($password);
+        $data['password_must_change'] = $passwordWasGenerated ? 1 : 0;
         $data['created_by'] = (int)(Auth::id() ?? 0);
 
         try {
@@ -150,6 +152,15 @@ final class UsersController
                     'assign_enabled'=>(int)$data['assign_enabled'],
                 ]
             );
+
+            if ($passwordWasGenerated) {
+                $this->sendTemporaryPasswordEmail(
+                    (string)$data['email'],
+                    (string)$data['full_name'],
+                    (string)$data['username'],
+                    $password
+                );
+            }
 
             unset($_SESSION['_old_user_form']);
             $_SESSION['_flash_success'] =
@@ -181,7 +192,8 @@ final class UsersController
         $roles = $repo->roles();
         $queues = $repo->queues();
         $error = $_SESSION['_flash_error'] ?? null;
-        unset($_SESSION['_flash_error']);
+        $success = $_SESSION['_flash_success'] ?? null;
+        unset($_SESSION['_flash_error'], $_SESSION['_flash_success']);
 
         $view = dirname(__DIR__) . '/Views/users/edit.php';
         require dirname(__DIR__) . '/Views/layout.php';
@@ -239,12 +251,14 @@ final class UsersController
         }
 
         $password = trim((string)($_POST['password'] ?? ''));
-        if ($password !== '') {
+        $passwordChanged = $password !== '';
+        if ($passwordChanged) {
             $errors = PasswordPolicy::validate($password);
             if ($errors !== []) {
                 $this->fail(implode(' ', $errors), "/admin/users/{$id}/edit");
             }
             $data['password_hash'] = PasswordPolicy::hash($password);
+            $data['password_must_change'] = 1;
         }
 
         try {
@@ -256,6 +270,15 @@ final class UsersController
                 (int)(Auth::id() ?? 0)
             );
 
+            if ($passwordChanged) {
+                $this->sendTemporaryPasswordEmail(
+                    (string)$data['email'],
+                    (string)$data['full_name'],
+                    (string)$data['username'],
+                    $password
+                );
+            }
+
             (new AuditRepository($this->pdo))->log(
                 Auth::id(),
                 'USER_UPDATED',
@@ -265,7 +288,7 @@ final class UsersController
                     'roles'=>$roleCodes,
                     'queue_ids'=>$queueIds,
                     'assign_enabled'=>(int)$data['assign_enabled'],
-                    'password_changed'=>$password !== '',
+                    'password_changed'=>$passwordChanged,
                 ]
             );
 
@@ -276,6 +299,122 @@ final class UsersController
             error_log('[UsersController::update] ' . $e->getMessage());
             $this->fail('No fue posible actualizar el usuario.', "/admin/users/{$id}/edit");
         }
+    }
+
+    private function sendTemporaryPasswordEmail(
+        string $email,
+        string $fullName,
+        string $username,
+        string $temporaryPassword
+    ): void {
+        if (
+            !filter_var($email, FILTER_VALIDATE_EMAIL)
+            || !filter_var(
+                $_ENV['SEND_TEMP_PASSWORD_EMAILS'] ?? '1',
+                FILTER_VALIDATE_BOOL
+            )
+        ) {
+            return;
+        }
+
+        try {
+            $appUrl = rtrim((string)($_ENV['APP_URL'] ?? ''), '/');
+            if ($appUrl === '') {
+                return;
+            }
+
+            $fromEmail = (string)($_ENV['MAIL_FROM_EMAIL'] ?? 'noreply@icbf.gov.co');
+            $fromName = (string)($_ENV['MAIL_FROM_NAME'] ?? 'ICBF Reparto');
+            $subject = 'Activación de cuenta - ICBF Reparto';
+
+            $safeName = htmlspecialchars($fullName, ENT_QUOTES, 'UTF-8');
+            $safeUser = htmlspecialchars($username, ENT_QUOTES, 'UTF-8');
+            $safePassword = htmlspecialchars($temporaryPassword, ENT_QUOTES, 'UTF-8');
+            $safeUrl = htmlspecialchars($appUrl . '/login', ENT_QUOTES, 'UTF-8');
+
+            $html = '<!doctype html><html lang="es"><body style="font-family:Arial,sans-serif">'
+                . '<h2>Activación de cuenta</h2>'
+                . '<p>Hola ' . $safeName . '.</p>'
+                . '<p>Tu cuenta de ICBF Reparto fue creada o restablecida.</p>'
+                . '<p><strong>Usuario:</strong> ' . $safeUser . '</p>'
+                . '<p><strong>Contraseña temporal:</strong> ' . $safePassword . '</p>'
+                . '<p><a href="' . $safeUrl . '">Ingresar al sistema</a></p>'
+                . '<p><strong>Por seguridad, debes cambiar la contraseña en tu primer ingreso.</strong></p>'
+                . '</body></html>';
+
+            $headers = [
+                'MIME-Version: 1.0',
+                'Content-Type: text/html; charset=UTF-8',
+                'From: ' . $fromName . ' <' . $fromEmail . '>',
+            ];
+
+            if (mail($email, $subject, $html, implode("\r\n", $headers))) {
+                (new AuditRepository($this->pdo))->log(
+                    Auth::id(),
+                    'TEMP_PASSWORD_EMAIL_SENT',
+                    'USER',
+                    null,
+                    ['recipient_domain'=>strtolower((string)substr(strrchr($email, '@') ?: '', 1))]
+                );
+            }
+        } catch (\Throwable $e) {
+            error_log('[UsersController::sendTemporaryPasswordEmail] ' . $e->getMessage());
+        }
+    }
+
+    public function resetPassword(int $id): void
+    {
+        Authorization::requirePermission($this->pdo, 'USER_EDIT');
+        Csrf::validate($_POST['_csrf'] ?? null);
+
+        $repo = new UserRepository($this->pdo);
+        $user = $repo->findById($id);
+
+        if (!$user) {
+            $_SESSION['_flash_error'] = 'Usuario no encontrado.';
+            header('Location: /admin/users');
+            exit;
+        }
+
+        if ((int)$user['is_active'] !== 1) {
+            $_SESSION['_flash_error'] = 'Solo se puede restablecer la contraseña de un usuario activo.';
+            header('Location: /admin/users/' . $id . '/edit');
+            exit;
+        }
+
+        $temporaryPassword = TemporaryPasswordGenerator::generate();
+
+        try {
+            $repo->updatePassword(
+                $id,
+                PasswordPolicy::hash($temporaryPassword),
+                true
+            );
+
+            $this->sendTemporaryPasswordEmail(
+                (string)$user['email'],
+                (string)$user['full_name'],
+                (string)$user['username'],
+                $temporaryPassword
+            );
+
+            (new AuditRepository($this->pdo))->log(
+                Auth::id(),
+                'USER_PASSWORD_RESET',
+                'USER',
+                (string)$id
+            );
+
+            $_SESSION['_flash_success'] =
+                'Contraseña temporal generada: ' . $temporaryPassword
+                . '. El usuario deberá cambiarla al ingresar.';
+        } catch (\Throwable $e) {
+            error_log('[UsersController::resetPassword] ' . $e->getMessage());
+            $_SESSION['_flash_error'] = 'No fue posible restablecer la contraseña.';
+        }
+
+        header('Location: /admin/users/' . $id . '/edit');
+        exit;
     }
 
     public function toggleActive(int $id): void

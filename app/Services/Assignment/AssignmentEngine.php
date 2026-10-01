@@ -97,6 +97,10 @@ final class AssignmentEngine
                     continue;
                 }
 
+                if (!$this->repo->isWithinActiveShift($caseQueueId, $userId)) {
+                    continue;
+                }
+
                 if (!$this->repo->isEligibleForQueue($caseQueueId, $userId)) {
                     continue;
                 }

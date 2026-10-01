@@ -12,8 +12,8 @@ final class PasswordPolicy
 
         $length = mb_strlen($password);
 
-        if ($length < 12) {
-            $errors[] = 'La contraseña debe tener al menos 12 caracteres.';
+        if ($length < 8) {
+            $errors[] = 'La contraseña debe tener al menos 8 caracteres.';
         }
         if ($length > 128) {
             $errors[] = 'La contraseña no puede tener más de 128 caracteres.';

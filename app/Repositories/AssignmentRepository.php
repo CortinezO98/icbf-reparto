@@ -83,6 +83,18 @@ final class AssignmentRepository
              WHERE qa.queue_id=:qid
                AND qa.is_enabled=1
                AND qa.removed_at IS NULL
+             AND (
+                   :require_shift=0
+                   OR EXISTS (
+                        SELECT 1
+                        FROM agent_shifts ash
+                        WHERE ash.user_id=u.id
+                          AND ash.is_active=1
+                          AND ash.starts_at<=NOW(6)
+                          AND ash.ends_at>NOW(6)
+                          AND (ash.queue_id IS NULL OR ash.queue_id=qa.queue_id)
+                   )
+             )
                AND NOT EXISTS (
                     SELECT 1
                     FROM queue_skills qs
@@ -106,6 +118,7 @@ final class AssignmentRepository
         $st->execute([
             ':qid'=>$queueId,
             ':presence_cutoff'=>$this->presenceCutoff(),
+            ':require_shift'=>$this->requireShift() ? 1 : 0,
         ]);
 
         return $st->fetchAll() ?: [];
@@ -164,6 +177,18 @@ final class AssignmentRepository
                AND qa.user_id=:uid
                AND qa.is_enabled=1
                AND qa.removed_at IS NULL
+               AND (
+                   :require_shift=0
+                   OR EXISTS (
+                        SELECT 1
+                        FROM agent_shifts ash
+                        WHERE ash.user_id=u.id
+                          AND ash.is_active=1
+                          AND ash.starts_at<=NOW(6)
+                          AND ash.ends_at>NOW(6)
+                          AND (ash.queue_id IS NULL OR ash.queue_id=qa.queue_id)
+                   )
+               )
                AND NOT EXISTS (
                     SELECT 1
                     FROM queue_skills qs
@@ -183,6 +208,65 @@ final class AssignmentRepository
         $st->execute([
             ':qid'=>$queueId,
             ':uid'=>$userId,
+            ':require_shift'=>$this->requireShift() ? 1 : 0,
+        ]);
+
+        return (bool)$st->fetchColumn();
+    }
+
+    /** @return list<int> */
+    public function caseIdsOutsideActiveShift(int $limit = 100): array
+    {
+        if (!$this->requireShift()) {
+            return [];
+        }
+
+        $st = $this->pdo->prepare(
+            "SELECT c.id
+             FROM cases c
+             JOIN users u ON u.id=c.assigned_user_id
+             JOIN case_assignments ca
+               ON ca.case_id=c.id
+              AND ca.ended_at IS NULL
+             WHERE c.assigned_user_id IS NOT NULL
+               AND c.closed_at IS NULL
+               AND c.current_state NOT IN ('CLOSED','PENDING_ASSIGNMENT')
+               AND NOT EXISTS (
+                    SELECT 1
+                    FROM agent_shifts ash
+                    WHERE ash.user_id=u.id
+                      AND ash.is_active=1
+                      AND ash.starts_at<=NOW(6)
+                      AND ash.ends_at>NOW(6)
+               )
+             ORDER BY COALESCE(c.assigned_at,c.created_at) ASC,c.id ASC
+             LIMIT :limit"
+        );
+        $st->bindValue(':limit', max(1,min(500,$limit)), PDO::PARAM_INT);
+        $st->execute();
+
+        return array_map('intval', $st->fetchAll(PDO::FETCH_COLUMN) ?: []);
+    }
+
+    public function isWithinActiveShift(int $queueId, int $userId): bool
+    {
+        if (!$this->requireShift()) {
+            return true;
+        }
+
+        $st = $this->pdo->prepare(
+            "SELECT 1
+             FROM agent_shifts ash
+             WHERE ash.user_id=:uid
+               AND ash.is_active=1
+               AND ash.starts_at<=NOW(6)
+               AND ash.ends_at>NOW(6)
+               AND (ash.queue_id IS NULL OR ash.queue_id=:qid)
+             LIMIT 1"
+        );
+        $st->execute([
+            ':uid'=>$userId,
+            ':qid'=>$queueId,
         ]);
 
         return (bool)$st->fetchColumn();
@@ -286,6 +370,14 @@ final class AssignmentRepository
              WHERE id=:uid"
         );
         $touch->execute([':uid'=>$userId]);
+    }
+
+    private function requireShift(): bool
+    {
+        return filter_var(
+            $_ENV['ASSIGNMENT_REQUIRE_SHIFT'] ?? '1',
+            FILTER_VALIDATE_BOOL
+        );
     }
 
     private function presenceCutoff(): string
