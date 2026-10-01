@@ -310,7 +310,8 @@ final class CaseOperationsRepository
     public function reassignCase(
         int $caseId,
         int $targetUserId,
-        int $actorUserId
+        ?int $actorUserId,
+        string $reason = 'MANUAL_REASSIGN'
     ): void {
         $this->pdo->beginTransaction();
 
@@ -352,10 +353,10 @@ final class CaseOperationsRepository
 
             $this->pdo->prepare(
                 "UPDATE case_assignments
-                 SET ended_at=NOW(6),end_reason='MANUAL_REASSIGN'
+                 SET ended_at=NOW(6),end_reason=:reason
                  WHERE case_id=:case_id
                    AND ended_at IS NULL"
-            )->execute([':case_id'=>$caseId]);
+            )->execute([':case_id'=>$caseId, ':reason'=>$reason]);
 
             $this->pdo->prepare(
                 "UPDATE cases
@@ -394,6 +395,7 @@ final class CaseOperationsRepository
                     'assignment_type'=>'REASSIGN',
                     'previous_user_id'=>$currentUserId ?: null,
                     'new_user_id'=>$targetUserId,
+                    'reason'=>$reason,
                 ], JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES),
             ]);
 
