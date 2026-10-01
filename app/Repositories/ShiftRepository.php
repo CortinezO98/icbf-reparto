@@ -93,6 +93,120 @@ final class ShiftRepository
     }
 
     /** @return array<string,mixed>|null */
+    public function currentShiftForAgentQueue(
+        int $userId,
+        int $queueId,
+        ?DateTimeImmutable $now = null
+    ): ?array {
+        $tz = new DateTimeZone($_ENV['APP_TIMEZONE'] ?? 'America/Bogota');
+        $local = ($now ?? new DateTimeImmutable('now', $tz))->setTimezone($tz);
+        $date = $local->format('Y-m-d');
+        $weekday = (int)$local->format('N');
+        $time = $local->format('H:i:s');
+
+        $st = $this->pdo->prepare(
+            "SELECT
+                ass.id schedule_id,
+                ass.user_id,
+                ass.queue_id,
+                ass.shift_id,
+                ass.schedule_date,
+                ass.weekday,
+                ass.valid_from,
+                ass.valid_to,
+                ws.code shift_code,
+                ws.name shift_name,
+                ws.start_time,
+                ws.end_time
+             FROM agent_shift_schedules ass
+             JOIN work_shifts ws
+               ON ws.id=ass.shift_id
+              AND ws.is_active=1
+             WHERE ass.user_id=:user_id
+               AND ass.queue_id=:queue_id
+               AND ass.is_active=1
+               AND (
+                    ass.schedule_date=:schedule_date
+                    OR (
+                        ass.schedule_date IS NULL
+                        AND ass.weekday=:weekday
+                    )
+               )
+               AND (ass.valid_from IS NULL OR ass.valid_from<=:valid_from_date)
+               AND (ass.valid_to IS NULL OR ass.valid_to>=:valid_to_date)
+               AND ws.start_time<=:start_time
+               AND ws.end_time>:end_time
+             ORDER BY
+                CASE WHEN ass.schedule_date IS NULL THEN 1 ELSE 0 END,
+                ass.valid_from DESC,
+                ws.start_time DESC,
+                ass.id DESC
+             LIMIT 1"
+        );
+        $st->execute([
+            ':user_id'=>$userId,
+            ':queue_id'=>$queueId,
+            ':schedule_date'=>$date,
+            ':weekday'=>$weekday,
+            ':valid_from_date'=>$date,
+            ':valid_to_date'=>$date,
+            ':start_time'=>$time,
+            ':end_time'=>$time,
+        ]);
+
+        $row = $st->fetch();
+
+        return $row ?: null;
+    }
+
+    public function hasAnyCurrentShift(
+        int $userId,
+        DateTimeImmutable $now
+    ): bool {
+        $tz = new DateTimeZone($_ENV['APP_TIMEZONE'] ?? 'America/Bogota');
+        $local = $now->setTimezone($tz);
+        $date = $local->format('Y-m-d');
+        $weekday = (int)$local->format('N');
+        $time = $local->format('H:i:s');
+
+        $st = $this->pdo->prepare(
+            "SELECT 1
+             FROM agent_shift_schedules ass
+             JOIN work_shifts ws
+               ON ws.id=ass.shift_id
+              AND ws.is_active=1
+             JOIN work_queues q
+               ON q.id=ass.queue_id
+              AND q.is_active=1
+             WHERE ass.user_id=:user_id
+               AND ass.is_active=1
+               AND (
+                    ass.schedule_date=:schedule_date
+                    OR (
+                        ass.schedule_date IS NULL
+                        AND ass.weekday=:weekday
+                    )
+               )
+               AND (ass.valid_from IS NULL OR ass.valid_from<=:valid_from_date)
+               AND (ass.valid_to IS NULL OR ass.valid_to>=:valid_to_date)
+               AND ws.start_time<=:start_time
+               AND ws.end_time>:end_time
+             LIMIT 1"
+        );
+        $st->execute([
+            ':user_id'=>$userId,
+            ':schedule_date'=>$date,
+            ':weekday'=>$weekday,
+            ':valid_from_date'=>$date,
+            ':valid_to_date'=>$date,
+            ':start_time'=>$time,
+            ':end_time'=>$time,
+        ]);
+
+        return (bool)$st->fetchColumn();
+    }
+
+    /** @return array<string,mixed>|null */
     public function findSchedule(int $scheduleId): ?array
     {
         $st = $this->pdo->prepare(
@@ -350,10 +464,11 @@ final class ShiftRepository
         ]);
     }
 
+    /** @return list<int> */
     public function releaseCasesForShiftEnd(
         int $userId,
         int $queueId
-    ): int {
+    ): array {
         $st = $this->pdo->prepare(
             "SELECT id,case_number,current_state
              FROM cases
@@ -370,8 +485,11 @@ final class ShiftRepository
         ]);
         $cases = $st->fetchAll() ?: [];
 
+        $releasedIds = [];
+
         foreach ($cases as $case) {
             $caseId = (int)$case['id'];
+            $releasedIds[] = $caseId;
 
             $this->pdo->prepare(
                 "UPDATE case_assignments
@@ -417,13 +535,52 @@ final class ShiftRepository
             ]);
         }
 
-        return count($cases);
+        return $releasedIds;
     }
 
-    public function markAgentOfflineAtShiftEnd(int $userId): void
+    public function pendingForCaseIds(array $caseIds): int
     {
+        $caseIds = array_values(array_unique(array_filter(
+            array_map('intval', $caseIds),
+            static fn (int $id): bool => $id > 0
+        )));
+
+        if ($caseIds === []) {
+            return 0;
+        }
+
+        $placeholders = [];
+        $params = [];
+
+        foreach ($caseIds as $index => $caseId) {
+            $placeholder = ':case_' . $index;
+            $placeholders[] = $placeholder;
+            $params[$placeholder] = $caseId;
+        }
+
         $st = $this->pdo->prepare(
-            "SELECT id
+            "SELECT COUNT(*)
+             FROM cases
+             WHERE id IN (" . implode(',', $placeholders) . ")
+               AND assigned_user_id IS NULL
+               AND closed_at IS NULL
+               AND current_state='PENDING_ASSIGNMENT'"
+        );
+        $st->execute($params);
+
+        return (int)$st->fetchColumn();
+    }
+
+    public function markAgentOfflineAtShiftEnd(
+        int $userId,
+        DateTimeImmutable $now
+    ): void {
+        if ($this->hasAnyCurrentShift($userId, $now)) {
+            return;
+        }
+
+        $st = $this->pdo->prepare(
+            "SELECT id,status_code
              FROM agent_presence
              WHERE user_id=:user_id
                AND ended_at IS NULL
@@ -432,9 +589,9 @@ final class ShiftRepository
              FOR UPDATE"
         );
         $st->execute([':user_id'=>$userId]);
-        $presenceId = $st->fetchColumn();
+        $presence = $st->fetch();
 
-        if ($presenceId === false) {
+        if (!$presence || (string)$presence['status_code'] === 'OFFLINE') {
             return;
         }
 
@@ -443,7 +600,7 @@ final class ShiftRepository
              SET ended_at=NOW(6),
                  last_heartbeat_at=NOW(6)
              WHERE id=:id"
-        )->execute([':id'=>(int)$presenceId]);
+        )->execute([':id'=>(int)$presence['id']]);
 
         $this->pdo->prepare(
             "INSERT INTO agent_presence
