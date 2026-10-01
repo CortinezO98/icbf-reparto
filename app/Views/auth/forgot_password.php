@@ -20,7 +20,7 @@
                 </p>
 
                 <form method="post" action="/forgot-password" autocomplete="off">
-                    <input type="hidden" name="_csrf" value="<?= htmlspecialchars(AppAuthCsrf::token(), ENT_QUOTES, 'UTF-8') ?>">
+                    <input type="hidden" name="_csrf" value="<?= htmlspecialchars(\App\Auth\Csrf::token(), ENT_QUOTES, 'UTF-8') ?>">
                     <div class="mb-3">
                         <label for="email" class="form-label">Correo electrónico</label>
                         <input id="email" class="form-control" name="email" type="email"
