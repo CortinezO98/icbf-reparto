@@ -5,37 +5,32 @@ use App\Config\Database;
 
 /** @var array<string,mixed> $data */
 $summary = $data['summary'] ?? [];
-$cases = $data['cases'] ?? [];
-$queues = $data['queues'] ?? [];
+$daily = $data['daily'] ?? [];
 $agents = $data['agents'] ?? [];
-$states = $data['states'] ?? [];
-$sla = $data['sla'] ?? [];
+$queues = $data['queues'] ?? [];
+$cases = $data['cases'] ?? [];
 $filters = $data['filters'] ?? ['queues'=>[],'agents'=>[]];
 $selected = $data['selected'] ?? [];
-$period = (string)($data['period'] ?? 'Hoy');
 
 $fmt = static fn(mixed $value): string => number_format((float)$value, 0, ',', '.');
-$hours = static function(mixed $minutes) use ($fmt): string {
-    if ($minutes === null || $minutes === '') return '—';
+
+$hours = static function (mixed $minutes): string {
+    if ($minutes === null || $minutes === '') {
+        return '—';
+    }
+
     $minutes = max(0, (float)$minutes);
-    return $minutes < 60
-        ? $fmt($minutes) . ' min'
-        : number_format($minutes / 60, 1, ',', '.') . ' h';
+
+    return number_format($minutes / 60, 1, ',', '.') . ' h';
 };
-$badge = static function(mixed $status): string {
-    return match ((string)$status) {
-        'GREEN' => 'status-green',
-        'YELLOW' => 'status-yellow',
-        'RED','BREACHED' => 'status-red',
-        default => 'status-gray',
-    };
-};
+
 $stateText = static fn(mixed $state): string => match ((string)$state) {
     'PENDING_ASSIGNMENT' => 'Pendiente de asignación',
     'ASSIGNED' => 'Asignado',
     'CLOSED' => 'Cerrado',
     default => (string)$state,
 };
+
 $slaText = static fn(mixed $value): string => match ((string)$value) {
     'GREEN' => 'Verde',
     'YELLOW' => 'Amarillo',
@@ -44,253 +39,517 @@ $slaText = static fn(mixed $value): string => match ((string)$value) {
     'PENDING' => 'Pendiente',
     default => (string)$value,
 };
+
+$startDate = (string)($selected['start_date'] ?? '');
+$endDate = (string)($selected['end_date'] ?? '');
+
+$green = (int)($summary['sla_green'] ?? 0);
+$yellow = (int)($summary['sla_yellow'] ?? 0);
+$red = (int)($summary['sla_red'] ?? 0);
+$breached = (int)($summary['sla_breached'] ?? 0);
+
+$slaVisibleTotal = $green + $yellow + $red;
+$greenPct = $slaVisibleTotal > 0 ? round(($green / $slaVisibleTotal) * 100, 1) : 0;
+$yellowPct = $slaVisibleTotal > 0 ? round(($yellow / $slaVisibleTotal) * 100, 1) : 0;
+$redPct = $slaVisibleTotal > 0 ? round(($red / $slaVisibleTotal) * 100, 1) : 0;
+
+$totalCases = (int)($summary['total_cases'] ?? 0);
+$managedCases = (int)($summary['managed_cases'] ?? 0);
+$responseRate = $summary['response_rate_percent'] ?? null;
+$breachRate = $totalCases > 0 ? round(($breached / $totalCases) * 100, 1) : 0;
+
+$maxDaily = 1;
+foreach ($daily as $row) {
+    $maxDaily = max($maxDaily, (int)($row['total'] ?? 0));
+}
+
+$exportQuery = $_GET;
+unset($exportQuery['export']);
+$exportUrl = '/reports/export' . ($exportQuery !== [] ? '?' . http_build_query($exportQuery) : '');
 ?>
 <style>
-.report-head{display:flex;justify-content:space-between;gap:16px;align-items:flex-start;flex-wrap:wrap;margin-bottom:18px}
-.report-head h1{font-weight:800;margin:0}.report-head p{margin:4px 0 0;color:#6c757d}
-.report-filters{background:#fff;border:1px solid rgba(33,37,41,.12);border-radius:14px;padding:15px;margin-bottom:18px}
-.report-filters label{font-size:.74rem;font-weight:700;color:#495057;margin-bottom:4px}
-.report-card{height:100%;background:#fff;border:1px solid rgba(33,37,41,.12);border-radius:16px;box-shadow:0 2px 5px rgba(0,0,0,.035);overflow:hidden}
-.report-card .card-body{padding:18px}
-.report-kpi{min-height:125px}.report-kpi-label{font-size:.78rem;color:#6c757d}.report-kpi-value{font-size:1.9rem;font-weight:800;margin-top:4px}.report-kpi-detail{font-size:.76rem;color:#6c757d;margin-top:5px}
-.report-table{width:100%;border-collapse:collapse}.report-table th{font-size:.7rem;text-transform:uppercase;letter-spacing:.3px;color:#6c757d;background:#f8f9fa;white-space:nowrap}.report-table th,.report-table td{padding:9px 10px;border-bottom:1px solid #edf0f2}.report-table tbody tr:hover{background:rgba(76,175,80,.045)}
-.report-scroll{overflow:auto}.report-bar{display:grid;grid-template-columns:120px 1fr 45px;gap:8px;align-items:center;margin:9px 0}.report-bar-label{font-size:.78rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.report-bar-track{height:8px;background:#edf0f2;border-radius:999px;overflow:hidden}.report-bar-fill{height:100%;background:var(--color-primary);border-radius:999px}.report-bar-value{text-align:right;font-size:.76rem;font-weight:700}
-.report-empty{text-align:center;color:#6c757d;padding:22px;font-size:.85rem}
+.reports-page{padding-bottom:28px}
+.reports-header{display:flex;justify-content:space-between;align-items:flex-start;gap:20px;flex-wrap:wrap;margin-bottom:20px}
+.reports-header h1{font-size:1.65rem;font-weight:800;letter-spacing:-.02em;margin:0;color:#172033}
+.reports-header p{margin:4px 0 0;color:#667085;font-size:.94rem}
+.reports-header-actions{display:flex;align-items:center;gap:8px}
+.reports-period{display:inline-flex;align-items:center;gap:7px;background:#fff;border:1px solid #dfe3e8;border-radius:8px;padding:9px 12px;font-size:.82rem;color:#344054;white-space:nowrap}
+.reports-filter{background:#fff;border:1px solid #e8eaed;border-radius:16px;box-shadow:0 2px 8px rgba(16,24,40,.05);padding:18px;margin-bottom:20px}
+.reports-filter label{font-size:.75rem;font-weight:700;color:#475467;margin-bottom:6px}
+.reports-filter .form-control,.reports-filter .form-select{height:42px;border-color:#d9dde3;font-size:.86rem}
+.reports-filter .input-group-text{background:#fff;border-color:#d9dde3;color:#667085}
+.reports-filter .btn{height:42px}
+.report-card{height:100%;background:#fff;border:1px solid #e8eaed;border-radius:16px;box-shadow:0 2px 8px rgba(16,24,40,.045);overflow:hidden}
+.report-card-body{padding:18px}
+.report-kpi{min-height:156px}
+.report-kpi .kpi-label{font-size:.78rem;color:#667085;margin-bottom:3px}
+.report-kpi .kpi-value{font-size:1.8rem;line-height:1.05;font-weight:800;color:#172033}
+.report-kpi .kpi-detail{font-size:.76rem;color:#667085;margin-top:7px}
+.report-kpi .kpi-icon{width:42px;height:42px;border-radius:10px;display:grid;place-items:center;font-size:1.25rem}
+.kpi-blue{background:#eaf2ff;color:#1769e0}
+.kpi-green{background:#e8f7ef;color:#138a55}
+.kpi-yellow{background:#fff7df;color:#a66a00}
+.kpi-red{background:#fff0f0;color:#e33b4a}
+.sla-number{font-size:1.55rem;font-weight:800;letter-spacing:-.02em}
+.sla-number span{font-weight:500;color:#98a2b3}
+.sla-progress{height:7px;background:#eef1f4;border-radius:999px;overflow:hidden}
+.sla-progress > div{height:100%;border-radius:999px}
+.sla-line{display:grid;grid-template-columns:78px 1fr 45px;align-items:center;gap:8px;margin-top:9px;font-size:.75rem}
+.sla-pill{display:inline-flex;width:max-content;padding:2px 7px;border-radius:999px;font-weight:700}
+.sla-green{background:#e7f7ee;color:#117a49}
+.sla-yellow{background:#fff4cf;color:#8b6100}
+.sla-red{background:#ffe7e7;color:#c52e3d}
+.sla-breached{background:#fff0f0;color:#d92d3d}
+.report-section-title{font-size:.98rem;font-weight:800;color:#172033}
+.report-section-subtitle{font-size:.77rem;color:#667085;margin-top:2px}
+.daily-table,.productivity-table{width:100%;border-collapse:collapse}
+.daily-table th,.productivity-table th{font-size:.68rem;text-transform:uppercase;letter-spacing:.35px;color:#667085;font-weight:700;border-bottom:1px solid #e6e9ed;padding:9px 8px;white-space:nowrap}
+.daily-table td,.productivity-table td{font-size:.82rem;color:#344054;border-bottom:1px solid #eef0f2;padding:9px 8px}
+.daily-table tbody tr:last-child td,.productivity-table tbody tr:last-child td{border-bottom:0}
+.daily-bar{height:8px;background:#e9edf1;border-radius:999px;overflow:hidden}
+.daily-bar-fill{height:100%;background:#1473ea;border-radius:999px}
+.daily-value{text-align:right;font-weight:800;color:#172033}
+.daily-trend{text-align:right;font-size:.74rem;color:#667085}
+.report-scroll{overflow:auto}
+.report-empty{text-align:center;color:#98a2b3;padding:24px 12px;font-size:.84rem}
+.productivity-table .agent-name{font-weight:700;color:#172033}
+.productivity-table .muted{font-size:.72rem;color:#98a2b3}
+.sla-status-badge{display:inline-flex;align-items:center;padding:4px 8px;border-radius:999px;font-size:.7rem;font-weight:700}
+.status-blue{background:#eaf2ff;color:#175cd3}
+.status-green{background:#e8f7ef;color:#117a49}
+.status-yellow{background:#fff4cf;color:#8b6100}
+.status-red{background:#ffe7e7;color:#c52e3d}
+.status-gray{background:#f2f4f7;color:#667085}
+@media(max-width:767.98px){
+  .reports-header h1{font-size:1.4rem}
+  .reports-header-actions{width:100%;justify-content:space-between}
+  .report-kpi{min-height:130px}
+  .sla-line{grid-template-columns:72px 1fr 38px}
+}
 </style>
 
-<div class="report-head">
-    <div>
-        <h1><i class="bi bi-file-earmark-bar-graph text-brand me-2"></i>Reportes operativos</h1>
-        <p>Consulta y exporta información de casos, ANS, colas y agentes con los filtros seleccionados.</p>
-    </div>
-    <?php if (Authorization::hasPermission(Database::connection(), (int)Auth::id(), 'REPORT_EXPORT')): ?>
-        <?php
-        $query = $_GET;
-        $query['export'] = null;
-        $exportUrl = '/reports/export?' . http_build_query($query);
-        ?>
-        <a class="btn btn-success" href="<?= htmlspecialchars($exportUrl, ENT_QUOTES, 'UTF-8') ?>">
-            <i class="bi bi-filetype-csv me-1"></i>Exportar CSV
-        </a>
-    <?php endif; ?>
-</div>
+<div class="reports-page">
+    <div class="reports-header">
+        <div>
+            <h1><i class="bi bi-file-earmark-bar-graph me-2" style="color:var(--color-primary)"></i>Dashboard de Reportes</h1>
+            <p>Análisis completo de métricas y desempeño del sistema</p>
+        </div>
 
-<form class="report-filters" method="get" action="/reports">
-    <div class="row g-2 align-items-end">
-        <div class="col-sm-6 col-lg-2">
-            <label for="period">Periodo</label>
-            <select class="form-select" id="period" name="period">
-                <?php foreach (['today'=>'Hoy','7d'=>'Últimos 7 días','month'=>'Mes actual','all'=>'Histórico'] as $key=>$label): ?>
-                    <option value="<?= $key ?>" <?= ($selected['period'] ?? '') === $key ? 'selected' : '' ?>><?= $label ?></option>
-                <?php endforeach; ?>
-            </select>
-        </div>
-        <div class="col-sm-6 col-lg-2">
-            <label for="queue_id">Cola</label>
-            <select class="form-select" id="queue_id" name="queue_id">
-                <option value="">Todas</option>
-                <?php foreach ($filters['queues'] as $queue): ?>
-                    <option value="<?= (int)$queue['id'] ?>" <?= (int)($selected['queue_id'] ?? 0) === (int)$queue['id'] ? 'selected' : '' ?>>
-                        <?= htmlspecialchars((string)$queue['code'], ENT_QUOTES, 'UTF-8') ?>
-                    </option>
-                <?php endforeach; ?>
-            </select>
-        </div>
-        <div class="col-sm-6 col-lg-2">
-            <label for="agent_id">Agente</label>
-            <select class="form-select" id="agent_id" name="agent_id">
-                <option value="">Todos</option>
-                <?php foreach ($filters['agents'] as $agent): ?>
-                    <option value="<?= (int)$agent['id'] ?>" <?= (int)($selected['agent_id'] ?? 0) === (int)$agent['id'] ? 'selected' : '' ?>>
-                        <?= htmlspecialchars((string)$agent['full_name'], ENT_QUOTES, 'UTF-8') ?>
-                    </option>
-                <?php endforeach; ?>
-            </select>
-        </div>
-        <div class="col-sm-6 col-lg-2">
-            <label for="state">Estado</label>
-            <select class="form-select" id="state" name="state">
-                <option value="">Todos</option>
-                <?php foreach (['PENDING_ASSIGNMENT'=>'Pendiente de asignación','ASSIGNED'=>'Asignado','CLOSED'=>'Cerrado'] as $key=>$label): ?>
-                    <option value="<?= $key ?>" <?= ($selected['state'] ?? '') === $key ? 'selected' : '' ?>><?= $label ?></option>
-                <?php endforeach; ?>
-            </select>
-        </div>
-        <div class="col-sm-6 col-lg-2">
-            <label for="sla">ANS</label>
-            <select class="form-select" id="sla" name="sla">
-                <option value="">Todos</option>
-                <?php foreach (['GREEN'=>'Verde','YELLOW'=>'Amarillo','RED'=>'Rojo','BREACHED'=>'Vencido'] as $key=>$label): ?>
-                    <option value="<?= $key ?>" <?= ($selected['sla'] ?? '') === $key ? 'selected' : '' ?>><?= $label ?></option>
-                <?php endforeach; ?>
-            </select>
-        </div>
-        <div class="col-sm-6 col-lg-2 d-flex gap-2">
-            <button class="btn btn-primary flex-fill" type="submit"><i class="bi bi-funnel me-1"></i>Aplicar</button>
-            <a class="btn btn-outline-secondary" href="/reports" title="Limpiar filtros"><i class="bi bi-x-lg"></i></a>
+        <div class="reports-header-actions">
+            <div class="reports-period">
+                <i class="bi bi-calendar3"></i>
+                <span><?= htmlspecialchars((string)($data['period'] ?? ''), ENT_QUOTES, 'UTF-8') ?></span>
+            </div>
+
+            <?php if (Authorization::hasPermission(Database::connection(), (int)Auth::id(), 'REPORT_EXPORT')): ?>
+                <a class="btn btn-outline-primary" href="<?= htmlspecialchars($exportUrl, ENT_QUOTES, 'UTF-8') ?>">
+                    <i class="bi bi-download me-1"></i>Exportar
+                </a>
+            <?php endif; ?>
         </div>
     </div>
-</form>
 
-<div class="row g-3 mb-3">
-<?php
-$kpis = [
-    ['Total casos',$summary['total_cases'] ?? 0,'Periodo seleccionado','bi-collection'],
-    ['Abiertos',$summary['open_cases'] ?? 0,'Sin cierre','bi-inbox'],
-    ['Pendientes',$summary['pending_assignment'] ?? 0,'Sin asignación','bi-person-plus'],
-    ['Cerrados',$summary['closed_cases'] ?? 0,'Con cierre registrado','bi-check2-circle'],
-    ['Con gestión',$summary['managed_cases'] ?? 0,'Primera gestión registrada','bi-chat-left-text'],
-    ['Cumplimiento ANS',$summary['sla_compliance_percent'] === null ? '—' : $summary['sla_compliance_percent'].'%','Casos cerrados dentro de ANS','bi-clock-history'],
-];
-foreach ($kpis as [$label,$value,$detail,$icon]):
-?>
-    <div class="col-6 col-xl-2">
-        <div class="report-card report-kpi"><div class="card-body">
-            <div class="text-brand fs-5"><i class="bi <?= $icon ?>"></i></div>
-            <div class="report-kpi-label"><?= htmlspecialchars($label, ENT_QUOTES, 'UTF-8') ?></div>
-            <div class="report-kpi-value"><?= htmlspecialchars((string)$value, ENT_QUOTES, 'UTF-8') ?></div>
-            <div class="report-kpi-detail"><?= htmlspecialchars($detail, ENT_QUOTES, 'UTF-8') ?></div>
-        </div></div>
-    </div>
-<?php endforeach; ?>
-</div>
-
-<div class="row g-3 mb-3">
-    <div class="col-xl-6">
-        <div class="report-card"><div class="card-body">
-            <div class="fw-bold">Distribución por ANS</div>
-            <div class="text-muted small mb-2">Casos del periodo filtrado.</div>
-            <?php
-            $maxSla = max(1, ...array_map(static fn(array $r): int => (int)$r['total'], $sla));
-            foreach ($sla as $row):
-            ?>
-                <div class="report-bar">
-                    <div class="report-bar-label"><?= htmlspecialchars($slaText($row['label']), ENT_QUOTES, 'UTF-8') ?></div>
-                    <div class="report-bar-track"><div class="report-bar-fill" style="width:<?= min(100, ((int)$row['total'] / $maxSla) * 100) ?>%"></div></div>
-                    <div class="report-bar-value"><?= $fmt($row['total']) ?></div>
+    <form class="reports-filter" method="get" action="/reports">
+        <div class="row g-3 align-items-end">
+            <div class="col-12 col-md-2">
+                <label for="start">Fecha Inicio</label>
+                <div class="input-group">
+                    <span class="input-group-text"><i class="bi bi-calendar"></i></span>
+                    <input class="form-control" type="date" id="start" name="start"
+                           value="<?= htmlspecialchars($startDate, ENT_QUOTES, 'UTF-8') ?>">
                 </div>
-            <?php endforeach; ?>
-            <?php if ($sla === []): ?><div class="report-empty">Sin datos.</div><?php endif; ?>
-        </div></div>
-    </div>
-    <div class="col-xl-6">
-        <div class="report-card"><div class="card-body">
-            <div class="fw-bold">Distribución por estado</div>
-            <div class="text-muted small mb-2">Estado registrado actualmente.</div>
-            <?php
-            $maxState = max(1, ...array_map(static fn(array $r): int => (int)$r['total'], $states));
-            foreach ($states as $row):
-            ?>
-                <div class="report-bar">
-                    <div class="report-bar-label"><?= htmlspecialchars($stateText($row['label']), ENT_QUOTES, 'UTF-8') ?></div>
-                    <div class="report-bar-track"><div class="report-bar-fill" style="width:<?= min(100, ((int)$row['total'] / $maxState) * 100) ?>%"></div></div>
-                    <div class="report-bar-value"><?= $fmt($row['total']) ?></div>
-                </div>
-            <?php endforeach; ?>
-            <?php if ($states === []): ?><div class="report-empty">Sin datos.</div><?php endif; ?>
-        </div></div>
-    </div>
-</div>
+            </div>
 
-<div class="row g-3 mb-3">
-    <div class="col-xl-6">
-        <div class="report-card"><div class="card-body">
-            <div class="fw-bold">Resumen por cola</div>
-            <div class="text-muted small mb-2">Carga actual y actividad del periodo.</div>
+            <div class="col-12 col-md-2">
+                <label for="end">Fecha Fin</label>
+                <div class="input-group">
+                    <span class="input-group-text"><i class="bi bi-calendar"></i></span>
+                    <input class="form-control" type="date" id="end" name="end"
+                           value="<?= htmlspecialchars($endDate, ENT_QUOTES, 'UTF-8') ?>">
+                </div>
+            </div>
+
+            <div class="col-12 col-md-2">
+                <label for="queue_id">Cola</label>
+                <select class="form-select" id="queue_id" name="queue_id">
+                    <option value="">Todas</option>
+                    <?php foreach ($filters['queues'] as $queue): ?>
+                        <option value="<?= (int)$queue['id'] ?>"
+                            <?= (int)($selected['queue_id'] ?? 0) === (int)$queue['id'] ? 'selected' : '' ?>>
+                            <?= htmlspecialchars((string)$queue['code'], ENT_QUOTES, 'UTF-8') ?>
+                        </option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+
+            <div class="col-12 col-md-2">
+                <label for="agent_id">Agente</label>
+                <select class="form-select" id="agent_id" name="agent_id">
+                    <option value="">Todos</option>
+                    <?php foreach ($filters['agents'] as $agent): ?>
+                        <option value="<?= (int)$agent['id'] ?>"
+                            <?= (int)($selected['agent_id'] ?? 0) === (int)$agent['id'] ? 'selected' : '' ?>>
+                            <?= htmlspecialchars((string)$agent['full_name'], ENT_QUOTES, 'UTF-8') ?>
+                        </option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+
+            <div class="col-12 col-md-2">
+                <label for="state">Estado</label>
+                <select class="form-select" id="state" name="state">
+                    <option value="">Todos</option>
+                    <?php foreach ([
+                        'PENDING_ASSIGNMENT'=>'Pendiente de asignación',
+                        'ASSIGNED'=>'Asignado',
+                        'CLOSED'=>'Cerrado'
+                    ] as $key=>$label): ?>
+                        <option value="<?= $key ?>"
+                            <?= ($selected['state'] ?? '') === $key ? 'selected' : '' ?>>
+                            <?= $label ?>
+                        </option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+
+            <div class="col-12 col-md-2">
+                <label for="sla">ANS</label>
+                <div class="d-flex gap-2">
+                    <select class="form-select" id="sla" name="sla">
+                        <option value="">Todos</option>
+                        <?php foreach ([
+                            'GREEN'=>'Verde',
+                            'YELLOW'=>'Amarillo',
+                            'RED'=>'Rojo',
+                            'BREACHED'=>'Vencido'
+                        ] as $key=>$label): ?>
+                            <option value="<?= $key ?>"
+                                <?= ($selected['sla'] ?? '') === $key ? 'selected' : '' ?>>
+                                <?= $label ?>
+                            </option>
+                        <?php endforeach; ?>
+                    </select>
+                    <button class="btn btn-primary px-3" type="submit" title="Aplicar filtros">
+                        <i class="bi bi-funnel"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </form>
+
+    <div class="row g-3 mb-3">
+        <div class="col-12 col-xl-3">
+            <div class="report-card report-kpi">
+                <div class="report-card-body">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div>
+                            <div class="kpi-label">Casos Totales</div>
+                            <div class="kpi-value"><?= $fmt($totalCases) ?></div>
+                            <div class="kpi-detail">
+                                <?= $fmt($summary['open_cases'] ?? 0) ?> abiertos
+                                <span class="ms-1">(<?= $totalCases > 0 ? round(((int)($summary['open_cases'] ?? 0) / $totalCases) * 100) : 0 ?>%)</span>
+                            </div>
+                        </div>
+                        <div class="kpi-icon kpi-blue"><i class="bi bi-folder2-open"></i></div>
+                    </div>
+                    <div class="small text-muted mt-3">
+                        Cerrados: <strong><?= $fmt($summary['closed_cases'] ?? 0) ?></strong>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-12 col-xl-3">
+            <div class="report-card report-kpi">
+                <div class="report-card-body">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div>
+                            <div class="kpi-label">Respondidos</div>
+                            <div class="kpi-value"><?= $fmt($managedCases) ?></div>
+                            <div class="kpi-detail">
+                                Tasa de respuesta:
+                                <strong><?= $responseRate === null ? '—' : $responseRate . '%' ?></strong>
+                            </div>
+                        </div>
+                        <div class="kpi-icon kpi-green"><i class="bi bi-check-circle"></i></div>
+                    </div>
+                    <div class="sla-progress mt-3">
+                        <div style="width:<?= min(100, max(0, (float)($responseRate ?? 0))) ?>%;background:#198754"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-12 col-xl-3">
+            <div class="report-card report-kpi">
+                <div class="report-card-body">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div class="w-100">
+                            <div class="kpi-label">Estado SLA</div>
+                            <div class="sla-number">
+                                <?= $fmt($green) ?><span>/</span><?= $fmt($yellow) ?><span>/</span><?= $fmt($red) ?>
+                            </div>
+                            <div class="d-flex gap-2 mt-1">
+                                <span class="sla-pill sla-green">Verde</span>
+                                <span class="sla-pill sla-yellow">Amarillo</span>
+                                <span class="sla-pill sla-red">Rojo</span>
+                            </div>
+                        </div>
+                        <div class="kpi-icon kpi-yellow ms-2"><i class="bi bi-speedometer2"></i></div>
+                    </div>
+
+                    <div class="sla-line">
+                        <span>Verde</span>
+                        <div class="sla-progress"><div style="width:<?= $greenPct ?>%;background:#198754"></div></div>
+                        <strong><?= $greenPct ?>%</strong>
+                    </div>
+                    <div class="sla-line">
+                        <span>Amarillo</span>
+                        <div class="sla-progress"><div style="width:<?= $yellowPct ?>%;background:#f0ad00"></div></div>
+                        <strong><?= $yellowPct ?>%</strong>
+                    </div>
+                    <div class="sla-line">
+                        <span>Rojo</span>
+                        <div class="sla-progress"><div style="width:<?= $redPct ?>%;background:#dc3545"></div></div>
+                        <strong><?= $redPct ?>%</strong>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-12 col-xl-3">
+            <div class="report-card report-kpi">
+                <div class="report-card-body">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div>
+                            <div class="kpi-label">Vencidos</div>
+                            <div class="kpi-value" style="color:#dc3545"><?= $fmt($breached) ?></div>
+                            <div class="kpi-detail">Tasa de vencimiento: <strong><?= $breachRate ?>%</strong></div>
+                        </div>
+                        <div class="kpi-icon kpi-red"><i class="bi bi-exclamation-triangle"></i></div>
+                    </div>
+                    <div class="mt-3 px-2 py-2 rounded-2" style="background:#fff4d6;color:#805f00;font-size:.76rem">
+                        <i class="bi bi-person-dash me-1"></i>
+                        Sin gestión: <strong><?= $fmt($summary['unmanaged_open_cases'] ?? 0) ?></strong>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="report-card mb-3">
+        <div class="report-card-body">
+            <div class="d-flex align-items-center gap-2 mb-3">
+                <i class="bi bi-graph-up-arrow" style="color:var(--color-primary)"></i>
+                <div>
+                    <div class="report-section-title">Serie Diaria - Casos Recibidos</div>
+                    <div class="report-section-subtitle">Cantidad de casos creados por día dentro del periodo seleccionado.</div>
+                </div>
+            </div>
+
+            <?php if ($daily !== []): ?>
+                <div class="report-scroll">
+                    <table class="daily-table">
+                        <thead>
+                            <tr>
+                                <th style="width:18%">Día</th>
+                                <th style="width:15%;text-align:right">Casos recibidos</th>
+                                <th>Tendencia</th>
+                                <th style="width:8%;text-align:right">%</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                        <?php foreach ($daily as $row):
+                            $count = (int)($row['total'] ?? 0);
+                            $trend = $maxDaily > 0 ? round(($count / $maxDaily) * 100) : 0;
+                        ?>
+                            <tr>
+                                <td><strong><?= htmlspecialchars(date('d/m/Y', strtotime((string)$row['day'])), ENT_QUOTES, 'UTF-8') ?></strong></td>
+                                <td class="daily-value"><?= $fmt($count) ?></td>
+                                <td>
+                                    <div class="daily-bar">
+                                        <div class="daily-bar-fill" style="width:<?= min(100, $trend) ?>%"></div>
+                                    </div>
+                                </td>
+                                <td class="daily-trend"><?= $trend ?>%</td>
+                            </tr>
+                        <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                </div>
+            <?php else: ?>
+                <div class="report-empty">No hay casos recibidos en el periodo seleccionado.</div>
+            <?php endif; ?>
+        </div>
+    </div>
+
+    <div class="report-card mb-3">
+        <div class="report-card-body">
+            <div class="d-flex justify-content-between align-items-start gap-3 mb-3">
+                <div>
+                    <div class="d-flex align-items-center gap-2">
+                        <i class="bi bi-people" style="color:var(--color-primary)"></i>
+                        <div class="report-section-title">Productividad por Agente</div>
+                    </div>
+                    <div class="report-section-subtitle">Casos asignados, resueltos, vencidos, tiempo de respuesta y cumplimiento ANS.</div>
+                </div>
+                <span class="small text-muted d-none d-md-block">Periodo seleccionado</span>
+            </div>
+
             <div class="report-scroll">
-                <table class="report-table">
-                    <thead><tr><th>Cola</th><th>Recibidos</th><th>Abiertos</th><th>Pendientes</th><th>Cerrados</th></tr></thead>
-                    <tbody>
-                    <?php foreach ($queues as $row): ?>
+                <table class="productivity-table">
+                    <thead>
                         <tr>
-                            <td><strong><?= htmlspecialchars((string)$row['code'], ENT_QUOTES, 'UTF-8') ?></strong><div class="small text-muted"><?= htmlspecialchars((string)$row['name'], ENT_QUOTES, 'UTF-8') ?></div></td>
-                            <td><?= $fmt($row['received_period']) ?></td>
-                            <td><?= $fmt($row['open_cases']) ?></td>
-                            <td><?= $fmt($row['pending_assignment']) ?></td>
-                            <td><?= $fmt($row['closed_cases']) ?></td>
+                            <th>Agente</th>
+                            <th style="text-align:right">Asignados</th>
+                            <th style="text-align:right">Resueltos</th>
+                            <th style="text-align:right">Vencidos</th>
+                            <th style="text-align:right">Tiempo resp. (h)</th>
+                            <th style="text-align:right">% Cumplimiento SLA</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    <?php foreach ($agents as $agent):
+                        $closed = (int)($agent['closed_cases'] ?? 0);
+                        $compliant = (int)($agent['compliant_cases'] ?? 0);
+                        $compliance = $closed > 0 ? round(($compliant / $closed) * 100, 1) : null;
+                    ?>
+                        <tr>
+                            <td>
+                                <div class="agent-name"><?= htmlspecialchars((string)$agent['full_name'], ENT_QUOTES, 'UTF-8') ?></div>
+                                <div class="muted"><?= htmlspecialchars((string)$agent['username'], ENT_QUOTES, 'UTF-8') ?></div>
+                            </td>
+                            <td style="text-align:right"><?= $fmt($agent['assigned_cases'] ?? 0) ?></td>
+                            <td style="text-align:right"><?= $fmt($agent['resolved_cases'] ?? 0) ?></td>
+                            <td style="text-align:right">
+                                <?php if ((int)($agent['breached_cases'] ?? 0) > 0): ?>
+                                    <span class="sla-status-badge status-red"><?= $fmt($agent['breached_cases']) ?></span>
+                                <?php else: ?>
+                                    0
+                                <?php endif; ?>
+                            </td>
+                            <td style="text-align:right"><?= $hours($agent['response_minutes'] ?? null) ?></td>
+                            <td style="text-align:right">
+                                <?php if ($compliance === null): ?>
+                                    —
+                                <?php else: ?>
+                                    <strong><?= $compliance ?>%</strong>
+                                <?php endif; ?>
+                            </td>
                         </tr>
                     <?php endforeach; ?>
-                    <?php if ($queues === []): ?><tr><td colspan="5" class="report-empty">Sin datos.</td></tr><?php endif; ?>
+
+                    <?php if ($agents === []): ?>
+                        <tr><td colspan="6" class="report-empty">No hay datos de agentes para el periodo seleccionado.</td></tr>
+                    <?php endif; ?>
                     </tbody>
                 </table>
             </div>
-        </div></div>
+        </div>
     </div>
-    <div class="col-xl-6">
-        <div class="report-card"><div class="card-body">
-            <div class="fw-bold">Resumen por agente</div>
-            <div class="text-muted small mb-2">Carga activa y actividad del periodo.</div>
-            <div class="report-scroll">
-                <table class="report-table">
-                    <thead><tr><th>Agente</th><th>Activos</th><th>Recibidos</th><th>Gestionados</th><th>Cerrados</th></tr></thead>
-                    <tbody>
-                    <?php foreach ($agents as $row): ?>
-                        <tr>
-                            <td><strong><?= htmlspecialchars((string)$row['full_name'], ENT_QUOTES, 'UTF-8') ?></strong><div class="small text-muted"><?= htmlspecialchars((string)$row['username'], ENT_QUOTES, 'UTF-8') ?></div></td>
-                            <td><?= $fmt($row['open_cases']) ?></td>
-                            <td><?= $fmt($row['received_period']) ?></td>
-                            <td><?= $fmt($row['managed_period']) ?></td>
-                            <td><?= $fmt($row['closed_period']) ?></td>
-                        </tr>
-                    <?php endforeach; ?>
-                    <?php if ($agents === []): ?><tr><td colspan="5" class="report-empty">Sin agentes activos.</td></tr><?php endif; ?>
-                    </tbody>
-                </table>
+
+    <div class="row g-3 mb-3">
+        <div class="col-12 col-xl-6">
+            <div class="report-card">
+                <div class="report-card-body">
+                    <div class="report-section-title">Resumen por Cola</div>
+                    <div class="report-section-subtitle mb-3">Carga y comportamiento de las colas.</div>
+                    <div class="report-scroll">
+                        <table class="productivity-table">
+                            <thead>
+                                <tr>
+                                    <th>Cola</th>
+                                    <th style="text-align:right">Recibidos</th>
+                                    <th style="text-align:right">Abiertos</th>
+                                    <th style="text-align:right">Cerrados</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                            <?php foreach ($queues as $queue): ?>
+                                <tr>
+                                    <td>
+                                        <div class="agent-name"><?= htmlspecialchars((string)$queue['code'], ENT_QUOTES, 'UTF-8') ?></div>
+                                        <div class="muted"><?= htmlspecialchars((string)$queue['name'], ENT_QUOTES, 'UTF-8') ?></div>
+                                    </td>
+                                    <td style="text-align:right"><?= $fmt($queue['received_period'] ?? 0) ?></td>
+                                    <td style="text-align:right"><?= $fmt($queue['open_cases'] ?? 0) ?></td>
+                                    <td style="text-align:right"><?= $fmt($queue['closed_cases'] ?? 0) ?></td>
+                                </tr>
+                            <?php endforeach; ?>
+                            <?php if ($queues === []): ?>
+                                <tr><td colspan="4" class="report-empty">Sin datos.</td></tr>
+                            <?php endif; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
             </div>
-        </div></div>
-    </div>
-</div>
-
-<div class="report-card">
-    <div class="card-body">
-        <div class="d-flex justify-content-between align-items-start gap-2 mb-2">
-            <div><div class="fw-bold">Detalle de casos</div><div class="text-muted small">Hasta 200 registros por consulta. La exportación permite hasta 5.000.</div></div>
-            <span class="badge text-bg-light border"><?= $fmt(count($cases)) ?> mostrados</span>
         </div>
-        <div class="report-scroll">
-            <table class="report-table">
-                <thead>
-                    <tr>
-                        <th>Caso</th><th>Cola</th><th>Agente</th><th>Estado</th>
-                        <th>ANS</th><th>Tipo petición</th><th>Regional</th><th>Canal</th>
-                        <th>Creado</th><th>Primera gestión</th><th>Cerrado</th><th></th>
-                    </tr>
-                </thead>
-                <tbody>
-                <?php foreach ($cases as $row): ?>
-                    <tr>
-                        <td>
-                            <a href="/cases/<?= (int)$row['id'] ?>" class="fw-bold text-decoration-none">
-                                <?= htmlspecialchars((string)$row['case_number'], ENT_QUOTES, 'UTF-8') ?>
-                            </a>
-                            <div class="small text-muted"><?= htmlspecialchars((string)$row['external_key'], ENT_QUOTES, 'UTF-8') ?></div>
-                        </td>
-                        <td><?= htmlspecialchars((string)($row['queue_code'] ?: 'Sin cola'), ENT_QUOTES, 'UTF-8') ?></td>
-                        <td><?= htmlspecialchars((string)($row['agent_name'] ?: 'Sin asignar'), ENT_QUOTES, 'UTF-8') ?></td>
-                        <td><span class="status-badge status-blue"><?= htmlspecialchars($stateText($row['current_state']), ENT_QUOTES, 'UTF-8') ?></span></td>
-                        <td>
-                            <span class="status-badge <?= $badge($row['sla_status']) ?>">
-                                <?= htmlspecialchars($slaText($row['sla_status'] ?: 'PENDING'), ENT_QUOTES, 'UTF-8') ?>
-                            </span>
-                            <div class="small text-muted"><?= $hours($row['sla_elapsed_minutes']) ?></div>
-                        </td>
-                        <td><?= htmlspecialchars((string)($row['petition_type'] ?: '—'), ENT_QUOTES, 'UTF-8') ?></td>
-                        <td><?= htmlspecialchars((string)($row['regional'] ?: '—'), ENT_QUOTES, 'UTF-8') ?></td>
-                        <td><?= htmlspecialchars((string)($row['origin_channel'] ?: '—'), ENT_QUOTES, 'UTF-8') ?></td>
-                        <td class="small"><?= htmlspecialchars((string)$row['created_at'], ENT_QUOTES, 'UTF-8') ?></td>
-                        <td class="small"><?= htmlspecialchars((string)($row['first_management_at'] ?: '—'), ENT_QUOTES, 'UTF-8') ?></td>
-                        <td class="small"><?= htmlspecialchars((string)($row['closed_at'] ?: '—'), ENT_QUOTES, 'UTF-8') ?></td>
-                        <td><a href="/cases/<?= (int)$row['id'] ?>" class="btn btn-sm btn-outline-primary"><i class="bi bi-eye"></i></a></td>
-                    </tr>
-                <?php endforeach; ?>
-                <?php if ($cases === []): ?><tr><td colspan="12" class="report-empty">No hay casos con los filtros seleccionados.</td></tr><?php endif; ?>
-                </tbody>
-            </table>
+
+        <div class="col-12 col-xl-6">
+            <div class="report-card">
+                <div class="report-card-body">
+                    <div class="report-section-title">Detalle de casos</div>
+                    <div class="report-section-subtitle mb-3">Hasta 200 registros visibles. La exportación permite hasta 5.000.</div>
+                    <div class="report-scroll">
+                        <table class="productivity-table">
+                            <thead>
+                                <tr>
+                                    <th>Caso</th>
+                                    <th>Agente</th>
+                                    <th>Estado</th>
+                                    <th>ANS</th>
+                                    <th></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                            <?php foreach (array_slice($cases, 0, 12) as $row):
+                                $slaStatus = (string)($row['sla_status'] ?? 'PENDING');
+                                $slaClass = match ($slaStatus) {
+                                    'GREEN' => 'status-green',
+                                    'YELLOW' => 'status-yellow',
+                                    'RED','BREACHED' => 'status-red',
+                                    default => 'status-gray',
+                                };
+                            ?>
+                                <tr>
+                                    <td>
+                                        <a href="/cases/<?= (int)$row['id'] ?>" class="agent-name text-decoration-none">
+                                            <?= htmlspecialchars((string)$row['case_number'], ENT_QUOTES, 'UTF-8') ?>
+                                        </a>
+                                        <div class="muted"><?= htmlspecialchars((string)($row['queue_code'] ?: 'Sin cola'), ENT_QUOTES, 'UTF-8') ?></div>
+                                    </td>
+                                    <td><?= htmlspecialchars((string)($row['agent_name'] ?: 'Sin asignar'), ENT_QUOTES, 'UTF-8') ?></td>
+                                    <td>
+                                        <span class="sla-status-badge status-blue">
+                                            <?= htmlspecialchars($stateText($row['current_state']), ENT_QUOTES, 'UTF-8') ?>
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <span class="sla-status-badge <?= $slaClass ?>">
+                                            <?= htmlspecialchars($slaText($slaStatus), ENT_QUOTES, 'UTF-8') ?>
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <a href="/cases/<?= (int)$row['id'] ?>" class="btn btn-sm btn-outline-primary" title="Ver caso">
+                                            <i class="bi bi-eye"></i>
+                                        </a>
+                                    </td>
+                                </tr>
+                            <?php endforeach; ?>
+
+                            <?php if ($cases === []): ?>
+                                <tr><td colspan="5" class="report-empty">No hay casos con los filtros seleccionados.</td></tr>
+                            <?php endif; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
-</div>
 
-<div class="small text-muted mt-3">
-    Periodo: <strong><?= htmlspecialchars($period, ENT_QUOTES, 'UTF-8') ?></strong>.
-    Los casos se filtran por fecha de creación; la vista conserva los tiempos y estado ANS registrados.
+    <div class="small text-muted mt-2">
+        Los indicadores se calculan sobre la fecha de creación de los casos. El tiempo de respuesta usa la primera gestión registrada y el cumplimiento ANS usa el estado ANS persistido en cada caso.
+    </div>
 </div>
