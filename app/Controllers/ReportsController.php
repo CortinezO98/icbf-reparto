@@ -510,7 +510,9 @@ final class ReportsController
      *   sla:?string,
      *   regional:?string,
      *   petition_type:?string,
-     *   management_type:?string
+     *   management_type:?string,
+     *   supervisor_id:?int,
+     *   segment:?string
      * }
      */
     private function filters(): array
