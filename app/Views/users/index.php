@@ -97,7 +97,7 @@ $query = static function(int $page) use ($search,$active,$roleId,$queueId): stri
                 <thead>
                     <tr>
                         <th>ID</th><th>Documento</th><th>Usuario</th><th>Nombre</th><th>Email</th>
-                        <th>Roles</th><th>Colas</th><th>Reparto</th><th>Presencia</th><th>Estado</th><th>Acciones</th>
+                        <th>Roles</th><th>Colas</th><th>Supervisor</th><th>Reparto</th><th>Presencia</th><th>Estado</th><th>Acciones</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -110,6 +110,7 @@ $query = static function(int $page) use ($search,$active,$roleId,$queueId): stri
                         <td><?= htmlspecialchars((string)$u['email'], ENT_QUOTES, 'UTF-8') ?></td>
                         <td><span class="badge role"><?= htmlspecialchars((string)($u['roles'] ?: 'Sin rol'), ENT_QUOTES, 'UTF-8') ?></span></td>
                         <td><?= htmlspecialchars((string)($u['queues'] ?: '—'), ENT_QUOTES, 'UTF-8') ?></td>
+                        <td><?= htmlspecialchars((string)($u['supervisor_name'] ?: '—'), ENT_QUOTES, 'UTF-8') ?></td>
                         <td><?= (int)$u['assign_enabled'] === 1 ? '<span class="badge ok">Asignable</span>' : '<span class="badge off">No aplica</span>' ?></td>
                         <td><span class="badge presence"><?= htmlspecialchars((string)$u['presence_label'], ENT_QUOTES, 'UTF-8') ?></span></td>
                         <td><?= (int)$u['is_active'] === 1 ? '<span class="badge ok">Activo</span>' : '<span class="badge off">Inactivo</span>' ?></td>
@@ -127,7 +128,7 @@ $query = static function(int $page) use ($search,$active,$roleId,$queueId): stri
                     </tr>
                 <?php endforeach; ?>
                 <?php if ($users === []): ?>
-                    <tr><td colspan="11" class="muted">No se encontraron usuarios con los filtros seleccionados.</td></tr>
+                    <tr><td colspan="12" class="muted">No se encontraron usuarios con los filtros seleccionados.</td></tr>
                 <?php endif; ?>
                 </tbody>
             </table>
