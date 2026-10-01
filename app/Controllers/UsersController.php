@@ -361,6 +361,61 @@ final class UsersController
         }
     }
 
+    public function resetPassword(int $id): void
+    {
+        Authorization::requirePermission($this->pdo, 'USER_EDIT');
+        Csrf::validate($_POST['_csrf'] ?? null);
+
+        $repo = new UserRepository($this->pdo);
+        $user = $repo->findById($id);
+
+        if (!$user) {
+            $_SESSION['_flash_error'] = 'Usuario no encontrado.';
+            header('Location: /admin/users');
+            exit;
+        }
+
+        if ((int)$user['is_active'] !== 1) {
+            $_SESSION['_flash_error'] = 'Solo se puede restablecer la contraseña de un usuario activo.';
+            header('Location: /admin/users/' . $id . '/edit');
+            exit;
+        }
+
+        $temporaryPassword = TemporaryPasswordGenerator::generate();
+
+        try {
+            $repo->updatePassword(
+                $id,
+                PasswordPolicy::hash($temporaryPassword),
+                true
+            );
+
+            $this->sendTemporaryPasswordEmail(
+                (string)$user['email'],
+                (string)$user['full_name'],
+                (string)$user['username'],
+                $temporaryPassword
+            );
+
+            (new AuditRepository($this->pdo))->log(
+                Auth::id(),
+                'USER_PASSWORD_RESET',
+                'USER',
+                (string)$id
+            );
+
+            $_SESSION['_flash_success'] =
+                'Contraseña temporal generada: ' . $temporaryPassword
+                . '. El usuario deberá cambiarla al ingresar.';
+        } catch (\Throwable $e) {
+            error_log('[UsersController::resetPassword] ' . $e->getMessage());
+            $_SESSION['_flash_error'] = 'No fue posible restablecer la contraseña.';
+        }
+
+        header('Location: /admin/users/' . $id . '/edit');
+        exit;
+    }
+
     public function toggleActive(int $id): void
     {
         Authorization::requirePermission($this->pdo, 'USER_EDIT');
