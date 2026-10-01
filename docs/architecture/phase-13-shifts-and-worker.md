@@ -57,7 +57,7 @@ bin/worker.php ejecuta continuamente:
 
 Variables:
 
-- WORKER_INTERVAL_SECONDS=10;
+- WORKER_INTERVAL_SECONDS=5;
 - SLA_WORKER_INTERVAL_SECONDS=300.
 
 El worker utiliza un GET_LOCK de MariaDB para evitar dos instancias activas simultáneamente.
@@ -118,3 +118,13 @@ La pantalla /admin/shifts permite:
 - activar/desactivar cronogramas.
 
 La administración está protegida con SHIFT_VIEW y SHIFT_MANAGE.
+
+## Presencia y desconexión
+
+Los estados operativos de agente siguen siendo excluyentes para el reparto: únicamente `AVAILABLE` permite recibir casos. `TRAINING`, `MEETING`, `BREAK`, `ASYNC_ACTIVITY`, `BATHROOM`, `TECH_FAILURE`, `FEEDBACK` y `ACTIVE_BREAK` no son estados asignables.
+
+Cada cambio de estado se almacena en `agent_presence` con inicio, fin, origen y usuario que lo estableció. El cierre de sesión registra `OFFLINE` inmediatamente.
+
+Si el cliente deja de enviar heartbeat, el worker detecta la sesión obsoleta después de `AGENT_PRESENCE_STALE_SECONDS` y cierra el estado anterior, dejando un registro `OFFLINE` con origen `SYSTEM` y motivo `STALE_HEARTBEAT`. Por tanto, para una desconexión explícita la hora es la del logout; para una pérdida de red o cierre abrupto es la hora de detección.
+
+El reporte de agentes muestra el histórico de transiciones con inicio, fin/desconexión, duración y origen, y el reporte en tiempo real presenta como Desconectado a un agente cuyo heartbeat ya no está vigente.
