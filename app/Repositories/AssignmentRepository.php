@@ -606,3 +606,129 @@ final class AssignmentRepository
                 !$newUser
                 || (int)$newUser['is_active'] !== 1
                 || (int)$newUser['assign_enabled'] !== 1
+            ) {
+                throw new \RuntimeException('El agente destino no está habilitado para recibir casos.');
+            }
+
+            if (!$this->isAvailableNow($newUserId)) {
+                throw new \RuntimeException('El agente destino no está disponible o su señal está vencida.');
+            }
+
+            if (!$this->isOnShiftForQueue($queueId, $newUserId)) {
+                throw new \RuntimeException('El agente destino no está dentro de un turno vigente para esta cola.');
+            }
+
+            if (!$this->isEligibleForQueue($queueId, $newUserId)) {
+                throw new \RuntimeException('El agente destino no cumple la configuración de la cola o sus habilidades.');
+            }
+
+            $capacity = $this->capacityForQueue($queueId, $newUserId);
+            $openCases = $this->openCaseCount($queueId, $newUserId);
+
+            if ($capacity <= 0 || $openCases >= $capacity) {
+                throw new \RuntimeException('El agente destino no tiene capacidad disponible.');
+            }
+
+            $closeAssignment = $this->pdo->prepare(
+                "UPDATE case_assignments
+                 SET ended_at=NOW(6),
+                     end_reason='MANUAL_REASSIGN'
+                 WHERE case_id=:case_id
+                   AND user_id=:current_user_id
+                   AND ended_at IS NULL"
+            );
+            $closeAssignment->execute([
+                ':case_id'=>$caseId,
+                ':current_user_id'=>$currentUserId,
+            ]);
+
+            if ($closeAssignment->rowCount() !== 1) {
+                throw new \RuntimeException('No se encontró la asignación activa del caso.');
+            }
+
+            $update = $this->pdo->prepare(
+                "UPDATE cases
+                 SET assigned_user_id=:new_user_id,
+                     assigned_at=NOW(6),
+                     current_state='ASSIGNED',
+                     updated_at=NOW(6)
+                 WHERE id=:case_id
+                   AND assigned_user_id=:current_user_id
+                   AND current_state='ASSIGNED'
+                   AND closed_at IS NULL"
+            );
+            $update->execute([
+                ':case_id'=>$caseId,
+                ':new_user_id'=>$newUserId,
+                ':current_user_id'=>$currentUserId,
+            ]);
+
+            if ($update->rowCount() !== 1) {
+                throw new \RuntimeException('El caso cambió durante la reasignación.');
+            }
+
+            $assignment = $this->pdo->prepare(
+                "INSERT INTO case_assignments
+                 (case_id,queue_id,user_id,assignment_type,assigned_by,assigned_at)
+                 VALUES(:case_id,:queue_id,:user_id,'REASSIGN',:assigned_by,NOW(6))"
+            );
+            $assignment->execute([
+                ':case_id'=>$caseId,
+                ':queue_id'=>$queueId,
+                ':user_id'=>$newUserId,
+                ':assigned_by'=>$actorUserId,
+            ]);
+
+            $event = $this->pdo->prepare(
+                "INSERT INTO case_events
+                 (case_id,actor_user_id,event_type,from_state,to_state,details_json,created_at)
+                 VALUES
+                 (:case_id,:actor,'CASE_REASSIGNED','ASSIGNED','ASSIGNED',:details,NOW(6))"
+            );
+            $event->execute([
+                ':case_id'=>$caseId,
+                ':actor'=>$actorUserId,
+                ':details'=>json_encode(
+                    [
+                        'reason'=>$reason,
+                        'queue_id'=>$queueId,
+                        'from_user_id'=>$currentUserId,
+                        'to_user_id'=>$newUserId,
+                        'assignment_type'=>'REASSIGN',
+                    ],
+                    JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES
+                ),
+            ]);
+
+            $touch = $this->pdo->prepare(
+                "UPDATE users
+                 SET last_assigned_at=NOW(6)
+                 WHERE id=:user_id"
+            );
+            $touch->execute([':user_id'=>$newUserId]);
+
+            $this->pdo->commit();
+
+            return [
+                'from_user_id'=>$currentUserId,
+                'to_user_id'=>$newUserId,
+                'queue_id'=>$queueId,
+            ];
+        } catch (\Throwable $e) {
+            if ($this->pdo->inTransaction()) {
+                $this->pdo->rollBack();
+            }
+
+            throw $e;
+        }
+    }
+
+    private function presenceCutoff(): string
+    {
+        $stale = max(30, (int)($_ENV['AGENT_PRESENCE_STALE_SECONDS'] ?? 90));
+
+        return (new DateTimeImmutable())
+            ->modify("-{$stale} seconds")
+            ->format('Y-m-d H:i:s.u');
+    }
+}
