@@ -30,7 +30,7 @@
      <td><span class="badge"><?= $effectiveCapacity ?></span></td>
      <td>
       <form method="post" action="/admin/queues/<?= (int)$item['queue_id'] ?>/agents/<?= (int)$item['user_id'] ?>/capacity" style="display:flex;gap:8px;align-items:center">
-       <input type="hidden" name="_csrf" value="<?= htmlspecialchars(AppAuthCsrf::token(),ENT_QUOTES,'UTF-8') ?>">
+       <input type="hidden" name="_csrf" value="<?= htmlspecialchars(\App\Auth\Csrf::token(),ENT_QUOTES,'UTF-8') ?>">
        <input type="number" name="capacity" min="1" max="1000"
               value="<?= $item['capacity_override'] !== null ? (int)$item['capacity_override'] : '' ?>"
               placeholder="Por defecto" style="max-width:150px">
