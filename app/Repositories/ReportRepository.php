@@ -14,7 +14,9 @@ use PDO;
      *   sla:?string,
      *   regional?:?string,
      *   petition_type?:?string,
-     *   management_type?:?string
+     *   management_type?:?string,
+     *   supervisor_id?:?int,
+     *   segment?:?string
      * } */
 
 final class ReportRepository
@@ -98,6 +100,8 @@ final class ReportRepository
                 'queues' => $this->activeQueues(),
                 'agents' => $this->activeAgents(),
                 'regionals' => $this->activeRegionals(),
+                'supervisors' => $this->activeSupervisors(),
+                'segments' => $this->activeSegments(),
                 'petition_types' => $this->activePetitionTypes(),
                 'management_types' => $this->activeManagementTypes(),
             ],
@@ -134,6 +138,10 @@ final class ReportRepository
             'assignments' => $this->assignmentsForExport($filters),
             'volume_time' => $this->volumeTimeForExport($filters),
             'monthly' => $this->monthlyForExport($filters),
+            'police' => $this->policeForExport($filters),
+            'escalations' => $this->escalationsForExport($filters),
+            'reassignments' => $this->reassignmentsForExport($filters),
+            'directed' => $this->directedForExport($filters),
             default => throw new \InvalidArgumentException('Tipo de reporte no permitido.'),
         };
     }
@@ -666,16 +674,18 @@ final class ReportRepository
 
         $st = $this->pdo->prepare(
             "SELECT
-                c.id,c.case_number,c.external_key,c.petition_type,c.regional,
+                c.id,c.case_number,c.external_key,c.petition_type,c.regional,c.segment,
                 c.origin_channel,c.radicated_at,c.created_at,c.assigned_at,
                 c.first_management_at,c.last_management_at,c.closed_at,
                 c.current_state,c.current_management_type_code,
                 c.assigned_user_id,c.sla_status,c.sla_elapsed_minutes,c.sla_due_at,
                 q.code queue_code,q.name queue_name,
-                u.full_name agent_name
+                u.full_name agent_name,
+                supervisor.full_name supervisor_name
              FROM cases c
              LEFT JOIN work_queues q ON q.id=c.queue_id
              LEFT JOIN users u ON u.id=c.assigned_user_id
+             LEFT JOIN users supervisor ON supervisor.id=u.supervisor_user_id
              {$where}
              ORDER BY c.created_at DESC,c.id DESC
              LIMIT {$limit}"
