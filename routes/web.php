@@ -9,6 +9,7 @@ use App\Controllers\AgentPresenceController;
 use App\Controllers\AgentStatusController;
 use App\Controllers\CasesController;
 use App\Controllers\SlaController;
+use App\Controllers\ReportsController;
 use App\Auth\Auth;
 use App\Auth\Authorization;
 use App\Http\Router;
@@ -41,6 +42,8 @@ return static function(Router $router,PDO $pdo): void {
  $router->get('/admin/users/export',fn()=>(new UsersController($pdo))->exportUsers());
 
  $router->get('/sla',fn()=>(new SlaController($pdo))->index());
+ $router->get('/reports',fn()=>(new ReportsController($pdo))->index());
+ $router->get('/reports/export',fn()=>(new ReportsController($pdo))->export());
  $router->get('/cases',fn()=>(new CasesController($pdo))->index());
  $router->get('/cases/{id}',fn(int $id)=>(new CasesController($pdo))->show($id));
  $router->post('/cases/{id}/manage',fn(int $id)=>(new CasesController($pdo))->manage($id));
