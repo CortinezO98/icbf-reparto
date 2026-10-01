@@ -118,7 +118,10 @@ final class ReportRepository
         return $where;
     }
 
-    /** @return array<string,mixed> */
+    /**
+     * @param array{period?:string,from:?string,to:?string,queue_id:?int,agent_id:?int,state:?string,sla:?string} $filters
+     * @return array<string,mixed>
+     */
     private function params(array $filters): array
     {
         $params = [];
