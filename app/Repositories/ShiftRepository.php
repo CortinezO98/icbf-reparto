@@ -526,46 +526,44 @@ final class ShiftRepository
         string $startTime,
         string $endTime
     ): void {
-        $where = "WHERE ass.user_id=:user_id
+        if ($scheduleDate !== null) {
+            $st = $this->pdo->prepare(
+                "SELECT ws.start_time,ws.end_time
+                 FROM agent_shift_schedules ass
+                 JOIN work_shifts ws ON ws.id=ass.shift_id
+                 WHERE ass.user_id=:user_id
                    AND ass.queue_id=:queue_id
                    AND ass.is_active=1
-                   AND (
-                        ass.schedule_date=:schedule_date
-                        OR (
-                            :schedule_date_null IS NULL
-                            AND ass.schedule_date IS NULL
-                            AND ass.weekday=:weekday
-                            AND (ass.valid_from IS NULL OR :valid_from_overlap IS NULL OR ass.valid_from<=:valid_to_overlap)
-                            AND (ass.valid_to IS NULL OR :valid_from_overlap IS NULL OR ass.valid_to>=:valid_from_overlap)
-                        )
-                   )";
-
-        $params = [
-            ':user_id'=>$userId,
-            ':queue_id'=>$queueId,
-            ':schedule_date'=>$scheduleDate,
-            ':schedule_date_null'=>$scheduleDate,
-            ':weekday'=>$weekday,
-            ':valid_from_overlap'=>$validFrom,
-            ':valid_to_overlap'=>$validTo,
-        ];
-
-        if ($scheduleDate !== null) {
-            $where = "WHERE ass.user_id=:user_id
-                       AND ass.queue_id=:queue_id
-                       AND ass.is_active=1
-                       AND ass.schedule_date=:schedule_date";
-            $params[':schedule_date']=$scheduleDate;
+                   AND ass.schedule_date=:schedule_date
+                 LIMIT 100"
+            );
+            $st->execute([
+                ':user_id'=>$userId,
+                ':queue_id'=>$queueId,
+                ':schedule_date'=>$scheduleDate,
+            ]);
+        } else {
+            $st = $this->pdo->prepare(
+                "SELECT ws.start_time,ws.end_time
+                 FROM agent_shift_schedules ass
+                 JOIN work_shifts ws ON ws.id=ass.shift_id
+                 WHERE ass.user_id=:user_id
+                   AND ass.queue_id=:queue_id
+                   AND ass.is_active=1
+                   AND ass.schedule_date IS NULL
+                   AND ass.weekday=:weekday
+                   AND (ass.valid_from IS NULL OR :valid_to IS NULL OR ass.valid_from<=:valid_to)
+                   AND (ass.valid_to IS NULL OR :valid_from IS NULL OR ass.valid_to>=:valid_from)
+                 LIMIT 100"
+            );
+            $st->execute([
+                ':user_id'=>$userId,
+                ':queue_id'=>$queueId,
+                ':weekday'=>$weekday,
+                ':valid_from'=>$validFrom,
+                ':valid_to'=>$validTo,
+            ]);
         }
-
-        $st = $this->pdo->prepare(
-            "SELECT ws.start_time,ws.end_time
-             FROM agent_shift_schedules ass
-             JOIN work_shifts ws ON ws.id=ass.shift_id
-             {$where}
-             LIMIT 100"
-        );
-        $st->execute($params);
 
         foreach ($st->fetchAll() ?: [] as $existing) {
             if (
