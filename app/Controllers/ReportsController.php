@@ -6,6 +6,9 @@ namespace App\Controllers;
 use App\Auth\Authorization;
 use App\Repositories\ReportRepository;
 use PDO;
+use PhpOffice\PhpSpreadsheet\Spreadsheet;
+use PhpOffice\PhpSpreadsheet\Style\Fill;
+use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 
 final class ReportsController
 {
@@ -31,11 +34,49 @@ final class ReportsController
     {
         Authorization::requirePermission($this->pdo, 'REPORT_EXPORT');
 
+        $report = $this->allowed(
+            $_GET['report'] ?? 'cases',
+            ['cases', 'agents_summary', 'agents_history', 'agents_realtime']
+        ) ?? 'cases';
+
+        $format = strtolower(trim((string)($_GET['format'] ?? 'csv')));
+        if (!in_array($format, ['csv', 'xlsx'], true)) {
+            $format = 'csv';
+        }
+
         $filters = $this->filters();
-        $rows = (new ReportRepository($this->pdo))->casesForExport($filters);
+        $staleSeconds = max(30, (int)($_ENV['AGENT_PRESENCE_STALE_SECONDS'] ?? 90));
+        $rows = (new ReportRepository($this->pdo))->reportRows(
+            $report,
+            $filters,
+            $staleSeconds
+        );
 
-        $filename = 'reporte_casos_' . date('Ymd_His') . '.csv';
+        $matrix = $this->exportMatrix($report, $rows);
 
+        if ($format === 'xlsx') {
+            $this->sendExcel(
+                $matrix['title'],
+                $matrix['headers'],
+                $matrix['data'],
+                $matrix['filename']
+            );
+            return;
+        }
+
+        $this->sendCsv(
+            $matrix['headers'],
+            $matrix['data'],
+            $matrix['filename']
+        );
+    }
+
+    /**
+     * @param list<string> $headers
+     * @param list<list<mixed>> $rows
+     */
+    private function sendCsv(array $headers, array $rows, string $filename): never
+    {
         header('Content-Type: text/csv; charset=UTF-8');
         header('Content-Disposition: attachment; filename="' . $filename . '"');
         header('Cache-Control: no-store, no-cache, must-revalidate');
@@ -47,39 +88,213 @@ final class ReportsController
         }
 
         fwrite($out, "\xEF\xBB\xBF");
-
-        fputcsv($out, [
-            'Caso','Clave externa','Tipo petición','Regional','Canal',
-            'Cola','Agente','Estado','Gestión actual','ANS',
-            'Minutos ANS','Vencimiento ANS','Radicado','Creado',
-            'Asignado','Primera gestión','Última gestión','Cerrado'
-        ], ';');
+        fputcsv($out, $headers, ';');
 
         foreach ($rows as $row) {
-            fputcsv($out, [
-                $row['case_number'],
-                $row['external_key'],
-                $row['petition_type'],
-                $row['regional'],
-                $row['origin_channel'],
-                $row['queue_code'],
-                $row['agent_name'],
-                $row['current_state'],
-                $row['current_management_type_code'],
-                $row['sla_status'],
-                $row['sla_elapsed_minutes'],
-                $row['sla_due_at'],
-                $row['radicated_at'],
-                $row['created_at'],
-                $row['assigned_at'],
-                $row['first_management_at'],
-                $row['last_management_at'],
-                $row['closed_at'],
-            ], ';');
+            fputcsv($out, $row, ';');
         }
 
         fclose($out);
         exit;
+    }
+
+    /**
+     * @param list<string> $headers
+     * @param list<list<mixed>> $rows
+     */
+    private function sendExcel(
+        string $title,
+        array $headers,
+        array $rows,
+        string $filename
+    ): never {
+        $spreadsheet = new Spreadsheet();
+        $spreadsheet->getProperties()
+            ->setCreator('ICBF Reparto')
+            ->setTitle($title)
+            ->setSubject($title);
+
+        $sheet = $spreadsheet->getActiveSheet();
+        $sheet->setTitle('Reporte');
+
+        $sheet->fromArray([$headers, ...$rows], null, 'A1');
+
+        $columnCount = count($headers);
+        $lastColumn = $this->excelColumn($columnCount);
+        $lastRow = max(1, count($rows) + 1);
+
+        $headerRange = 'A1:' . $lastColumn . '1';
+        $fullRange = 'A1:' . $lastColumn . $lastRow;
+
+        $sheet->getStyle($headerRange)->getFont()->setBold(true);
+        $sheet->getStyle($headerRange)->getFill()
+            ->setFillType(Fill::FILL_SOLID)
+            ->getStartColor()
+            ->setARGB('FF0D6EFD');
+
+        $sheet->getStyle($headerRange)->getFont()->getColor()->setARGB('FFFFFFFF');
+        $sheet->getStyle($fullRange)->getAlignment()->setVertical('top');
+        $sheet->freezePane('A2');
+        $sheet->setAutoFilter($fullRange);
+
+        for ($column = 1; $column <= $columnCount; $column++) {
+            $letter = $this->excelColumn($column);
+            $sheet->getColumnDimension($letter)->setAutoSize(true);
+        }
+
+        $sheet->getStyle($fullRange)->getAlignment()->setWrapText(true);
+
+        header(
+            'Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        );
+        header('Content-Disposition: attachment; filename="' . $filename . '"');
+        header('Cache-Control: no-store, no-cache, must-revalidate');
+        header('Pragma: no-cache');
+
+        $writer = new Xlsx($spreadsheet);
+        $writer->save('php://output');
+        $spreadsheet->disconnectWorksheets();
+        exit;
+    }
+
+    private function excelColumn(int $number): string
+    {
+        $column = '';
+
+        while ($number > 0) {
+            $remainder = ($number - 1) % 26;
+            $column = chr(65 + $remainder) . $column;
+            $number = intdiv($number - 1, 26);
+        }
+
+        return $column;
+    }
+
+    /**
+     * @param list<array<string,mixed>> $rows
+     * @return array{
+     *   title:string,
+     *   filename:string,
+     *   headers:list<string>,
+     *   data:list<list<mixed>>
+     * }
+     */
+    private function exportMatrix(string $report, array $rows): array
+    {
+        $stamp = date('Ymd_His');
+
+        return match ($report) {
+            'cases' => [
+                'title' => 'Casos y SLA',
+                'filename' => 'reporte_casos_sla_' . $stamp,
+                'headers' => [
+                    'Caso','Clave externa','Tipo petición','Regional','Canal',
+                    'Cola','Agente','Estado','Gestión actual','ANS',
+                    'Minutos ANS','Vencimiento ANS','Radicado','Creado',
+                    'Asignado','Primera gestión','Última gestión','Cerrado'
+                ],
+                'data' => array_map(
+                    static fn(array $row): array => [
+                        $row['case_number'] ?? '',
+                        $row['external_key'] ?? '',
+                        $row['petition_type'] ?? '',
+                        $row['regional'] ?? '',
+                        $row['origin_channel'] ?? '',
+                        $row['queue_code'] ?? '',
+                        $row['agent_name'] ?? '',
+                        $row['current_state'] ?? '',
+                        $row['current_management_type_code'] ?? '',
+                        $row['sla_status'] ?? '',
+                        $row['sla_elapsed_minutes'] ?? '',
+                        $row['sla_due_at'] ?? '',
+                        $row['radicated_at'] ?? '',
+                        $row['created_at'] ?? '',
+                        $row['assigned_at'] ?? '',
+                        $row['first_management_at'] ?? '',
+                        $row['last_management_at'] ?? '',
+                        $row['closed_at'] ?? '',
+                    ],
+                    $rows
+                ),
+            ],
+            'agents_summary' => [
+                'title' => 'Agentes - Resumen',
+                'filename' => 'reporte_agentes_resumen_' . $stamp,
+                'headers' => [
+                    'Agente','Usuario','Asignados','Resueltos','Vencidos',
+                    'Tiempo primera gestión (min)','Cumplimiento SLA (%)'
+                ],
+                'data' => array_map(
+                    static function(array $row): array {
+                        $closed = (int)($row['closed_cases'] ?? 0);
+                        $compliant = (int)($row['compliant_cases'] ?? 0);
+                        $compliance = $closed > 0
+                            ? round(($compliant / $closed) * 100, 1)
+                            : null;
+
+                        return [
+                            $row['full_name'] ?? '',
+                            $row['username'] ?? '',
+                            (int)($row['assigned_cases'] ?? 0),
+                            (int)($row['resolved_cases'] ?? 0),
+                            (int)($row['breached_cases'] ?? 0),
+                            $row['response_minutes'] ?? '',
+                            $compliance ?? '',
+                        ];
+                    },
+                    $rows
+                ),
+            ],
+            'agents_history' => [
+                'title' => 'Agentes - Histórico Detallado',
+                'filename' => 'reporte_agentes_historico_' . $stamp,
+                'headers' => [
+                    'Agente','Usuario','Estado','Estado descriptivo',
+                    'Inicio','Fin','Último heartbeat','Origen',
+                    'Establecido por','Duración (min)'
+                ],
+                'data' => array_map(
+                    static fn(array $row): array => [
+                        $row['full_name'] ?? '',
+                        $row['username'] ?? '',
+                        $row['status_code'] ?? '',
+                        $row['status_label'] ?? '',
+                        $row['started_at'] ?? '',
+                        $row['ended_at'] ?? '',
+                        $row['last_heartbeat_at'] ?? '',
+                        $row['source'] ?? '',
+                        $row['set_by_name'] ?? '',
+                        (int)($row['duration_minutes'] ?? 0),
+                    ],
+                    $rows
+                ),
+            ],
+            'agents_realtime' => [
+                'title' => 'Agentes - Estado en Tiempo Real',
+                'filename' => 'reporte_agentes_tiempo_real_' . $stamp,
+                'headers' => [
+                    'Agente','Usuario','Estado','Disponible para reparto',
+                    'Inicio estado','Último heartbeat','Colas',
+                    'Capacidad configurada','Casos abiertos','Capacidad libre'
+                ],
+                'data' => array_map(
+                    static fn(array $row): array => [
+                        $row['full_name'] ?? '',
+                        $row['username'] ?? '',
+                        $row['effective_status'] ?? $row['status_label'] ?? '',
+                        (int)($row['effective_available'] ?? 0) === 1 ? 'Sí' : 'No',
+                        $row['started_at'] ?? '',
+                        $row['last_heartbeat_at'] ?? '',
+                        $row['queue_codes'] ?? '',
+                        (int)($row['configured_capacity'] ?? 0),
+                        (int)($row['open_cases'] ?? 0),
+                        (int)($row['free_capacity'] ?? 0),
+                    ],
+                    $rows
+                ),
+            ],
+            default => throw new \InvalidArgumentException('Tipo de reporte no permitido.'),
+        };
     }
 
     /**
