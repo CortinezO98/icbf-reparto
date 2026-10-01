@@ -92,6 +92,17 @@ $allQueuesSelected = $activeQueueIds !== []
                             <div class="form-text">
                                 Si defines una nueva contraseña desde administración, se tratará como temporal y el usuario deberá cambiarla al ingresar.
                             </div>
+
+                            <form method="post"
+                                  action="/admin/users/<?= (int)$editUser['id'] ?>/reset-temporary-password"
+                                  class="mt-2"
+                                  onsubmit="return confirm('¿Deseas generar una nueva contraseña temporal para este usuario?');">
+                                <input type="hidden" name="_csrf"
+                                       value="<?= htmlspecialchars(\App\Auth\Csrf::token(), ENT_QUOTES, 'UTF-8') ?>">
+                                <button type="submit" class="btn btn-sm btn-outline-warning">
+                                    <i class="bi bi-arrow-repeat me-1"></i>Renovar contraseña temporal
+                                </button>
+                            </form>
                         </div>
 
                         <div class="col-md-6">
