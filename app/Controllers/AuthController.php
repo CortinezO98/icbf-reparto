@@ -157,7 +157,7 @@ final class AuthController
             try {
                 $token = bin2hex(random_bytes(32));
                 $tokenHash = hash('sha256', $token);
-                $expiresAt = (new \DateTimeImmutable('+60 minutes'))->format('Y-m-d H:i:s.u');
+                $expiresAt = (new \DateTimeImmutable('+30 minutes'))->format('Y-m-d H:i:s.u');
 
                 $repo->createPasswordResetToken(
                     (int)$user['id'],
@@ -462,7 +462,7 @@ final class AuthController
             . '<p>Hola ' . $safeName . '.</p>'
             . '<p>Recibimos una solicitud para restablecer tu contraseña.</p>'
             . '<p><a href="' . htmlspecialchars($link, ENT_QUOTES, 'UTF-8') . '">Restablecer contraseña</a></p>'
-            . '<p>El enlace es válido durante 60 minutos y solo puede utilizarse una vez.</p>'
+            . '<p>El enlace es válido durante 30 minutos y solo puede utilizarse una vez.</p>'
             . '<p>Si no solicitaste este cambio, puedes ignorar este mensaje.</p>'
             . '</body></html>';
 
