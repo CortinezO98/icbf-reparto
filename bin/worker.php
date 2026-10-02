@@ -95,6 +95,40 @@ try {
                 );
             }
 
+            // Antes del reparto general, el worker recupera los casos que
+            // históricamente pertenecían a cada agente actualmente disponible.
+            // Esto evita que casos liberados por una versión anterior queden
+            // pendientes o sean entregados a otro agente.
+            $recoveryRepository = new AssignmentRepository($pdo);
+            foreach ($recoveryRepository->availableAgentIds() as $availableAgentId) {
+                try {
+                    $recoveryResult = $assignment->recoverForAgent(
+                        $availableAgentId,
+                        500
+                    );
+
+                    if ($recoveryResult['recovered'] > 0) {
+                        echo sprintf(
+                            "[worker] recuperados=%d agente=%d iteraciones=%d\\n",
+                            $recoveryResult['recovered'],
+                            $availableAgentId,
+                            $recoveryResult['iterations']
+                        );
+                    }
+                } catch (\\Throwable $recoveryError) {
+                    error_log(
+                        '[WORKER][CASE_RECOVERY] ' . $recoveryError->getMessage()
+                    );
+                    fwrite(
+                        STDERR,
+                        '[worker] error recuperando casos del agente '
+                        . $availableAgentId . ': '
+                        . $recoveryError->getMessage()
+                        . PHP_EOL
+                    );
+                }
+            }
+
             $assignmentResult = $assignment->run(null, 500);
 
             if (
