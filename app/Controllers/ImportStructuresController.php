@@ -67,5 +67,23 @@ final class ImportStructuresController {
  }
 
  public function addField(int $sid,int $vid): void { Authorization::requirePermission($this->pdo,'STRUCTURE_ADMIN'); Csrf::validate($_POST['_csrf']??null); $fc=trim((string)($_POST['field_code']??'')); $dn=trim((string)($_POST['display_name']??'')); $eh=trim((string)($_POST['excel_header']??'')); $dt=(string)($_POST['data_type']??'STRING'); if(!preg_match('/^[a-zA-Z][a-zA-Z0-9_]{1,99}$/',$fc)||$dn===''||$eh===''||!in_array($dt,['STRING','INTEGER','DECIMAL','DATE','DATETIME','BOOLEAN','CATALOG'],true)){$_SESSION['_flash_error']='Configuración de campo inválida.';header('Location: /admin/structures/'.$sid);exit;} try{(new ImportStructureRepository($this->pdo))->addField($vid,['field_code'=>$fc,'display_name'=>$dn,'excel_header'=>$eh,'header_aliases'=>(string)($_POST['header_aliases']??''),'data_type'=>$dt,'is_required'=>isset($_POST['is_required'])?1:0,'is_external_key'=>isset($_POST['is_external_key'])?1:0,'is_reportable'=>isset($_POST['is_reportable'])?1:0,'max_length'=>(int)($_POST['max_length']??0),'validation_regex'=>trim((string)($_POST['validation_regex']??'')),'date_format'=>trim((string)($_POST['date_format']??'')),'sort_order'=>(int)($_POST['sort_order']??0)]);$_SESSION['_flash_success']='Campo agregado.';}catch(\Throwable $e){error_log($e->getMessage());$_SESSION['_flash_error']='No fue posible agregar el campo.';} header('Location: /admin/structures/'.$sid);exit; }
+ public function updateFields(int $sid,int $vid): void {
+  Authorization::requirePermission($this->pdo,'STRUCTURE_ADMIN');
+  Csrf::validate($_POST['_csrf']??null);
+
+  try {
+   $fields=$_POST['fields']??[];
+   if(!is_array($fields) || $fields===[]) throw new \RuntimeException('No se recibieron campos para actualizar.');
+   (new ImportStructureRepository($this->pdo))->updateDraftFields($sid,$vid,$fields);
+   $_SESSION['_flash_success']='Configuración de campos guardada.';
+  } catch(\Throwable $e) {
+   error_log($e->getMessage());
+   $_SESSION['_flash_error']=$e instanceof \RuntimeException ? $e->getMessage() : 'No fue posible guardar la configuración de los campos.';
+  }
+
+  header('Location: /admin/structures/'.$sid);
+  exit;
+ }
+
  public function activate(int $sid,int $vid): void { Authorization::requirePermission($this->pdo,'STRUCTURE_ADMIN'); Csrf::validate($_POST['_csrf']??null); try{(new ImportStructureRepository($this->pdo))->activate($sid,$vid,(int)Auth::id());$_SESSION['_flash_success']='Versión activada.';}catch(\Throwable $e){$_SESSION['_flash_error']=$e->getMessage();} header('Location: /admin/structures/'.$sid);exit; }
 }
