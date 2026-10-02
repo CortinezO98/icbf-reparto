@@ -64,6 +64,7 @@ final class SlaService
         ];
     }
 
+    /** @return array{processed:int,alerts_touched:int} */
     public function evaluateOpenCases(): array
     {
         $processed = 0;
@@ -82,6 +83,39 @@ final class SlaService
             'processed'=>$processed,
             'alerts_touched'=>$openedAlerts,
         ];
+    }
+
+    /**
+     * Evalúa un caso puntual, incluyendo casos recién cerrados.
+     *
+     * Al cerrar un caso se conserva el cálculo final del ANS usando closed_at
+     * como instante final y se cierran las alertas operativas asociadas.
+     *
+     * @return array<string,mixed>|null
+     */
+    public function evaluateCase(int $caseId): ?array
+    {
+        $case = $this->repository->caseForEvaluation($caseId);
+
+        if ($case === null) {
+            return null;
+        }
+
+        $snapshot = $this->snapshot($case);
+        $this->repository->persistSnapshot($caseId, $snapshot);
+
+        if (
+            !empty($case['closed_at'])
+            || (string)($case['current_state'] ?? '') === 'CLOSED'
+        ) {
+            foreach (['NO_MANAGEMENT','NEAR_SLA','SLA_BREACHED'] as $type) {
+                $this->repository->resolveAlert($caseId, $type);
+            }
+        } else {
+            $this->syncAlerts($case, $snapshot);
+        }
+
+        return $snapshot;
     }
 
     /**

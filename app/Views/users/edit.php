@@ -2,6 +2,7 @@
 /** @var array<string,mixed> $editUser */
 /** @var list<array<string,mixed>> $roles */
 /** @var list<array<string,mixed>> $queues */
+/** @var list<array<string,mixed>> $supervisors */
 /** @var string|null $error */
 
 $selectedRoles = array_map('intval', (array)($editUser['role_ids'] ?? []));
@@ -38,6 +39,12 @@ $allQueuesSelected = $activeQueueIds !== []
     <?php if ($error): ?>
         <div class="alert alert-danger admin-user-form">
             <?= htmlspecialchars($error, ENT_QUOTES, 'UTF-8') ?>
+        </div>
+    <?php endif; ?>
+
+    <?php if (!empty($success)): ?>
+        <div class="alert alert-success admin-user-form">
+            <?= htmlspecialchars((string)$success, ENT_QUOTES, 'UTF-8') ?>
         </div>
     <?php endif; ?>
 
@@ -89,7 +96,17 @@ $allQueuesSelected = $activeQueueIds !== []
                             <input class="form-control" type="password" name="password"
                                    maxlength="128" autocomplete="new-password"
                                    placeholder="Vacía para conservar la actual">
-                            <div class="form-text">Déjala vacía si no deseas cambiarla.</div>
+                            <div class="form-text">
+                                Si defines una nueva contraseña desde administración, se tratará como temporal y el usuario deberá cambiarla al ingresar.
+                            </div>
+
+                            <button type="submit"
+                                    class="btn btn-sm btn-outline-warning mt-2"
+                                    formaction="/admin/users/<?= (int)$editUser['id'] ?>/reset-temporary-password"
+                                    formmethod="post"
+                                    onclick="return confirm('¿Deseas generar una nueva contraseña temporal para este usuario?');">
+                                <i class="bi bi-arrow-repeat me-1"></i>Renovar contraseña temporal
+                            </button>
                         </div>
 
                         <div class="col-md-6">
@@ -123,6 +140,19 @@ $allQueuesSelected = $activeQueueIds !== []
                             </option>
                         <?php endforeach; ?>
                     </select>
+
+                    <div class="mt-3" id="supervisorBlock">
+                        <label for="supervisor_user_id" class="form-label">Supervisor del agente</label>
+                        <select class="form-select" id="supervisor_user_id" name="supervisor_user_id">
+                            <option value="">Sin supervisor asignado</option>
+                            <?php foreach ($supervisors as $supervisor): ?>
+                                <option value="<?= (int)$supervisor['id'] ?>" <?= (int)($editUser['supervisor_user_id'] ?? 0) === (int)$supervisor['id'] ? 'selected' : '' ?>>
+                                    <?= htmlspecialchars((string)$supervisor['full_name'], ENT_QUOTES, 'UTF-8') ?>
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
+                        <div class="form-text">Se utiliza para organizar el equipo y filtrar la reportería.</div>
+                    </div>
 
                     <div id="queueSection" class="mt-4">
                         <h6 class="form-section-title">
@@ -173,6 +203,8 @@ $allQueuesSelected = $activeQueueIds !== []
     const allQueuesHidden = document.getElementById('allQueuesHidden');
     const assignBlock = document.getElementById('assignBlock');
     const assignEnabled = document.getElementById('assign_enabled');
+    const supervisorBlock = document.getElementById('supervisorBlock');
+    const supervisorSelect = document.getElementById('supervisor_user_id');
 
     const selectedRoleCodes = () =>
         [...rolesSelect.selectedOptions].map(o => o.dataset.roleCode || '');
@@ -181,10 +213,15 @@ $allQueuesSelected = $activeQueueIds !== []
         const agent = selectedRoleCodes().includes('AGENTE');
         queueSection.style.display = agent ? '' : 'none';
         assignBlock.style.display = agent ? '' : 'none';
+        if (supervisorBlock) supervisorBlock.style.display = agent ? '' : 'none';
         queuesSelect.disabled = !agent;
         assignEnabled.disabled = !agent;
+        if (supervisorSelect) supervisorSelect.disabled = !agent;
 
-        if (!agent) assignEnabled.checked = false;
+        if (!agent) {
+            assignEnabled.checked = false;
+            if (supervisorSelect) supervisorSelect.value = '';
+        }
     };
 
     const syncAll = () => {

@@ -51,7 +51,7 @@ final class Auth
         return self::check() ? (int)$_SESSION['user']['id'] : null;
     }
 
-    /** @return array{id:int,username:string,full_name:string,email:string}|null */
+    /** @return array{id:int,username:string,full_name:string,email:string,must_change_password:int}|null */
     public static function user(): ?array
     {
         return $_SESSION['user'] ?? null;
@@ -67,6 +67,7 @@ final class Auth
             'username' => (string)$user['username'],
             'full_name' => (string)$user['full_name'],
             'email' => (string)$user['email'],
+            'must_change_password' => (int)($user['must_change_password'] ?? 0),
         ];
 
         $_SESSION['_last_activity'] = time();
@@ -98,6 +99,14 @@ final class Auth
     {
         if (!self::check()) {
             header('Location: /login');
+            exit;
+        }
+
+        $mustChange = (int)($_SESSION['user']['must_change_password'] ?? 0) === 1;
+        $path = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?: '/';
+
+        if ($mustChange && $path !== '/change-password') {
+            header('Location: /change-password');
             exit;
         }
     }

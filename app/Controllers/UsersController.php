@@ -61,6 +61,7 @@ final class UsersController
         $repo = new UserRepository($this->pdo);
         $roles = $repo->roles();
         $queues = $repo->queues();
+        $supervisors = $repo->supervisors();
 
         $error = $_SESSION['_flash_error'] ?? null;
         $old = $_SESSION['_old_user_form'] ?? [];
@@ -110,10 +111,15 @@ final class UsersController
         if (!$isAgent) {
             $queueIds = [];
             $data['assign_enabled'] = 0;
+            $data['supervisor_user_id'] = null;
+        } elseif (!empty($data['supervisor_user_id']) && !$repo->isActiveSupervisor((int)$data['supervisor_user_id'])) {
+            $this->fail('El supervisor seleccionado no es válido o está inactivo.', '/admin/users/create');
         }
 
         $password = trim((string)($_POST['password'] ?? ''));
-        if ($password === '') {
+        $temporaryPassword = $password === '';
+
+        if ($temporaryPassword) {
             $password = TemporaryPasswordGenerator::generate();
         }
 
@@ -134,6 +140,7 @@ final class UsersController
         }
 
         $data['password_hash'] = PasswordPolicy::hash($password);
+        $data['must_change_password'] = $temporaryPassword ? 1 : 0;
         $data['created_by'] = (int)(Auth::id() ?? 0);
 
         try {
@@ -148,12 +155,14 @@ final class UsersController
                     'roles'=>$roleCodes,
                     'queue_ids'=>$queueIds,
                     'assign_enabled'=>(int)$data['assign_enabled'],
+                    'temporary_password'=>$temporaryPassword,
                 ]
             );
 
             unset($_SESSION['_old_user_form']);
-            $_SESSION['_flash_success'] =
-                'Usuario creado correctamente. Contraseña temporal: ' . $password;
+            $_SESSION['_flash_success'] = $temporaryPassword
+                ? 'Usuario creado correctamente. Contraseña temporal: ' . $password
+                : 'Usuario creado correctamente.';
             header('Location: /admin/users');
             exit;
         } catch (\Throwable $e) {
@@ -180,8 +189,10 @@ final class UsersController
 
         $roles = $repo->roles();
         $queues = $repo->queues();
+        $supervisors = $repo->supervisors();
         $error = $_SESSION['_flash_error'] ?? null;
-        unset($_SESSION['_flash_error']);
+        $success = $_SESSION['_flash_success'] ?? null;
+        unset($_SESSION['_flash_error'], $_SESSION['_flash_success']);
 
         $view = dirname(__DIR__) . '/Views/users/edit.php';
         require dirname(__DIR__) . '/Views/layout.php';
@@ -224,6 +235,11 @@ final class UsersController
         if (!$isAgent) {
             $queueIds = [];
             $data['assign_enabled'] = 0;
+            $data['supervisor_user_id'] = null;
+        } elseif (!empty($data['supervisor_user_id']) && (int)$data['supervisor_user_id'] === $id) {
+            $this->fail('Un usuario no puede ser su propio supervisor.', "/admin/users/{$id}/edit");
+        } elseif (!empty($data['supervisor_user_id']) && !$repo->isActiveSupervisor((int)$data['supervisor_user_id'])) {
+            $this->fail('El supervisor seleccionado no es válido o está inactivo.', "/admin/users/{$id}/edit");
         }
 
         if ($repo->duplicateExists(
@@ -239,12 +255,15 @@ final class UsersController
         }
 
         $password = trim((string)($_POST['password'] ?? ''));
-        if ($password !== '') {
+        $temporaryPassword = $password !== '';
+
+        if ($temporaryPassword) {
             $errors = PasswordPolicy::validate($password);
             if ($errors !== []) {
                 $this->fail(implode(' ', $errors), "/admin/users/{$id}/edit");
             }
             $data['password_hash'] = PasswordPolicy::hash($password);
+            $data['must_change_password'] = 1;
         }
 
         try {
@@ -266,16 +285,75 @@ final class UsersController
                     'queue_ids'=>$queueIds,
                     'assign_enabled'=>(int)$data['assign_enabled'],
                     'password_changed'=>$password !== '',
+                    'temporary_password'=>$temporaryPassword,
                 ]
             );
 
-            $_SESSION['_flash_success'] = 'Usuario actualizado correctamente.';
+            $_SESSION['_flash_success'] = $temporaryPassword
+                ? 'Usuario actualizado. Contraseña temporal: ' . $password
+                : 'Usuario actualizado correctamente.';
             header('Location: /admin/users');
             exit;
         } catch (\Throwable $e) {
             error_log('[UsersController::update] ' . $e->getMessage());
             $this->fail('No fue posible actualizar el usuario.', "/admin/users/{$id}/edit");
         }
+    }
+
+    public function resetTemporaryPassword(int $id): void
+    {
+        Authorization::requirePermission($this->pdo, 'USER_EDIT');
+        Csrf::validate($_POST['_csrf'] ?? null);
+
+        if ((int)(Auth::id() ?? 0) === $id) {
+            $this->fail(
+                'Para tu propia cuenta utiliza la opción de cambio de contraseña.',
+                '/change-password'
+            );
+        }
+
+        $repo = new UserRepository($this->pdo);
+        $existing = $repo->findById($id);
+
+        if (!$existing) {
+            $this->fail('Usuario no encontrado.', '/admin/users');
+        }
+
+        $temporaryPassword = TemporaryPasswordGenerator::generate();
+
+        try {
+            $this->pdo->beginTransaction();
+
+            $repo->setTemporaryPassword(
+                $id,
+                PasswordPolicy::hash($temporaryPassword)
+            );
+            $repo->invalidatePasswordResets($id);
+
+            $this->pdo->commit();
+
+            (new AuditRepository($this->pdo))->log(
+                Auth::id(),
+                'USER_TEMPORARY_PASSWORD_RENEWED',
+                'USER',
+                (string)$id,
+                ['temporary_password'=>true]
+            );
+
+            $_SESSION['_flash_success'] =
+                'Contraseña temporal renovada para ' . (string)$existing['username']
+                . '. Nueva contraseña temporal: ' . $temporaryPassword;
+        } catch (\Throwable $e) {
+            if ($this->pdo->inTransaction()) {
+                $this->pdo->rollBack();
+            }
+
+            error_log('[UsersController::resetTemporaryPassword] ' . $e->getMessage());
+            $_SESSION['_flash_error'] = 'No fue posible renovar la contraseña temporal.';
+        }
+
+        header('Location: /admin/users/' . $id . '/edit');
+        exit;
     }
 
     public function toggleActive(int $id): void
@@ -457,6 +535,7 @@ final class UsersController
             'username'=>trim((string)($_POST['username'] ?? '')),
             'email'=>mb_strtolower(trim((string)($_POST['email'] ?? ''))),
             'full_name'=>$this->singleLine((string)($_POST['full_name'] ?? '')),
+            'supervisor_user_id'=>$this->positiveInt($_POST['supervisor_user_id'] ?? null),
             'is_active'=>isset($_POST['is_active']) ? 1 : 0,
             'assign_enabled'=>isset($_POST['assign_enabled']) ? 1 : 0,
         ];
@@ -493,6 +572,17 @@ final class UsersController
         }
 
         return $data;
+    }
+
+    private function positiveInt(mixed $value): ?int
+    {
+        if ($value === null || $value === '' || !is_scalar($value)) {
+            return null;
+        }
+
+        $value = (int)$value;
+
+        return $value > 0 ? $value : null;
     }
 
     private function singleLine(string $value): string

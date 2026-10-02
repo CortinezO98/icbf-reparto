@@ -48,6 +48,17 @@ Orden principal de bloqueo:
 Después de bloquear al usuario se revalidan disponibilidad, elegibilidad y capacidad.
 Esto evita exceder capacidad cuando dos procesos intentan repartir simultáneamente.
 
+## Colas sin agente elegible
+
+La ejecución global no se detiene porque una cola no tenga un agente elegible.
+
+Cuando una cola no puede recibir el caso actual, queda temporalmente bloqueada durante esa ejecución
+del motor y se continúa con otras colas pendientes. Al finalizar, los casos de la cola bloqueada
+permanecen en `PENDING_ASSIGNMENT` para una ejecución posterior.
+
+Esto permite que un agente disponible en otra cola continúe recibiendo casos aunque exista una cola
+sin capacidad, sin presencia disponible o sin habilidades suficientes.
+
 ## Trazabilidad
 
 Una asignación crea:
@@ -70,3 +81,6 @@ Reparto:
 Opcionalmente:
 
 `php bin/assign-pending.php --queue=1 --max=100`
+
+El motor también se ejecuta automáticamente después de confirmar una carga y al pasar un agente
+a estado `AVAILABLE`.

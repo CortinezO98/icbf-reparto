@@ -18,6 +18,9 @@ $canViewAgentStatus = false;
 $canViewUsers = false;
 $canViewStructures = false;
 $canViewQueues = false;
+$canViewReports = false;
+$canViewShifts = false;
+$canViewSla = false;
 
 if (Auth::check() && Auth::id() !== null) {
     $pdo = Database::connection();
@@ -29,6 +32,10 @@ if (Auth::check() && Auth::id() !== null) {
     $canViewUsers = Authorization::hasPermission($pdo, $uid, 'USER_VIEW');
     $canViewStructures = Authorization::hasPermission($pdo, $uid, 'STRUCTURE_VIEW');
     $canViewQueues = Authorization::hasPermission($pdo, $uid, 'QUEUE_VIEW');
+    $canViewReports = Authorization::hasPermission($pdo, $uid, 'REPORT_VIEW');
+    $canViewShifts = Authorization::hasPermission($pdo, $uid, 'SHIFT_VIEW');
+    // El tablero ANS es una herramienta de supervisión; los agentes no lo visualizan.
+    $canViewSla = !$isAgent && Authorization::hasPermission($pdo, $uid, 'SLA_VIEW');
 }
 
 $isActive = static function (string $prefix) use ($path): bool {
@@ -38,6 +45,11 @@ $isActive = static function (string $prefix) use ($path): bool {
 $user = Auth::user() ?? [];
 $fullName = (string)($user['full_name'] ?? $user['username'] ?? '');
 $rolesLabel = $currentUserRoles !== [] ? implode(', ', $currentUserRoles) : '';
+
+$globalFlashError = $_SESSION['_flash_error'] ?? null;
+$globalFlashSuccess = $_SESSION['_flash_success'] ?? null;
+$globalFlashWarning = $_SESSION['_flash_warning'] ?? null;
+unset($_SESSION['_flash_error'], $_SESSION['_flash_success'], $_SESSION['_flash_warning']);
 ?>
 <!doctype html>
 <html lang="es">
@@ -61,6 +73,9 @@ $rolesLabel = $currentUserRoles !== [] ? implode(', ', $currentUserRoles) : '';
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
     <link href="/assets/css/app.css?v=3" rel="stylesheet">
+    <?php if (str_starts_with($path, '/cases/')): ?>
+        <link href="/assets/css/case-detail.css?v=2" rel="stylesheet">
+    <?php endif; ?>
 </head>
 
 <body class="bg-light <?= $isAuthPage ? 'page-login' : 'page-app' ?>">
@@ -70,8 +85,8 @@ $rolesLabel = $currentUserRoles !== [] ? implode(', ', $currentUserRoles) : '';
      aria-label="Navegación principal">
     <div class="container-fluid">
         <a class="navbar-brand fw-semibold d-flex align-items-center gap-2"
-           href="/"
-           aria-label="ICBF Reparto - Inicio">
+           href="<?= $isAgent ? '/cases' : '/sla' ?>"
+           aria-label="ICBF Reparto">
             <i class="bi bi-diagram-3" aria-hidden="true"></i>
             <span>ICBF Reparto</span>
         </a>
@@ -88,17 +103,27 @@ $rolesLabel = $currentUserRoles !== [] ? implode(', ', $currentUserRoles) : '';
 
         <div class="collapse navbar-collapse" id="mainNavbar">
             <ul class="navbar-nav me-auto mb-2 mb-lg-0">
-                <li class="nav-item">
-                    <a class="nav-link <?= $path === '/' ? 'active' : '' ?>" href="/">
-                        <i class="bi bi-house-door me-1" aria-hidden="true"></i>Inicio
-                    </a>
-                </li>
+                <?php if ($canViewSla): ?>
+                    <li class="nav-item">
+                        <a class="nav-link <?= $isActive('/sla') || $path === '/' || $path === '/dashboard' ? 'active' : '' ?>" href="/sla">
+                            <i class="bi bi-speedometer2 me-1" aria-hidden="true"></i>Tablero ANS
+                        </a>
+                    </li>
+                <?php endif; ?>
 
                 <li class="nav-item">
                     <a class="nav-link <?= $isActive('/cases') ? 'active' : '' ?>" href="/cases">
                         <i class="bi bi-inbox me-1" aria-hidden="true"></i>Casos
                     </a>
                 </li>
+
+                <?php if ($canViewReports): ?>
+                    <li class="nav-item">
+                        <a class="nav-link <?= $isActive('/reports') ? 'active' : '' ?>" href="/reports">
+                            <i class="bi bi-file-earmark-bar-graph me-1" aria-hidden="true"></i>Reportes
+                        </a>
+                    </li>
+                <?php endif; ?>
 
                 <?php if (Authorization::hasPermission(Database::connection(), (int)Auth::id(), 'IMPORT_UPLOAD')): ?>
                     <li class="nav-item">
@@ -116,15 +141,7 @@ $rolesLabel = $currentUserRoles !== [] ? implode(', ', $currentUserRoles) : '';
                     </li>
                 <?php endif; ?>
 
-                <?php if (Authorization::hasPermission(Database::connection(), (int)Auth::id(), 'SLA_VIEW')): ?>
-                    <li class="nav-item">
-                        <a class="nav-link <?= $isActive('/sla') ? 'active' : '' ?>" href="/sla">
-                            <i class="bi bi-speedometer2 me-1" aria-hidden="true"></i>Tablero ANS
-                        </a>
-                    </li>
-                <?php endif; ?>
-
-                <?php if ($canViewUsers || $canViewStructures || $canViewQueues): ?>
+                <?php if ($canViewUsers || $canViewStructures || $canViewQueues || $canViewShifts): ?>
                     <li class="nav-item dropdown">
                         <a class="nav-link dropdown-toggle <?= $isActive('/admin') ? 'active' : '' ?>"
                            href="#"
@@ -152,6 +169,13 @@ $rolesLabel = $currentUserRoles !== [] ? implode(', ', $currentUserRoles) : '';
                                 <li>
                                     <a class="dropdown-item" href="/admin/queues">
                                         <i class="bi bi-diagram-2 me-2" aria-hidden="true"></i>Colas
+                                    </a>
+                                </li>
+                            <?php endif; ?>
+                            <?php if ($canViewShifts): ?>
+                                <li>
+                                    <a class="dropdown-item" href="/admin/shifts">
+                                        <i class="bi bi-calendar3 me-2" aria-hidden="true"></i>Turnos y cronograma
                                     </a>
                                 </li>
                             <?php endif; ?>
@@ -198,8 +222,37 @@ $rolesLabel = $currentUserRoles !== [] ? implode(', ', $currentUserRoles) : '';
 </nav>
 <?php endif; ?>
 
-<main class="<?= $isAuthPage ? '' : 'container py-4 app-shell' ?>" role="main" id="mainContent">
+<main class="<?= $isAuthPage ? '' : (str_starts_with($path, '/cases/') ? 'app-shell case-page-shell' : 'container py-4 app-shell') ?>" role="main" id="mainContent">
     <?php require $view; ?>
+
+    <?php if ($globalFlashError || $globalFlashSuccess || $globalFlashWarning): ?>
+    <script>
+    (() => {
+        if (!window.Swal) return;
+
+        const flash = <?= json_encode([
+            'error' => $globalFlashError,
+            'success' => $globalFlashSuccess,
+            'warning' => $globalFlashWarning,
+        ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>;
+
+        const type = flash.error ? 'error' : (flash.warning ? 'warning' : 'success');
+        const title = type === 'error'
+            ? 'No fue posible completar la operación'
+            : (type === 'warning' ? 'Atención' : 'Operación completada');
+
+        const text = flash.error || flash.warning || flash.success;
+
+        Swal.fire({
+            icon: type,
+            title,
+            text,
+            confirmButtonText: 'Entendido',
+            confirmButtonColor: '#4CAF50'
+        });
+    })();
+    </script>
+    <?php endif; ?>
 </main>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"

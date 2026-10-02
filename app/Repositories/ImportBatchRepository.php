@@ -29,12 +29,35 @@ final class ImportBatchRepository
     /** @return list<array<string,mixed>> */
     public function activeVersions(): array
     {
-        $sql = "SELECT v.id, v.version_number, v.target_sheet_mode, v.target_sheet_value,
-                       v.header_row, v.data_start_row, v.external_key_field_code,
-                       v.allow_csv, v.allow_xlsx, s.code structure_code, s.name structure_name
+        $sql = "SELECT
+                    v.id,
+                    v.version_number,
+                    v.target_sheet_mode,
+                    v.target_sheet_value,
+                    v.header_row,
+                    v.data_start_row,
+                    v.external_key_field_code,
+                    v.allow_csv,
+                    v.allow_xlsx,
+                    s.code structure_code,
+                    s.name structure_name,
+                    COUNT(DISTINCT CASE
+                        WHEN qs.is_active=1 AND q.is_active=1 THEN q.id
+                    END) queue_count,
+                    GROUP_CONCAT(
+                        DISTINCT CASE
+                            WHEN qs.is_active=1 AND q.is_active=1
+                            THEN CONCAT(q.id, ':', q.name)
+                        END
+                        ORDER BY q.name
+                        SEPARATOR '||'
+                    ) queue_options
                 FROM import_structure_versions v
                 JOIN import_structures s ON s.id=v.structure_id
+                LEFT JOIN queue_structures qs ON qs.structure_version_id=v.id
+                LEFT JOIN work_queues q ON q.id=qs.queue_id
                 WHERE v.status='ACTIVE' AND s.is_active=1
+                GROUP BY v.id
                 ORDER BY s.name, v.version_number DESC";
         return $this->pdo->query($sql)->fetchAll() ?: [];
     }

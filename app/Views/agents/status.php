@@ -7,7 +7,7 @@
         <h1><i class="bi bi-person-workspace text-brand me-2"></i>Estado de agentes</h1>
         <p class="muted">Seguimiento operativo de presencia, carga activa y capacidad de asignación.</p>
     </div>
-    <div class="refresh-note"><i class="bi bi-arrow-repeat me-1"></i>Actualización automática cada 15 segundos</div>
+    <div class="refresh-note"><i class="bi bi-arrow-repeat me-1"></i>Actualización automática cada 5 segundos</div>
 </div>
 
 <div class="metric-grid" id="presenceMetrics">
@@ -52,7 +52,7 @@
                     <td>
                         <span class="presence-badge">
                             <span class="presence-dot" style="background:<?= htmlspecialchars((string)$agent['status_color'], ENT_QUOTES, 'UTF-8') ?>"></span>
-                            <?= htmlspecialchars((string)$agent['status_label'], ENT_QUOTES, 'UTF-8') ?>
+                            <?= htmlspecialchars((string)($agent['effective_status_label'] ?? $agent['status_label']), ENT_QUOTES, 'UTF-8') ?>
                         </span>
                     </td>
                     <td><?= htmlspecialchars((string)($agent['queue_codes'] ?: 'Sin cola'), ENT_QUOTES, 'UTF-8') ?></td>
@@ -96,7 +96,7 @@
             tbody.innerHTML = (data.agents || []).map(agent => `
                 <tr>
                     <td><strong>${escapeHtml(agent.full_name)}</strong><div class="muted">${escapeHtml(agent.username)}</div></td>
-                    <td><span class="presence-badge"><span class="presence-dot" style="background:${escapeHtml(agent.status_color)}"></span>${escapeHtml(agent.status_label)}</span></td>
+                    <td><span class="presence-badge"><span class="presence-dot" style="background:${escapeHtml(agent.status_color)}"></span>${escapeHtml(agent.effective_status_label || agent.status_label)}</span></td>
                     <td>${escapeHtml(agent.queue_codes || 'Sin cola')}</td>
                     <td>${Number(agent.open_cases || 0)} / ${Number(agent.configured_capacity || 0)}</td>
                     <td>${Number(agent.free_capacity || 0)}</td>
@@ -106,6 +106,6 @@
         } catch (_) {}
     };
 
-    window.setInterval(refresh, 15000);
+    window.setInterval(refresh, 5000);
 })();
 </script>

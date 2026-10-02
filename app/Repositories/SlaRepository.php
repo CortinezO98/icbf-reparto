@@ -45,6 +45,21 @@ final class SlaRepository
         );
     }
 
+    /** @return array<string,mixed>|null */
+    public function caseForEvaluation(int $caseId): ?array
+    {
+        $st = $this->pdo->prepare(
+            "SELECT *
+             FROM cases
+             WHERE id=:id
+             LIMIT 1"
+        );
+        $st->execute([':id'=>$caseId]);
+
+        $row = $st->fetch();
+        return $row ?: null;
+    }
+
     /** @return list<array<string,mixed>> */
     public function openCases(): array
     {
@@ -151,11 +166,11 @@ final class SlaRepository
     {
         $row = $this->pdo->query(
             "SELECT
-                SUM(sla_status='GREEN') green_count,
-                SUM(sla_status='YELLOW') yellow_count,
-                SUM(sla_status='RED') red_count,
-                SUM(sla_status='BREACHED') breached_count,
-                SUM(current_state<>'CLOSED' AND closed_at IS NULL) open_count
+                SUM(closed_at IS NULL AND current_state<>'CLOSED' AND sla_status='GREEN') green_count,
+                SUM(closed_at IS NULL AND current_state<>'CLOSED' AND sla_status='YELLOW') yellow_count,
+                SUM(closed_at IS NULL AND current_state<>'CLOSED' AND sla_status='RED') red_count,
+                SUM(closed_at IS NULL AND current_state<>'CLOSED' AND sla_status='BREACHED') breached_count,
+                SUM(closed_at IS NULL AND current_state<>'CLOSED') open_count
              FROM cases"
         )->fetch() ?: [];
 
@@ -200,6 +215,8 @@ final class SlaRepository
             LEFT JOIN work_queues q ON q.id=c.queue_id
             LEFT JOIN users u ON u.id=c.assigned_user_id
             WHERE a.resolved_at IS NULL
+              AND c.closed_at IS NULL
+              AND c.current_state <> 'CLOSED'
             ORDER BY
                 FIELD(a.severity,'CRITICAL','WARNING','INFO'),
                 a.opened_at

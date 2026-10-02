@@ -22,10 +22,22 @@ El worker:
 php bin/evaluate-sla.php
 ```
 
-actualiza `cases.sla_*` y sincroniza `case_alerts`.
+actualiza los casos abiertos y sincroniza `case_alerts`.
 
-En producción debe programarse con cron o scheduler (por ejemplo cada 5 minutos).
 La pantalla `/sla` también recalcula al abrir para evitar mostrar información obsoleta si el worker se retrasa.
+
+## Cierre de casos
+
+Cuando una gestión cambia el caso a `CLOSED`, el flujo de cierre ejecuta una evaluación puntual del ANS.
+
+Esto garantiza que:
+
+- `sla_elapsed_minutes` conserve el tiempo hábil real hasta `closed_at`;
+- `sla_due_at` conserve el vencimiento calculado;
+- `sla_status` conserve el estado final del ANS;
+- las alertas abiertas del caso se resuelvan al cerrar.
+
+Los casos cerrados no se vuelven a evaluar como casos operativos abiertos.
 
 ## Alertas
 

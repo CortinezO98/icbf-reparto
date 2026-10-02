@@ -1,0 +1,20 @@
+INSERT IGNORE INTO sla_holidays (holiday_date,label,is_active)
+VALUES
+    ('2026-01-01','Año Nuevo',1),
+    ('2026-01-12','Día de los Reyes Magos',1),
+    ('2026-03-23','Día de San José',1),
+    ('2026-04-02','Jueves Santo',1),
+    ('2026-04-03','Viernes Santo',1),
+    ('2026-05-01','Día del Trabajo',1),
+    ('2026-05-18','Día de la Ascensión',1),
+    ('2026-06-08','Corpus Christi',1),
+    ('2026-06-15','Sagrado Corazón de Jesús',1),
+    ('2026-06-29','San Pedro y San Pablo',1),
+    ('2026-07-20','Día de la Independencia',1),
+    ('2026-08-07','Batalla de Boyacá',1),
+    ('2026-08-17','Asunción de la Virgen',1),
+    ('2026-10-12','Día de la Raza',1),
+    ('2026-11-02','Todos los Santos',1),
+    ('2026-11-16','Independencia de Cartagena',1),
+    ('2026-12-08','Día de la Inmaculada Concepción',1),
+    ('2026-12-25','Navidad',1);

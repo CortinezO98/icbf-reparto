@@ -86,6 +86,7 @@ final class ConfirmImportService
                     'source_batch_row_id'=>(int)$row['id'],
                     'petition_type'=>$this->firstValue($normalized, ['tipo_peticion','petition_type']),
                     'regional'=>$this->firstValue($normalized, ['regional']),
+                    'segment'=>$this->firstValue($normalized, ['segmento','segment']),
                     'origin_channel'=>$this->firstValue($normalized, ['canal_origen','origin_channel']),
                     'radicated_at'=>$radicatedAt,
                     'created_by'=>$userId,

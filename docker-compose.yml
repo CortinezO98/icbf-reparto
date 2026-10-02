@@ -34,6 +34,27 @@ services:
       retries: 10
     restart: unless-stopped
 
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: icbf-reparto-worker
+    working_dir: /var/www/html
+    env_file:
+      - .env
+    command: ["php", "bin/worker.php"]
+    depends_on:
+      app:
+        condition: service_healthy
+      db:
+        condition: service_healthy
+    volumes:
+      - ./:/var/www/html
+      - vendor_data:/var/www/html/vendor
+    networks:
+      - reparto_net
+    restart: unless-stopped
+
   db:
     image: mariadb:10.11
     container_name: icbf-reparto-db

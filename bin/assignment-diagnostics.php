@@ -34,6 +34,26 @@ $sql = "SELECT
             qa.is_enabled,
             COALESCE(qa.capacity_override,q.default_capacity) capacity,
             COALESCE(ap.status_code,'SIN_PRESENCIA') presence,
+            CASE WHEN EXISTS (
+                SELECT 1
+                FROM agent_shift_schedules ass
+                JOIN work_shifts ws ON ws.id=ass.shift_id
+                WHERE ass.user_id=u.id
+                  AND ass.queue_id=q.id
+                  AND ass.is_active=1
+                  AND ws.is_active=1
+                  AND (
+                      ass.schedule_date=CURDATE()
+                      OR (
+                          ass.schedule_date IS NULL
+                          AND ass.weekday=WEEKDAY(CURDATE())+1
+                      )
+                  )
+                  AND (ass.valid_from IS NULL OR ass.valid_from<=CURDATE())
+                  AND (ass.valid_to IS NULL OR ass.valid_to>=CURDATE())
+                  AND ws.start_time<=TIME(NOW())
+                  AND ws.end_time>TIME(NOW())
+            ) THEN 'ON_SHIFT' ELSE 'OFF_SHIFT' END shift_status,
             (
                 SELECT COUNT(*)
                 FROM cases c
@@ -64,6 +84,7 @@ foreach ($rows as $row) {
         . ' | ' . $row['full_name']
         . ' | enabled=' . $row['is_enabled']
         . ' | presence=' . $row['presence']
+        . ' | shift=' . $row['shift_status']
         . ' | open=' . $row['open_cases']
         . '/' . $row['capacity']
         . PHP_EOL;

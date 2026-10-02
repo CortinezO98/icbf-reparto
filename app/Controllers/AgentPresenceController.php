@@ -6,8 +6,10 @@ namespace App\Controllers;
 use App\Auth\Auth;
 use App\Auth\Authorization;
 use App\Auth\Csrf;
+use App\Repositories\AssignmentRepository;
 use App\Repositories\AuditRepository;
 use App\Repositories\PresenceRepository;
+use App\Services\Assignment\AssignmentEngine;
 use PDO;
 
 final class AgentPresenceController
@@ -43,19 +45,53 @@ final class AgentPresenceController
 
         try {
             $repo = new PresenceRepository($this->pdo);
+            $previousPresence = $repo->currentForUser($uid);
+            $staleCutoff = (new \DateTimeImmutable())
+                ->modify('-' . $this->staleSeconds() . ' seconds');
+
+            $wasAvailable = $previousPresence !== null
+                && (string)$previousPresence['status_code'] === 'AVAILABLE'
+                && !empty($previousPresence['last_heartbeat_at'])
+                && new \DateTimeImmutable((string)$previousPresence['last_heartbeat_at']) >= $staleCutoff;
+
             $repo->setSelectableStatus($uid, $status, $uid, 'USER');
+
+            $assignment = [
+                'assigned'=>0,
+                'no_agent'=>0,
+                'iterations'=>0,
+            ];
+
+            // Al pasar a AVAILABLE se intenta repartir inmediatamente los
+            // casos pendientes. El motor vuelve a validar todos los criterios
+            // de elegibilidad y capacidad dentro de sus transacciones.
+            if ($status === 'AVAILABLE' && !$wasAvailable) {
+                try {
+                    $assignment = (new AssignmentEngine(
+                        $this->pdo,
+                        new AssignmentRepository($this->pdo)
+                    ))->runForAgent($uid, 500);
+                } catch (\Throwable $assignmentError) {
+                    error_log('[AgentPresenceController::update][ASSIGNMENT] ' . $assignmentError->getMessage());
+                }
+            }
 
             (new AuditRepository($this->pdo))->log(
                 $uid,
                 'AGENT_PRESENCE_CHANGED',
                 'USER',
                 (string)$uid,
-                ['status_code'=>$status]
+                [
+                    'status_code'=>$status,
+                    'previous_status'=>$previousPresence['status_code'] ?? null,
+                    'assigned_after_available'=>$assignment['assigned'],
+                ]
             );
 
             $this->json([
                 'ok'=>true,
                 'presence'=>$repo->currentForUser($uid),
+                'assignment'=>$assignment,
             ]);
         } catch (\InvalidArgumentException $e) {
             $this->json(['ok'=>false,'message'=>$e->getMessage()], 422);

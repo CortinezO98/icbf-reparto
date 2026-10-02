@@ -27,7 +27,9 @@ final class CaseOperationsRepository
         int $perPage,
         string $search = '',
         string $state = '',
-        ?int $queueId = null
+        ?int $queueId = null,
+        string $slaStatus = '',
+        bool $managed = false
     ): array {
         $page = max(1, $page);
         $perPage = max(1, min(100, $perPage));
@@ -61,6 +63,19 @@ final class CaseOperationsRepository
         if ($queueId !== null && $queueId > 0) {
             $where .= ' AND c.queue_id=:queue_id';
             $params[':queue_id'] = $queueId;
+        }
+
+        if ($slaStatus !== '') {
+            if ($slaStatus === 'RED_OR_BREACHED') {
+                $where .= " AND c.sla_status IN ('RED','BREACHED')";
+            } else {
+                $where .= ' AND c.sla_status=:sla_status';
+                $params[':sla_status'] = $slaStatus;
+            }
+        }
+
+        if ($managed) {
+            $where .= ' AND c.first_management_at IS NOT NULL';
         }
 
         $count = $this->pdo->prepare("SELECT COUNT(*) FROM cases c {$where}");
@@ -153,6 +168,25 @@ final class CaseOperationsRepository
     }
 
     /** @return list<array<string,mixed>> */
+    public function assignments(int $caseId): array
+    {
+        $st = $this->pdo->prepare(
+            "SELECT
+                ca.*,
+                u.full_name user_name,
+                ab.full_name assigned_by_name
+             FROM case_assignments ca
+             JOIN users u ON u.id=ca.user_id
+             LEFT JOIN users ab ON ab.id=ca.assigned_by
+             WHERE ca.case_id=:id
+             ORDER BY ca.assigned_at DESC,ca.id DESC"
+        );
+        $st->execute([':id'=>$caseId]);
+
+        return $st->fetchAll() ?: [];
+    }
+
+    /** @return list<array<string,mixed>> */
     public function events(int $caseId): array
     {
         $st = $this->pdo->prepare(
@@ -190,6 +224,25 @@ final class CaseOperationsRepository
         $st->execute([':code'=>$catalogCode]);
 
         return $st->fetchAll() ?: [];
+    }
+
+    /** @return array{code:string,label:string}|null */
+    public function catalogItem(string $catalogCode, string $itemCode): ?array
+    {
+        $st = $this->pdo->prepare(
+            "SELECT ci.code,ci.label
+             FROM catalog_items ci
+             JOIN catalogs c ON c.id=ci.catalog_id
+             WHERE c.code=:catalog
+               AND c.is_active=1
+               AND ci.code=:item
+               AND ci.is_active=1
+             LIMIT 1"
+        );
+        $st->execute([':catalog'=>$catalogCode, ':item'=>$itemCode]);
+        $row = $st->fetch();
+
+        return $row ?: null;
     }
 
     public function canManage(int $caseId, int $userId): bool
@@ -290,8 +343,7 @@ final class CaseOperationsRepository
             $update->execute([
                 ':type'=>$managementType,
                 ':escalation'=>$data['escalation_category_code'] ?? null,
-                ':new_petition_flag'=>$newPetitionType !== null && $newPetitionType !== '' ? 1 : 0,
-                ':new_petition'=>$newPetitionType,
+                ':petition_type'=>(string)$data['petition_type_selected'],
                 ':closed_flag'=>$closed ? 1 : 0,
                 ':closed_flag2'=>$closed ? 1 : 0,
                 ':id'=>$caseId,

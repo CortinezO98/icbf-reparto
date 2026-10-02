@@ -15,26 +15,48 @@ final class AssignmentEngine
     }
 
     /** @return array{assigned:int,no_agent:int,iterations:int} */
-    public function run(?int $queueId = null, int $maxAssignments = 500): array
+    public function run(
+        ?int $queueId = null,
+        int $maxAssignments = 500,
+        string $assignmentType = 'AUTO'
+    ): array
     {
+        $assignmentType = strtoupper(trim($assignmentType));
+
+        if (!in_array($assignmentType, ['AUTO','REASSIGN'], true)) {
+            throw new \InvalidArgumentException('Tipo de asignación no permitido.');
+        }
+
         $maxAssignments = max(1, min(5000, $maxAssignments));
 
         $assigned = 0;
         $noAgent = 0;
         $iterations = 0;
+        $blockedQueueIds = [];
 
         while ($assigned < $maxAssignments) {
             $iterations++;
 
-            $result = $this->assignOne($queueId);
+            $result = $this->assignOne(
+                $queueId,
+                $blockedQueueIds,
+                $assignmentType
+            );
 
-            if ($result === 'NO_CASE') {
+            if ($result['status'] === 'NO_CASE') {
                 break;
             }
 
-            if ($result === 'NO_AGENT') {
+            if ($result['status'] === 'NO_AGENT') {
                 $noAgent++;
-                break;
+
+                if ($result['queue_id'] !== null) {
+                    $blockedQueueIds[$result['queue_id']] = true;
+                }
+
+                // No detenemos todo el proceso por una cola sin agente:
+                // otras colas pueden tener agentes elegibles.
+                continue;
             }
 
             $assigned++;
@@ -47,17 +69,238 @@ final class AssignmentEngine
         ];
     }
 
-    /** @return 'ASSIGNED'|'NO_AGENT'|'NO_CASE' */
-    private function assignOne(?int $queueId): string
+    /**
+     * Recupera únicamente casos previamente asignados al agente que quedaron
+     * pendientes por una liberación automática histórica. No toma casos nuevos.
+     *
+     * @return array{recovered:int,iterations:int}
+     */
+    public function recoverForAgent(
+        int $userId,
+        int $maxRecoveries = 500
+    ): array {
+        $maxRecoveries = max(1, min(5000, $maxRecoveries));
+        $recovered = 0;
+        $iterations = 0;
+
+        // Para recuperar casos históricos no dependemos del cronograma actual:
+        // el caso ya pertenecía al agente y no debe perderse por estar fuera
+        // de un turno recién configurado o por no existir cronograma.
+        $queueIds = $this->repo->recoverableQueueIdsForAgent($userId);
+
+        foreach ($queueIds as $queueId) {
+            while ($recovered < $maxRecoveries) {
+                $iterations++;
+
+                $this->pdo->beginTransaction();
+
+                try {
+                    $lockedUser = $this->repo->lockUser($userId);
+
+                    if (
+                        !$lockedUser
+                        || (int)$lockedUser['is_active'] !== 1
+                        || (int)$lockedUser['assign_enabled'] !== 1
+                        || !$this->repo->isAvailableNow($userId)
+                        || !$this->repo->isEligibleForQueue($queueId, $userId)
+                    ) {
+                        $this->pdo->commit();
+                        break;
+                    }
+
+                    $capacity = $this->repo->capacityForQueue($queueId, $userId);
+                    $openCases = $this->repo->openCaseCount($queueId, $userId);
+
+                    if ($capacity <= 0 || $openCases >= $capacity) {
+                        $this->pdo->commit();
+                        break;
+                    }
+
+                    $limit = min(
+                        $capacity - $openCases,
+                        $maxRecoveries - $recovered
+                    );
+
+                    $caseIds = $this->repo->recoverInterruptedCasesForAgent(
+                        $queueId,
+                        $userId,
+                        $limit
+                    );
+
+                    $count = count($caseIds);
+                    $this->pdo->commit();
+
+                    if ($count === 0) {
+                        break;
+                    }
+
+                    $recovered += $count;
+                } catch (\Throwable $e) {
+                    if ($this->pdo->inTransaction()) {
+                        $this->pdo->rollBack();
+                    }
+
+                    throw $e;
+                }
+            }
+
+            if ($recovered >= $maxRecoveries) {
+                break;
+            }
+        }
+
+        return [
+            'recovered'=>$recovered,
+            'iterations'=>$iterations,
+        ];
+    }
+
+    /**
+     * Reparte inmediatamente a un agente que acaba de pasar a AVAILABLE.
+     *
+     * La operación queda limitada a las colas en las que el agente es elegible
+     * en este momento y respeta la capacidad configurada por cola. El worker
+     * continúa funcionando como mecanismo de respaldo para nuevos casos,
+     * cambios de presencia y concurrencia.
+     *
+     * @return array{assigned:int,no_agent:int,iterations:int}
+     */
+    public function runForAgent(
+        int $userId,
+        int $maxAssignments = 500
+    ): array {
+        $maxAssignments = max(1, min(5000, $maxAssignments));
+
+        $assigned = 0;
+        $iterations = 0;
+
+        $queueIds = $this->repo->eligibleQueueIdsForAgent($userId);
+
+        foreach ($queueIds as $queueId) {
+            while ($assigned < $maxAssignments) {
+                $iterations++;
+
+                $this->pdo->beginTransaction();
+
+                try {
+                    $lockedUser = $this->repo->lockUser($userId);
+
+                    if (
+                        !$lockedUser
+                        || (int)$lockedUser['is_active'] !== 1
+                        || (int)$lockedUser['assign_enabled'] !== 1
+                        || !$this->repo->isAvailableNow($userId)
+                        || !$this->repo->isOnShiftForQueue($queueId, $userId)
+                        || !$this->repo->isEligibleForQueue($queueId, $userId)
+                    ) {
+                        $this->pdo->commit();
+                        break;
+                    }
+
+                    $capacity = $this->repo->capacityForQueue($queueId, $userId);
+                    $openCases = $this->repo->openCaseCount($queueId, $userId);
+
+                    if ($capacity <= 0 || $openCases >= $capacity) {
+                        $this->pdo->commit();
+                        break;
+                    }
+
+                    // Antes de tomar casos nuevos, recuperamos los casos que
+                    // pertenecían anteriormente a este agente y que quedaron
+                    // pendientes por una liberación automática ocurrida antes
+                    // de la regla de permanencia. Nunca recuperamos un caso
+                    // cuya última asignación histórica pertenezca a otro agente.
+                    $recoveryLimit = min(
+                        $capacity - $openCases,
+                        $maxAssignments - $assigned
+                    );
+
+                    $recoveredCaseIds = $this->repo->recoverInterruptedCasesForAgent(
+                        $queueId,
+                        $userId,
+                        $recoveryLimit
+                    );
+
+                    if ($recoveredCaseIds !== []) {
+                        $assigned += count($recoveredCaseIds);
+                        $this->pdo->commit();
+                        continue;
+                    }
+
+                    $case = $this->repo->nextPendingCaseForUpdate($queueId);
+
+                    if ($case === null) {
+                        $this->pdo->commit();
+                        break;
+                    }
+
+                    $this->repo->assignCase(
+                        (int)$case['id'],
+                        $queueId,
+                        $userId,
+                        'AUTO'
+                    );
+
+                    $this->pdo->commit();
+                    $assigned++;
+                } catch (\Throwable $e) {
+                    if ($this->pdo->inTransaction()) {
+                        $this->pdo->rollBack();
+                    }
+
+                    throw $e;
+                }
+            }
+
+            if ($assigned >= $maxAssignments) {
+                break;
+            }
+        }
+
+        return [
+            'assigned'=>$assigned,
+            'no_agent'=>0,
+            'iterations'=>$iterations,
+        ];
+    }
+
+
+    /**
+     * Libera explícitamente los casos abiertos de un agente.
+     *
+     * Esta operación no se ejecuta automáticamente por desconexión, logout,
+     * heartbeat vencido ni fin de turno. Puede utilizarse cuando una acción
+     * administrativa decide liberar/reasignar casos de forma explícita.
+     *
+     * @return array{case_ids:list<int>,queue_ids:list<int>}
+     */
+    public function releaseCasesForAgent(
+        int $userId,
+        string $reason = 'STALE_HEARTBEAT'
+    ): array {
+        return $this->repo->releaseCasesForAgent($userId, $reason);
+    }
+
+
+    /**
+     * @param array<int,bool> $blockedQueueIds
+     * @return array{status:'ASSIGNED'|'NO_AGENT'|'NO_CASE',queue_id:int|null}
+     */
+    private function assignOne(
+        ?int $queueId,
+        array $blockedQueueIds,
+        string $assignmentType
+    ): array
     {
         $this->pdo->beginTransaction();
 
         try {
-            $case = $this->repo->nextPendingCaseForUpdate($queueId);
+            $excludedQueueIds = array_keys($blockedQueueIds);
+            $case = $this->repo->nextPendingCaseForUpdate($queueId, $excludedQueueIds);
 
             if (!$case) {
                 $this->pdo->commit();
-                return 'NO_CASE';
+                return ['status'=>'NO_CASE','queue_id'=>null];
             }
 
             $caseId = (int)$case['id'];
@@ -99,15 +342,20 @@ final class AssignmentEngine
                     continue;
                 }
 
-                $this->repo->assignCase($caseId, $caseQueueId, $userId);
+                $this->repo->assignCase(
+                    $caseId,
+                    $caseQueueId,
+                    $userId,
+                    $assignmentType
+                );
                 $this->pdo->commit();
 
-                return 'ASSIGNED';
+                return ['status'=>'ASSIGNED','queue_id'=>$caseQueueId];
             }
 
             $this->pdo->commit();
 
-            return 'NO_AGENT';
+            return ['status'=>'NO_AGENT','queue_id'=>$caseQueueId];
         } catch (\Throwable $e) {
             if ($this->pdo->inTransaction()) {
                 $this->pdo->rollBack();

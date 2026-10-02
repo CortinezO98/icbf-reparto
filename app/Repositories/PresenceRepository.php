@@ -122,6 +122,12 @@ final class PresenceRepository
 
     public function markOffline(int $userId, ?int $setBy = null, string $reason = 'SYSTEM'): int
     {
+        $current = $this->currentForUser($userId);
+
+        if ($current !== null && (string)$current['status_code'] === 'OFFLINE') {
+            return (int)$current['id'];
+        }
+
         return $this->setStatus(
             $userId,
             'OFFLINE',
@@ -159,6 +165,93 @@ final class PresenceRepository
         $this->heartbeat($userId);
 
         return $this->currentForUser($userId);
+    }
+
+    /**
+     * Cierra automáticamente las presencias cuyo heartbeat quedó obsoleto.
+     *
+     * La desconexión explícita (logout) se registra en el instante del logout.
+     * Para cierres de navegador, pérdida de red o caída del cliente, la hora
+     * registrada corresponde al momento en que el worker detecta el heartbeat
+     * vencido.
+     *
+     * @return array{processed:int,cutoff:string,user_ids:list<int>}
+     */
+    public function expireStalePresences(int $staleSeconds): array
+    {
+        $staleSeconds = max(30, $staleSeconds);
+        $cutoff = (new DateTimeImmutable())
+            ->modify('-' . $staleSeconds . ' seconds')
+            ->format('Y-m-d H:i:s.u');
+
+        $this->pdo->beginTransaction();
+
+        try {
+            $st = $this->pdo->prepare(
+                "SELECT id,user_id
+                 FROM agent_presence
+                 WHERE ended_at IS NULL
+                   AND status_code<>'OFFLINE'
+                   AND last_heartbeat_at IS NOT NULL
+                   AND last_heartbeat_at < :cutoff
+                 ORDER BY id
+                 FOR UPDATE"
+            );
+            $st->execute([':cutoff'=>$cutoff]);
+            $rows = $st->fetchAll() ?: [];
+
+            if ($rows === []) {
+                $this->pdo->commit();
+
+                return [
+                    'processed'=>0,
+                    'cutoff'=>$cutoff,
+                    'user_ids'=>[],
+                ];
+            }
+
+            $update = $this->pdo->prepare(
+                "UPDATE agent_presence
+                 SET ended_at=NOW(6)
+                 WHERE id=:id
+                   AND ended_at IS NULL"
+            );
+            $insert = $this->pdo->prepare(
+                "INSERT INTO agent_presence
+                 (user_id,status_code,started_at,last_heartbeat_at,notes,source,set_by)
+                 VALUES
+                 (:user_id,'OFFLINE',NOW(6),NULL,:notes,'SYSTEM',:set_by)"
+            );
+
+            $userIds = [];
+
+            foreach ($rows as $row) {
+                $userId = (int)$row['user_id'];
+                $userIds[$userId] = true;
+
+                $update->execute([':id'=>(int)$row['id']]);
+
+                $insert->execute([
+                    ':user_id'=>(int)$row['user_id'],
+                    ':notes'=>'STALE_HEARTBEAT',
+                    ':set_by'=>(int)$row['user_id'],
+                ]);
+            }
+
+            $this->pdo->commit();
+
+            return [
+                'processed'=>count($rows),
+                'cutoff'=>$cutoff,
+                'user_ids'=>array_map('intval', array_keys($userIds)),
+            ];
+        } catch (\Throwable $e) {
+            if ($this->pdo->inTransaction()) {
+                $this->pdo->rollBack();
+            }
+
+            throw $e;
+        }
     }
 
     public function heartbeat(int $userId): void
@@ -240,9 +333,20 @@ final class PresenceRepository
                 && (int)$row['is_active'] === 1
                 && (int)$row['assign_enabled'] === 1;
 
+            $stale = !$heartbeatFresh
+                && (string)$row['status_code'] !== 'OFFLINE';
+
             $row['effective_available'] = $available ? 1 : 0;
+            $row['effective_status_code'] = $stale
+                ? 'OFFLINE'
+                : (string)$row['status_code'];
+            $row['effective_status_label'] = $stale
+                ? 'Desconectado'
+                : (string)$row['status_label'];
             $row['status_color'] = PresenceStatus::color(
-                $available ? 'AVAILABLE' : (string)$row['status_code']
+                $stale
+                    ? 'OFFLINE'
+                    : ($available ? 'AVAILABLE' : (string)$row['status_code'])
             );
             $row['free_capacity'] = $available
                 ? max(0, (int)$row['configured_capacity'] - (int)$row['open_cases'])

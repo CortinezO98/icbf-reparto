@@ -48,6 +48,18 @@ final class BusinessTimeCalculatorTest extends TestCase
         );
     }
 
+    public function testStopsAtBusinessEndBeforeWeekend(): void
+    {
+        $calc = new BusinessTimeCalculator();
+
+        $minutes = $calc->businessMinutesBetween(
+            new DateTimeImmutable('2026-10-02 16:30:00'),
+            new DateTimeImmutable('2026-10-05 08:30:00')
+        );
+
+        self::assertSame(60, $minutes);
+    }
+
     public function testSkipsConfiguredHoliday(): void
     {
         $calc = new BusinessTimeCalculator(
@@ -67,4 +79,36 @@ final class BusinessTimeCalculatorTest extends TestCase
             $due->format('Y-m-d H:i:s')
         );
     }
+
+    public function testSixBusinessHoursAreExactly360Minutes(): void
+    {
+        $calc = new BusinessTimeCalculator();
+
+        $minutes = $calc->businessMinutesBetween(
+            new DateTimeImmutable('2026-09-30 08:00:00'),
+            new DateTimeImmutable('2026-09-30 14:00:00')
+        );
+
+        self::assertSame(360, $minutes);
+    }
+    public function testSkipsWeekendAndConfiguredHoliday(): void
+    {
+        $calc = new BusinessTimeCalculator(
+            '08:00:00',
+            '17:00:00',
+            'America/Bogota',
+            ['2026-10-12']
+        );
+
+        $due = $calc->addBusinessMinutes(
+            new DateTimeImmutable('2026-10-09 16:00:00'),
+            120
+        );
+
+        self::assertSame(
+            '2026-10-13 09:00:00',
+            $due->format('Y-m-d H:i:s')
+        );
+    }
+
 }
