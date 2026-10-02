@@ -3,7 +3,6 @@ declare(strict_types=1);
 
 namespace App\Services;
 
-use App\Repositories\AssignmentRepository;
 use App\Repositories\ShiftRepository;
 use DateTimeImmutable;
 use DateTimeZone;
@@ -49,26 +48,32 @@ final class ShiftService
 
                 $this->repository->markAgentOfflineAtShiftEnd($userId, $now);
 
-                $releasedCaseIds = $this->repository->releaseCasesForShiftEnd(
-                    $userId,
-                    $queueId
-                );
-
+                // El fin de turno marca al agente como OFFLINE, pero no libera
+                // los casos que ya está gestionando. La reasignación debe ser
+                // explícita por parte de un supervisor o administrador.
                 $this->pdo->commit();
 
                 $processed++;
-                $released += count($releasedCaseIds);
                 $queues[$queueId] = true;
+                $releasedCaseIds = [];
 
-                $assignmentError = null;
-
+                $this->pdo->beginTransaction();
                 try {
-                    $engine = new \App\Services\Assignment\AssignmentEngine(
-                        $this->pdo,
-                        new AssignmentRepository($this->pdo)
+                    $this->repository->finishShiftEndRun(
+                        $scheduleId,
+                        $date,
+                        0,
+                        []
                     );
-                    $engine->run($queueId, 500, 'REASSIGN');
+                    $this->pdo->commit();
                 } catch (\Throwable $e) {
+                    if ($this->pdo->inTransaction()) {
+                        $this->pdo->rollBack();
+                    }
+                    throw $e;
+                }
+
+            } catch (\Throwable $e) {
                     $assignmentError = $e;
                     error_log(
                         '[SHIFT_END_REASSIGN] ' . $e->getMessage()
