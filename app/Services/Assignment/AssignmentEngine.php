@@ -83,7 +83,10 @@ final class AssignmentEngine
         $recovered = 0;
         $iterations = 0;
 
-        $queueIds = $this->repo->eligibleQueueIdsForAgent($userId);
+        // Para recuperar casos históricos no dependemos del cronograma actual:
+        // el caso ya pertenecía al agente y no debe perderse por estar fuera
+        // de un turno recién configurado o por no existir cronograma.
+        $queueIds = $this->repo->recoverableQueueIdsForAgent($userId);
 
         foreach ($queueIds as $queueId) {
             while ($recovered < $maxRecoveries) {
@@ -99,7 +102,6 @@ final class AssignmentEngine
                         || (int)$lockedUser['is_active'] !== 1
                         || (int)$lockedUser['assign_enabled'] !== 1
                         || !$this->repo->isAvailableNow($userId)
-                        || !$this->repo->isOnShiftForQueue($queueId, $userId)
                         || !$this->repo->isEligibleForQueue($queueId, $userId)
                     ) {
                         $this->pdo->commit();
