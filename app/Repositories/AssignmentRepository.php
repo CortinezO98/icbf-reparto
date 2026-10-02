@@ -725,8 +725,11 @@ final class AssignmentRepository
 
 
     /**
-     * Libera los casos abiertos de un agente que dejó de estar disponible
-     * por pérdida de heartbeat u otra desconexión automática.
+     * Libera explícitamente los casos abiertos de un agente.
+     *
+     * No debe invocarse como consecuencia automática de logout, pérdida de
+     * heartbeat o desconexión. La permanencia del caso con su agente es el
+     * comportamiento normal hasta una reasignación explícita.
      *
      * @return array{case_ids:list<int>,queue_ids:list<int>}
      */
