@@ -42,6 +42,11 @@ $isActive = static function (string $prefix) use ($path): bool {
 $user = Auth::user() ?? [];
 $fullName = (string)($user['full_name'] ?? $user['username'] ?? '');
 $rolesLabel = $currentUserRoles !== [] ? implode(', ', $currentUserRoles) : '';
+
+$globalFlashError = $_SESSION['_flash_error'] ?? null;
+$globalFlashSuccess = $_SESSION['_flash_success'] ?? null;
+$globalFlashWarning = $_SESSION['_flash_warning'] ?? null;
+unset($_SESSION['_flash_error'], $_SESSION['_flash_success'], $_SESSION['_flash_warning']);
 ?>
 <!doctype html>
 <html lang="es">
@@ -213,6 +218,35 @@ $rolesLabel = $currentUserRoles !== [] ? implode(', ', $currentUserRoles) : '';
 
 <main class="<?= $isAuthPage ? '' : 'container py-4 app-shell' ?>" role="main" id="mainContent">
     <?php require $view; ?>
+
+    <?php if ($globalFlashError || $globalFlashSuccess || $globalFlashWarning): ?>
+    <script>
+    (() => {
+        if (!window.Swal) return;
+
+        const flash = <?= json_encode([
+            'error' => $globalFlashError,
+            'success' => $globalFlashSuccess,
+            'warning' => $globalFlashWarning,
+        ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>;
+
+        const type = flash.error ? 'error' : (flash.warning ? 'warning' : 'success');
+        const title = type === 'error'
+            ? 'No fue posible completar la operación'
+            : (type === 'warning' ? 'Atención' : 'Operación completada');
+
+        const text = flash.error || flash.warning || flash.success;
+
+        Swal.fire({
+            icon: type,
+            title,
+            text,
+            confirmButtonText: 'Entendido',
+            confirmButtonColor: '#4CAF50'
+        });
+    })();
+    </script>
+    <?php endif; ?>
 </main>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"
