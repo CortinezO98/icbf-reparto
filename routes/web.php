@@ -65,6 +65,7 @@ return static function(Router $router,PDO $pdo): void {
  $router->post('/admin/structures/{id}/versions/create',fn(int $id)=>(new ImportStructuresController($pdo))->createVersion($id));
  $router->post('/admin/structures/{id}/versions/create-from-excel',fn(int $id)=>(new ImportStructuresController($pdo))->createVersionFromExcel($id));
  $router->post('/admin/structures/{id}/versions/{versionId}/fields/create',fn(int $id,int $versionId)=>(new ImportStructuresController($pdo))->addField($id,$versionId));
+ $router->post('/admin/structures/{id}/versions/{versionId}/fields/update',fn(int $id,int $versionId)=>(new ImportStructuresController($pdo))->updateFields($id,$versionId));
  $router->post('/admin/structures/{id}/versions/{versionId}/external-key',fn(int $id,int $versionId)=>(new ImportStructuresController($pdo))->setExternalKey($id,$versionId));
  $router->post('/admin/structures/{id}/versions/{versionId}/activate',fn(int $id,int $versionId)=>(new ImportStructuresController($pdo))->activate($id,$versionId));
 
