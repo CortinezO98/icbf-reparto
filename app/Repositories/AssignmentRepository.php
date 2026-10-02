@@ -54,6 +54,41 @@ final class AssignmentRepository
     }
 
     /** @return list<int> */
+    public function recoverableQueueIdsForAgent(int $userId): array
+    {
+        $st = $this->pdo->prepare(
+            "SELECT DISTINCT c.queue_id
+             FROM cases c
+             JOIN case_assignments ca
+               ON ca.id=(
+                    SELECT ca2.id
+                    FROM case_assignments ca2
+                    WHERE ca2.case_id=c.id
+                    ORDER BY ca2.assigned_at DESC,ca2.id DESC
+                    LIMIT 1
+               )
+             JOIN work_queues q
+               ON q.id=c.queue_id
+              AND q.is_active=1
+             WHERE c.assigned_user_id IS NULL
+               AND c.closed_at IS NULL
+               AND c.current_state='PENDING_ASSIGNMENT'
+               AND ca.user_id=:user_id
+               AND ca.ended_at IS NOT NULL
+               AND ca.end_reason IN (
+                   'STALE_HEARTBEAT',
+                   'LOGOUT',
+                   'OFFLINE',
+                   'SHIFT_END'
+               )
+             ORDER BY c.queue_id"
+        );
+        $st->execute([':user_id'=>$userId]);
+
+        return array_map('intval', $st->fetchAll(PDO::FETCH_COLUMN) ?: []);
+    }
+
+    /** @return list<int> */
     public function availableAgentIds(): array
     {
         $stale = max(30, (int)($_ENV['AGENT_PRESENCE_STALE_SECONDS'] ?? 90));
