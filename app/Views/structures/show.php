@@ -194,49 +194,121 @@ $statusLabel = static fn(string $status): string => match ($status) {
                     <?php endif; ?>
                 </div>
 
-                <div class="table-responsive">
-                    <table class="table align-middle structure-fields-table">
-                        <thead>
-                            <tr>
-                                <th style="width:60px">#</th>
-                                <th>Encabezado</th>
-                                <th>Código técnico</th>
-                                <th>Tipo</th>
-                                <th>Estado</th>
-                                <th>Llave</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                        <?php foreach ($fields as $index => $f): ?>
-                            <tr>
-                                <td class="text-secondary"><?= $index + 1 ?></td>
-                                <td>
-                                    <div class="fw-semibold"><?= $e($f['display_name']) ?></div>
-                                    <div class="small text-secondary"><?= $e($f['excel_header']) ?></div>
-                                </td>
-                                <td><code><?= $e($f['field_code']) ?></code></td>
-                                <td><span class="badge text-bg-light border"><?= $e($f['data_type']) ?></span></td>
-                                <td>
-                                    <?php if ((int)$f['is_required'] === 1): ?>
-                                        <span class="badge bg-primary-subtle text-primary border border-primary-subtle">Obligatorio</span>
-                                    <?php else: ?>
-                                        <span class="text-secondary small">Opcional</span>
-                                    <?php endif; ?>
-                                </td>
-                                <td>
-                                    <?php if ((int)$f['is_external_key'] === 1): ?>
-                                        <span class="badge bg-success-subtle text-success border border-success-subtle">
-                                            <i class="bi bi-key-fill me-1"></i>Llave externa
-                                        </span>
-                                    <?php else: ?>
-                                        <span class="text-secondary small">No</span>
-                                    <?php endif; ?>
-                                </td>
-                            </tr>
-                        <?php endforeach; ?>
-                        </tbody>
-                    </table>
-                </div>
+                <form method="post"
+                      action="/admin/structures/<?= (int)$structure['id'] ?>/versions/<?= $vid ?>/fields/update">
+                    <input type="hidden" name="_csrf" value="<?= $e(\\App\\Auth\\Csrf::token()) ?>">
+
+                    <div class="table-responsive">
+                        <table class="table align-middle structure-fields-table">
+                            <thead>
+                                <tr>
+                                    <th style="width:60px">#</th>
+                                    <th style="min-width:180px">Encabezado</th>
+                                    <th style="min-width:150px">Código técnico</th>
+                                    <th style="min-width:145px">Tipo</th>
+                                    <th style="min-width:180px">Nombre visible</th>
+                                    <th>Reglas</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                            <?php foreach ($fields as $index => $f): ?>
+                                <?php $fid = (int)$f['id']; ?>
+                                <tr>
+                                    <td class="text-secondary"><?= $index + 1 ?></td>
+                                    <td>
+                                        <div class="fw-semibold"><?= $e($f['excel_header']) ?></div>
+                                        <?php if (!empty($f['header_aliases_json'])): ?>
+                                            <div class="small text-secondary mt-1">
+                                                <i class="bi bi-arrow-return-right me-1"></i>Con alias configurado
+                                            </div>
+                                        <?php endif; ?>
+                                    </td>
+                                    <td><code><?= $e($f['field_code']) ?></code></td>
+                                    <td>
+                                        <?php if ($v['status'] === 'DRAFT'): ?>
+                                            <select class="form-select form-select-sm"
+                                                    name="fields[<?= $fid ?>][data_type]">
+                                                <?php foreach (['STRING','INTEGER','DECIMAL','DATE','DATETIME','BOOLEAN','CATALOG'] as $type): ?>
+                                                    <option value="<?= $type ?>" <?= (string)$f['data_type'] === $type ? 'selected' : '' ?>><?= $type ?></option>
+                                                <?php endforeach; ?>
+                                            </select>
+                                        <?php else: ?>
+                                            <span class="badge text-bg-light border"><?= $e($f['data_type']) ?></span>
+                                        <?php endif; ?>
+                                    </td>
+                                    <td>
+                                        <?php if ($v['status'] === 'DRAFT'): ?>
+                                            <input class="form-control form-control-sm mb-2"
+                                                   name="fields[<?= $fid ?>][display_name]"
+                                                   value="<?= $e($f['display_name']) ?>"
+                                                   maxlength="180"
+                                                   required>
+                                            <input class="form-control form-control-sm"
+                                                   name="fields[<?= $fid ?>][header_aliases]"
+                                                   value="<?= $e(implode('; ', is_array(json_decode((string)($f['header_aliases_json'] ?? ''), true)) ? json_decode((string)$f['header_aliases_json'], true) : [])) ?>"
+                                                   placeholder="Alias de encabezado (opcional)">
+                                        <?php else: ?>
+                                            <div class="fw-semibold"><?= $e($f['display_name']) ?></div>
+                                        <?php endif; ?>
+                                    </td>
+                                    <td>
+                                        <?php if ($v['status'] === 'DRAFT'): ?>
+                                            <div class="d-flex flex-column gap-2 small">
+                                                <label class="form-check mb-0">
+                                                    <input class="form-check-input"
+                                                           type="checkbox"
+                                                           name="fields[<?= $fid ?>][is_required]"
+                                                           value="1"
+                                                           <?= (int)$f['is_required'] === 1 ? 'checked' : '' ?>>
+                                                    <span class="form-check-label">Obligatorio</span>
+                                                </label>
+                                                <label class="form-check mb-0">
+                                                    <input class="form-check-input"
+                                                           type="checkbox"
+                                                           name="fields[<?= $fid ?>][is_reportable]"
+                                                           value="1"
+                                                           <?= (int)$f['is_reportable'] === 1 ? 'checked' : '' ?>>
+                                                    <span class="form-check-label">Reportable</span>
+                                                </label>
+                                                <input class="form-control form-control-sm"
+                                                       type="number"
+                                                       min="0"
+                                                       name="fields[<?= $fid ?>][max_length]"
+                                                       value="<?= (int)($f['max_length'] ?? 0) ?>"
+                                                       placeholder="Longitud máx.">
+                                                <input class="form-control form-control-sm"
+                                                       name="fields[<?= $fid ?>][date_format]"
+                                                       value="<?= $e($f['date_format'] ?? '') ?>"
+                                                       placeholder="Formato fecha">
+                                                <input class="form-control form-control-sm"
+                                                       name="fields[<?= $fid ?>][validation_regex]"
+                                                       value="<?= $e($f['validation_regex'] ?? '') ?>"
+                                                       placeholder="Regex opcional">
+                                                <input type="hidden"
+                                                       name="fields[<?= $fid ?>][sort_order]"
+                                                       value="<?= $index + 1 ?>">
+                                            </div>
+                                        <?php else: ?>
+                                            <span class="text-secondary small">
+                                                <?= (int)$f['is_required'] === 1 ? 'Obligatorio' : 'Opcional' ?>
+                                            </span>
+                                        <?php endif; ?>
+                                    </td>
+                                </tr>
+                            <?php endforeach; ?>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <?php if ($v['status'] === 'DRAFT' && $fields !== []): ?>
+                        <div class="d-flex justify-content-end mt-3">
+                            <button class="btn btn-outline-brand" type="submit">
+                                <i class="bi bi-save2 me-1" aria-hidden="true"></i>
+                                Guardar configuración de campos
+                            </button>
+                        </div>
+                    <?php endif; ?>
+                </form>
 
                 <?php if ($v['status'] === 'DRAFT' && $fields !== []): ?>
                     <div class="mt-4 p-3 rounded-3 border bg-light-subtle">
