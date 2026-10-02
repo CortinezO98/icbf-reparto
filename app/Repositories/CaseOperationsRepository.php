@@ -226,6 +226,25 @@ final class CaseOperationsRepository
         return $st->fetchAll() ?: [];
     }
 
+    /** @return array{code:string,label:string}|null */
+    public function catalogItem(string $catalogCode, string $itemCode): ?array
+    {
+        $st = $this->pdo->prepare(
+            "SELECT ci.code,ci.label
+             FROM catalog_items ci
+             JOIN catalogs c ON c.id=ci.catalog_id
+             WHERE c.code=:catalog
+               AND c.is_active=1
+               AND ci.code=:item
+               AND ci.is_active=1
+             LIMIT 1"
+        );
+        $st->execute([':catalog'=>$catalogCode, ':item'=>$itemCode]);
+        $row = $st->fetch();
+
+        return $row ?: null;
+    }
+
     public function canManage(int $caseId, int $userId): bool
     {
         $st = $this->pdo->prepare(
