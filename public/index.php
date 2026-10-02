@@ -1,6 +1,7 @@
 <?php
-ob_start();
 declare(strict_types=1);
+
+ob_start();
 
 require dirname(__DIR__) . '/bootstrap/app.php';
 
