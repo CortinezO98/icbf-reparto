@@ -46,18 +46,19 @@ final class ShiftService
                     continue;
                 }
 
-                $this->repository->markAgentOfflineAtShiftEnd($userId, $now);
-
                 // El fin de turno marca al agente como OFFLINE, pero no libera
                 // los casos que ya está gestionando. La reasignación debe ser
                 // explícita por parte de un supervisor o administrador.
+                $this->repository->markAgentOfflineAtShiftEnd($userId, $now);
                 $this->pdo->commit();
 
                 $processed++;
                 $queues[$queueId] = true;
-                $releasedCaseIds = [];
 
+                // Se registra la finalización del procesamiento sin casos
+                // liberados. Los casos permanecen asignados a su agente.
                 $this->pdo->beginTransaction();
+
                 try {
                     $this->repository->finishShiftEndRun(
                         $scheduleId,
@@ -71,37 +72,6 @@ final class ShiftService
                         $this->pdo->rollBack();
                     }
                     throw $e;
-                }
-
-            } catch (\Throwable $e) {
-                    $assignmentError = $e;
-                    error_log(
-                        '[SHIFT_END_REASSIGN] ' . $e->getMessage()
-                    );
-                }
-
-                $pendingCases = $this->repository->pendingForCaseIds(
-                    $releasedCaseIds
-                );
-
-                $this->pdo->beginTransaction();
-                try {
-                    $this->repository->finishShiftEndRun(
-                        $scheduleId,
-                        $date,
-                        count($releasedCaseIds),
-                        $pendingCases
-                    );
-                    $this->pdo->commit();
-                } catch (\Throwable $e) {
-                    if ($this->pdo->inTransaction()) {
-                        $this->pdo->rollBack();
-                    }
-                    throw $e;
-                }
-
-                if ($assignmentError !== null) {
-                    throw $assignmentError;
                 }
             } catch (\Throwable $e) {
                 if ($this->pdo->inTransaction()) {
