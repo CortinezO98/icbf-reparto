@@ -90,7 +90,10 @@ foreach ($escalations as $item) {
                 <div class="datum"><small>Segmento</small><strong><?= htmlspecialchars((string)($case['segment'] ?: '—'), ENT_QUOTES, 'UTF-8') ?></strong></div>
                 <div class="datum"><small>Canal origen</small><strong><?= htmlspecialchars((string)($case['origin_channel'] ?: '—'), ENT_QUOTES, 'UTF-8') ?></strong></div>
                 <div class="datum"><small>Radicación</small><strong><?= htmlspecialchars((string)($case['radicated_at'] ?: '—'), ENT_QUOTES, 'UTF-8') ?></strong></div>
-                <div class="datum"><small>Última gestión</small><strong><?= htmlspecialchars((string)($case['current_management_type_code'] ?: 'Sin gestión'), ENT_QUOTES, 'UTF-8') ?></strong></div>
+                <div class="datum"><small>Última gestión</small><strong><?= htmlspecialchars($managementLabels[(string)($case['current_management_type_code'] ?? '')] ?? ((string)($case['current_management_type_code'] ?: 'Sin gestión')), ENT_QUOTES, 'UTF-8') ?></strong></div>
+                <?php if (!empty($case['current_escalation_category_code'])): ?>
+                    <div class="datum"><small>Subcategoría de escalamiento</small><strong><?= htmlspecialchars($escalationLabels[(string)$case['current_escalation_category_code']] ?? (string)$case['current_escalation_category_code'], ENT_QUOTES, 'UTF-8') ?></strong></div>
+                <?php endif; ?>
             </div>
 
             <?php if ($source !== []): ?>
