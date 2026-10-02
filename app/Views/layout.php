@@ -20,6 +20,7 @@ $canViewStructures = false;
 $canViewQueues = false;
 $canViewReports = false;
 $canViewShifts = false;
+$canViewSla = false;
 
 if (Auth::check() && Auth::id() !== null) {
     $pdo = Database::connection();
@@ -33,6 +34,8 @@ if (Auth::check() && Auth::id() !== null) {
     $canViewQueues = Authorization::hasPermission($pdo, $uid, 'QUEUE_VIEW');
     $canViewReports = Authorization::hasPermission($pdo, $uid, 'REPORT_VIEW');
     $canViewShifts = Authorization::hasPermission($pdo, $uid, 'SHIFT_VIEW');
+    // El tablero ANS es una herramienta de supervisión; los agentes no lo visualizan.
+    $canViewSla = !$isAgent && Authorization::hasPermission($pdo, $uid, 'SLA_VIEW');
 }
 
 $isActive = static function (string $prefix) use ($path): bool {
@@ -100,7 +103,7 @@ unset($_SESSION['_flash_error'], $_SESSION['_flash_success'], $_SESSION['_flash_
 
         <div class="collapse navbar-collapse" id="mainNavbar">
             <ul class="navbar-nav me-auto mb-2 mb-lg-0">
-                <?php if (Authorization::hasPermission(Database::connection(), (int)Auth::id(), 'SLA_VIEW')): ?>
+                <?php if ($canViewSla): ?>
                     <li class="nav-item">
                         <a class="nav-link <?= $isActive('/sla') || $path === '/' || $path === '/dashboard' ? 'active' : '' ?>" href="/sla">
                             <i class="bi bi-speedometer2 me-1" aria-hidden="true"></i>Tablero ANS
