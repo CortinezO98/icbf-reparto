@@ -70,6 +70,9 @@ unset($_SESSION['_flash_error'], $_SESSION['_flash_success'], $_SESSION['_flash_
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
     <link href="/assets/css/app.css?v=3" rel="stylesheet">
+    <?php if (str_starts_with($path, '/cases/')): ?>
+        <link href="/assets/css/case-detail.css?v=1" rel="stylesheet">
+    <?php endif; ?>
 </head>
 
 <body class="bg-light <?= $isAuthPage ? 'page-login' : 'page-app' ?>">
