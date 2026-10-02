@@ -5,7 +5,29 @@ use PDO;
 final class QueueRepository {
  public function __construct(private PDO $pdo) {}
  /** @return list<array<string,mixed>> */
- public function all(): array { return $this->pdo->query("SELECT q.*,COUNT(DISTINCT qa.id) agent_count,COUNT(DISTINCT qs.id) structure_count FROM work_queues q LEFT JOIN queue_agents qa ON qa.queue_id=q.id AND qa.is_enabled=1 LEFT JOIN queue_structures qs ON qs.queue_id=q.id AND qs.is_active=1 GROUP BY q.id ORDER BY q.priority DESC,q.name")->fetchAll() ?: []; }
+ public function all(): array {
+  $sql = "SELECT
+            q.*,
+            COUNT(DISTINCT qa.id) agent_count,
+            COUNT(DISTINCT qs.id) structure_count,
+            GROUP_CONCAT(
+              DISTINCT CONCAT(s.name, ' v', v.version_number)
+              ORDER BY s.name, v.version_number DESC
+              SEPARATOR '||'
+            ) structure_labels
+          FROM work_queues q
+          LEFT JOIN queue_agents qa
+            ON qa.queue_id=q.id AND qa.is_enabled=1 AND qa.removed_at IS NULL
+          LEFT JOIN queue_structures qs
+            ON qs.queue_id=q.id AND qs.is_active=1
+          LEFT JOIN import_structure_versions v
+            ON v.id=qs.structure_version_id AND v.status='ACTIVE'
+          LEFT JOIN import_structures s
+            ON s.id=v.structure_id AND s.is_active=1
+          GROUP BY q.id
+          ORDER BY q.priority DESC,q.name";
+  return $this->pdo->query($sql)->fetchAll() ?: [];
+}
  /** @return list<array<string,mixed>> */
  public function activeVersions(): array { return $this->pdo->query("SELECT v.id,CONCAT(s.name,' v',v.version_number) label FROM import_structure_versions v JOIN import_structures s ON s.id=v.structure_id WHERE v.status='ACTIVE' AND s.is_active=1 ORDER BY s.name,v.version_number DESC")->fetchAll() ?: []; }
  /** @param array<string,mixed> $d */
@@ -99,5 +121,43 @@ final class QueueRepository {
      }
  }
  
- public function attach(int $qid,int $vid): void { $st=$this->pdo->prepare('INSERT INTO queue_structures(queue_id,structure_version_id) VALUES(:q,:v) ON DUPLICATE KEY UPDATE is_active=1,updated_at=NOW(6)'); $st->execute([':q'=>$qid,':v'=>$vid]); }
+ public function attach(int $qid,int $vid): void {
+  $this->pdo->beginTransaction();
+  try {
+    $check = $this->pdo->prepare(
+      "SELECT v.id, s.name, v.version_number
+       FROM import_structure_versions v
+       JOIN import_structures s ON s.id=v.structure_id AND s.is_active=1
+       WHERE v.id=:vid AND v.status='ACTIVE'
+       LIMIT 1
+       FOR UPDATE"
+    );
+    $check->execute([':vid'=>$vid]);
+    if (!$check->fetch()) {
+      throw new \RuntimeException('La estructura seleccionada no está activa o ya no está disponible.');
+    }
+
+    $queue = $this->pdo->prepare(
+      "SELECT id FROM work_queues
+       WHERE id=:qid AND is_active=1
+       LIMIT 1
+       FOR UPDATE"
+    );
+    $queue->execute([':qid'=>$qid]);
+    if (!$queue->fetchColumn()) {
+      throw new \RuntimeException('La cola seleccionada no está activa.');
+    }
+
+    $st=$this->pdo->prepare(
+      'INSERT INTO queue_structures(queue_id,structure_version_id)
+       VALUES(:q,:v)
+       ON DUPLICATE KEY UPDATE is_active=1,updated_at=NOW(6)'
+    );
+    $st->execute([':q'=>$qid,':v'=>$vid]);
+    $this->pdo->commit();
+  } catch (\Throwable $e) {
+    if ($this->pdo->inTransaction()) $this->pdo->rollBack();
+    throw $e;
+  }
+}
 }
