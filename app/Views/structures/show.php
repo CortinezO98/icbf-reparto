@@ -78,7 +78,7 @@ $statusLabel = static fn(string $status): string => match ($status) {
                           enctype="multipart/form-data"
                           class="upload-version-box">
                         <input type="hidden" name="_csrf"
-                               value="<?= $e(AppAuthCsrf::token()) ?>">
+                               value="<?= $e(\App\Auth\Csrf::token()) ?>">
 
                         <label for="structure_file" class="form-label fw-semibold">
                             Archivo de estructura
@@ -155,7 +155,7 @@ $statusLabel = static fn(string $status): string => match ($status) {
                         <form method="post"
                               action="/admin/structures/<?= (int)$structure['id'] ?>/versions/<?= $vid ?>/activate"
                               class="m-0">
-                            <input type="hidden" name="_csrf" value="<?= $e(AppAuthCsrf::token()) ?>">
+                            <input type="hidden" name="_csrf" value="<?= $e(\App\Auth\Csrf::token()) ?>">
                             <button class="btn btn-brand"
                                     type="submit"
                                     <?= !$hasKey ? 'disabled title="Selecciona una llave externa antes de activar."' : '' ?>>
@@ -315,7 +315,7 @@ $statusLabel = static fn(string $status): string => match ($status) {
                         <form method="post"
                               action="/admin/structures/<?= (int)$structure['id'] ?>/versions/<?= $vid ?>/external-key"
                               class="row g-3 align-items-end">
-                            <input type="hidden" name="_csrf" value="<?= $e(AppAuthCsrf::token()) ?>">
+                            <input type="hidden" name="_csrf" value="<?= $e(\App\Auth\Csrf::token()) ?>">
                             <div class="col-lg-8">
                                 <label for="external_key_<?= $vid ?>" class="form-label fw-semibold mb-1">
                                     Llave externa de la versión
@@ -356,7 +356,7 @@ $statusLabel = static fn(string $status): string => match ($status) {
                         <form method="post"
                               action="/admin/structures/<?= (int)$structure['id'] ?>/versions/<?= $vid ?>/fields/create"
                               class="pt-4">
-                            <input type="hidden" name="_csrf" value="<?= $e(AppAuthCsrf::token()) ?>">
+                            <input type="hidden" name="_csrf" value="<?= $e(\App\Auth\Csrf::token()) ?>">
 
                             <div class="row g-3">
                                 <div class="col-md-4">
@@ -438,7 +438,7 @@ $statusLabel = static fn(string $status): string => match ($status) {
                 <form method="post"
                       action="/admin/structures/<?= (int)$structure['id'] ?>/versions/create"
                       class="row g-3 mt-2">
-                    <input type="hidden" name="_csrf" value="<?= $e(AppAuthCsrf::token()) ?>">
+                    <input type="hidden" name="_csrf" value="<?= $e(\App\Auth\Csrf::token()) ?>">
 
                     <div class="col-md-4">
                         <label class="form-label">Modo de hoja</label>
