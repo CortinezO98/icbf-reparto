@@ -54,6 +54,39 @@ final class AssignmentRepository
     }
 
     /** @return list<int> */
+    public function availableAgentIds(): array
+    {
+        $stale = max(30, (int)($_ENV['AGENT_PRESENCE_STALE_SECONDS'] ?? 90));
+        $cutoff = (new DateTimeImmutable())
+            ->modify("-{$stale} seconds")
+            ->format('Y-m-d H:i:s.u');
+
+        $st = $this->pdo->prepare(
+            "SELECT DISTINCT u.id
+             FROM users u
+             JOIN user_roles ur ON ur.user_id=u.id
+             JOIN roles r
+               ON r.id=ur.role_id
+              AND r.code='AGENTE'
+              AND r.is_active=1
+             JOIN agent_presence ap
+               ON ap.user_id=u.id
+              AND ap.ended_at IS NULL
+              AND ap.status_code='AVAILABLE'
+              AND ap.last_heartbeat_at>=:cutoff
+             WHERE u.is_active=1
+               AND u.assign_enabled=1
+             ORDER BY u.id"
+        );
+        $st->execute([':cutoff'=>$cutoff]);
+
+        return array_map(
+            'intval',
+            $st->fetchAll(PDO::FETCH_COLUMN) ?: []
+        );
+    }
+
+    /** @return list<int> */
     public function eligibleQueueIdsForAgent(int $userId): array
     {
         $tz = new \DateTimeZone($_ENV['APP_TIMEZONE'] ?? 'America/Bogota');
