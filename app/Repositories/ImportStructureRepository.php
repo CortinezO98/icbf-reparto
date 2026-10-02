@@ -105,6 +105,51 @@ final class ImportStructureRepository {
   }
  }
 
+ /** @param array<string,array<string,mixed>> $fields */
+ public function updateDraftFields(int $sid,int $vid,array $fields): void {
+  $allowedTypes=['STRING','INTEGER','DECIMAL','DATE','DATETIME','BOOLEAN','CATALOG'];
+
+  $this->pdo->beginTransaction();
+  try {
+   $st=$this->pdo->prepare('SELECT id FROM import_structure_versions WHERE id=:vid AND structure_id=:sid AND status="DRAFT" FOR UPDATE');
+   $st->execute([':vid'=>$vid,':sid'=>$sid]);
+   if(!$st->fetchColumn()) throw new \RuntimeException('Solo se pueden editar campos de una versión en borrador.');
+
+   $fieldSt=$this->pdo->prepare('SELECT id FROM import_structure_fields WHERE id=:id AND structure_version_id=:vid AND is_active=1');
+   $update=$this->pdo->prepare('UPDATE import_structure_fields SET display_name=:dn,data_type=:dt,is_required=:req,is_reportable=:rep,max_length=:ml,validation_regex=:rx,date_format=:df,header_aliases_json=:ha,sort_order=:so WHERE id=:id AND structure_version_id=:vid');
+
+   foreach($fields as $fieldId=>$data){
+    $id=(int)$fieldId;
+    $fieldSt->execute([':id'=>$id,':vid'=>$vid]);
+    if(!$fieldSt->fetchColumn()) throw new \RuntimeException('Se recibió un campo que no pertenece a la versión.');
+
+    $type=(string)($data['data_type'] ?? 'STRING');
+    if(!in_array($type,$allowedTypes,true)) throw new \RuntimeException('Tipo de dato no permitido.');
+
+    $displayName=trim((string)($data['display_name'] ?? ''));
+    if($displayName==='') throw new \RuntimeException('Todos los campos deben tener un nombre visible.');
+
+    $aliases=array_values(array_filter(array_map('trim',preg_split('/[\r\n,;]+/',(string)($data['header_aliases'] ?? '')) ?: [])));
+
+    $update->execute([
+     ':id'=>$id, ':vid'=>$vid, ':dn'=>$displayName, ':dt'=>$type,
+     ':req'=>isset($data['is_required']) ? 1 : 0,
+     ':rep'=>isset($data['is_reportable']) ? 1 : 0,
+     ':ml'=>max(0,(int)($data['max_length'] ?? 0)) ?: null,
+     ':rx'=>trim((string)($data['validation_regex'] ?? '')) ?: null,
+     ':df'=>trim((string)($data['date_format'] ?? '')) ?: null,
+     ':ha'=>$aliases!==[] ? json_encode($aliases,JSON_UNESCAPED_UNICODE) : null,
+     ':so'=>max(1,(int)($data['sort_order'] ?? 1))
+    ]);
+   }
+
+   $this->pdo->commit();
+  } catch(\Throwable $e){
+   if($this->pdo->inTransaction()) $this->pdo->rollBack();
+   throw $e;
+  }
+ }
+
  public function activate(int $sid,int $vid,int $uid): void {
   $this->pdo->beginTransaction(); try {
    $st=$this->pdo->prepare('SELECT id FROM import_structure_versions WHERE id=:vid AND structure_id=:sid FOR UPDATE'); $st->execute([':vid'=>$vid,':sid'=>$sid]); if(!$st->fetchColumn()) throw new \RuntimeException('Versión no encontrada.');
