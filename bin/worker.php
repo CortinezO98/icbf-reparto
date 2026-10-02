@@ -74,38 +74,12 @@ try {
                 );
 
                 foreach ($presenceResult['user_ids'] as $staleUserId) {
-                    try {
-                        $released = $assignment->releaseCasesForAgent(
-                            $staleUserId,
-                            'STALE_HEARTBEAT'
-                        );
-
-                        foreach ($released['queue_ids'] as $releasedQueueId) {
-                            $assignment->run($releasedQueueId, 500, 'REASSIGN');
-                        }
-
-                        if ($released['case_ids'] !== []) {
-                            echo sprintf(
-                                "[worker] desconexion agente=%d liberados=%d colas=%s\n",
-                                $staleUserId,
-                                count($released['case_ids']),
-                                $released['queue_ids'] === []
-                                    ? '-'
-                                    : implode(',', $released['queue_ids'])
-                            );
-                        }
-                    } catch (\Throwable $releaseError) {
-                        error_log(
-                            '[WORKER][STALE_RELEASE] ' . $releaseError->getMessage()
-                        );
-                        fwrite(
-                            STDERR,
-                            '[worker] error liberando casos por desconexion: '
-                            . $releaseError->getMessage()
-                            . PHP_EOL
-                        );
-                    }
+                    echo sprintf(
+                        "[worker] agente=%d marcado OFFLINE; casos existentes conservados\n",
+                        $staleUserId
+                    );
                 }
+
             }
 
             $shiftResult = $shiftService->processEndedShifts();
