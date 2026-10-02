@@ -70,6 +70,90 @@ final class AssignmentEngine
     }
 
     /**
+     * Recupera únicamente casos previamente asignados al agente que quedaron
+     * pendientes por una liberación automática histórica. No toma casos nuevos.
+     *
+     * @return array{recovered:int,iterations:int}
+     */
+    public function recoverForAgent(
+        int $userId,
+        int $maxRecoveries = 500
+    ): array {
+        $maxRecoveries = max(1, min(5000, $maxRecoveries));
+        $recovered = 0;
+        $iterations = 0;
+
+        $queueIds = $this->repo->eligibleQueueIdsForAgent($userId);
+
+        foreach ($queueIds as $queueId) {
+            while ($recovered < $maxRecoveries) {
+                $iterations++;
+
+                $this->pdo->beginTransaction();
+
+                try {
+                    $lockedUser = $this->repo->lockUser($userId);
+
+                    if (
+                        !$lockedUser
+                        || (int)$lockedUser['is_active'] !== 1
+                        || (int)$lockedUser['assign_enabled'] !== 1
+                        || !$this->repo->isAvailableNow($userId)
+                        || !$this->repo->isOnShiftForQueue($queueId, $userId)
+                        || !$this->repo->isEligibleForQueue($queueId, $userId)
+                    ) {
+                        $this->pdo->commit();
+                        break;
+                    }
+
+                    $capacity = $this->repo->capacityForQueue($queueId, $userId);
+                    $openCases = $this->repo->openCaseCount($queueId, $userId);
+
+                    if ($capacity <= 0 || $openCases >= $capacity) {
+                        $this->pdo->commit();
+                        break;
+                    }
+
+                    $limit = min(
+                        $capacity - $openCases,
+                        $maxRecoveries - $recovered
+                    );
+
+                    $caseIds = $this->repo->recoverInterruptedCasesForAgent(
+                        $queueId,
+                        $userId,
+                        $limit
+                    );
+
+                    $count = count($caseIds);
+                    $this->pdo->commit();
+
+                    if ($count === 0) {
+                        break;
+                    }
+
+                    $recovered += $count;
+                } catch (\Throwable $e) {
+                    if ($this->pdo->inTransaction()) {
+                        $this->pdo->rollBack();
+                    }
+
+                    throw $e;
+                }
+            }
+
+            if ($recovered >= $maxRecoveries) {
+                break;
+            }
+        }
+
+        return [
+            'recovered'=>$recovered,
+            'iterations'=>$iterations,
+        ];
+    }
+
+    /**
      * Reparte inmediatamente a un agente que acaba de pasar a AVAILABLE.
      *
      * La operación queda limitada a las colas en las que el agente es elegible
