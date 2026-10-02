@@ -148,9 +148,13 @@ final class StructureVersionBuilder
     {
         $preferred = [
             'numero_peticion',
+            'numero_de_peticion',
             'numero_sim',
+            'numero_de_sim',
             'numero_solicitud',
+            'numero_de_solicitud',
             'numero_caso',
+            'numero_de_caso',
             'id_peticion',
             'id_caso',
             'sim',
