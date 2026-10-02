@@ -64,7 +64,7 @@ final class ShiftService
                         $scheduleId,
                         $date,
                         0,
-                        []
+                        0
                     );
                     $this->pdo->commit();
                 } catch (\Throwable $e) {
