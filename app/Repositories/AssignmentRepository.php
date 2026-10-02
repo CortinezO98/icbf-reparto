@@ -119,26 +119,35 @@ final class AssignmentRepository
              WHERE qa.user_id=:user_id
                AND qa.is_enabled=1
                AND qa.removed_at IS NULL
-               AND EXISTS (
-                    SELECT 1
-                    FROM agent_shift_schedules ass
-                    JOIN work_shifts ws
-                      ON ws.id=ass.shift_id
-                     AND ws.is_active=1
-                    WHERE ass.user_id=u.id
-                      AND ass.queue_id=qa.queue_id
-                      AND ass.is_active=1
-                      AND (
-                           ass.schedule_date=:shift_date_specific
-                           OR (
-                               ass.schedule_date IS NULL
-                               AND ass.weekday=:shift_weekday
-                           )
-                      )
-                      AND (ass.valid_from IS NULL OR ass.valid_from<=:shift_valid_from)
-                      AND (ass.valid_to IS NULL OR ass.valid_to>=:shift_valid_to)
-                      AND ws.start_time<=:shift_time_start
-                      AND ws.end_time>:shift_time_end
+               AND (
+                    NOT EXISTS (
+                        SELECT 1
+                        FROM agent_shift_schedules ass0
+                        WHERE ass0.user_id=u.id
+                          AND ass0.queue_id=qa.queue_id
+                          AND ass0.is_active=1
+                    )
+                    OR EXISTS (
+                        SELECT 1
+                        FROM agent_shift_schedules ass
+                        JOIN work_shifts ws
+                          ON ws.id=ass.shift_id
+                         AND ws.is_active=1
+                        WHERE ass.user_id=u.id
+                          AND ass.queue_id=qa.queue_id
+                          AND ass.is_active=1
+                          AND (
+                               ass.schedule_date=:shift_date_specific
+                               OR (
+                                   ass.schedule_date IS NULL
+                                   AND ass.weekday=:shift_weekday
+                               )
+                          )
+                          AND (ass.valid_from IS NULL OR ass.valid_from<=:shift_valid_from)
+                          AND (ass.valid_to IS NULL OR ass.valid_to>=:shift_valid_to)
+                          AND ws.start_time<=:shift_time_start
+                          AND ws.end_time>:shift_time_end
+                    )
                )
                AND NOT EXISTS (
                     SELECT 1
@@ -210,26 +219,35 @@ final class AssignmentRepository
              WHERE qa.queue_id=:qid
                AND qa.is_enabled=1
                AND qa.removed_at IS NULL
-               AND EXISTS (
-                    SELECT 1
-                    FROM agent_shift_schedules ass
-                    JOIN work_shifts ws
-                      ON ws.id=ass.shift_id
-                     AND ws.is_active=1
-                    WHERE ass.user_id=u.id
-                      AND ass.queue_id=qa.queue_id
-                      AND ass.is_active=1
-                      AND (
-                           ass.schedule_date=:shift_date_specific
-                           OR (
-                               ass.schedule_date IS NULL
-                               AND ass.weekday=:shift_weekday
-                           )
-                      )
-                      AND (ass.valid_from IS NULL OR ass.valid_from<=:shift_valid_from)
-                      AND (ass.valid_to IS NULL OR ass.valid_to>=:shift_valid_to)
-                      AND ws.start_time<=:shift_time_start
-                      AND ws.end_time>:shift_time_end
+               AND (
+                    NOT EXISTS (
+                        SELECT 1
+                        FROM agent_shift_schedules ass0
+                        WHERE ass0.user_id=u.id
+                          AND ass0.queue_id=qa.queue_id
+                          AND ass0.is_active=1
+                    )
+                    OR EXISTS (
+                        SELECT 1
+                        FROM agent_shift_schedules ass
+                        JOIN work_shifts ws
+                          ON ws.id=ass.shift_id
+                         AND ws.is_active=1
+                        WHERE ass.user_id=u.id
+                          AND ass.queue_id=qa.queue_id
+                          AND ass.is_active=1
+                          AND (
+                               ass.schedule_date=:shift_date_specific
+                               OR (
+                                   ass.schedule_date IS NULL
+                                   AND ass.weekday=:shift_weekday
+                               )
+                          )
+                          AND (ass.valid_from IS NULL OR ass.valid_from<=:shift_valid_from)
+                          AND (ass.valid_to IS NULL OR ass.valid_to>=:shift_valid_to)
+                          AND ws.start_time<=:shift_time_start
+                          AND ws.end_time>:shift_time_end
+                    )
                )
                AND NOT EXISTS (
                     SELECT 1
@@ -290,6 +308,26 @@ final class AssignmentRepository
         $date = $local->format('Y-m-d');
         $weekday = (int)$local->format('N');
         $time = $local->format('H:i:s');
+
+        // El cronograma de turnos es opcional. Si no existe ninguna
+        // programación activa para la relación agente-cola, no debe bloquear
+        // el reparto: se conserva el comportamiento operativo anterior.
+        $configured = $this->pdo->prepare(
+            "SELECT 1
+             FROM agent_shift_schedules
+             WHERE user_id=:user_id
+               AND queue_id=:queue_id
+               AND is_active=1
+             LIMIT 1"
+        );
+        $configured->execute([
+            ':user_id'=>$userId,
+            ':queue_id'=>$queueId,
+        ]);
+
+        if (!$configured->fetchColumn()) {
+            return true;
+        }
 
         $st = $this->pdo->prepare(
             "SELECT 1
