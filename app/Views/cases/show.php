@@ -244,34 +244,44 @@ usort(
 
                 <div class="case-card__body">
                     <div class="case-kpi-grid">
-                        <div class="case-kpi">
-                            <div class="case-kpi__label"><i class="bi bi-clock" aria-hidden="true"></i>Tiempo ANS consumido</div>
-                            <div class="case-kpi__value"><?= $e($elapsedLabel) ?></div>
-                            <?php if (in_array($slaStatus, ['RED', 'BREACHED'], true)): ?>
-                                <div class="case-kpi__meta">Fuera del tiempo objetivo</div>
-                            <?php endif; ?>
+                        <div class="case-kpi case-kpi--sla">
+                            <div class="case-kpi__icon"><i class="bi bi-clock-history" aria-hidden="true"></i></div>
+                            <div class="case-kpi__content">
+                                <div class="case-kpi__label">Tiempo ANS consumido</div>
+                                <div class="case-kpi__value"><?= $e($elapsedLabel) ?></div>
+                                <?php if (in_array($slaStatus, ['RED', 'BREACHED'], true)): ?>
+                                    <div class="case-kpi__meta">Fuera del tiempo objetivo</div>
+                                <?php endif; ?>
+                            </div>
                         </div>
-                        <div class="case-kpi">
-                            <div class="case-kpi__label"><i class="bi bi-calendar-event" aria-hidden="true"></i>Vencimiento ANS</div>
-                            <div class="case-kpi__value"><?= $e($case['sla_due_at'] ?: '—') ?></div>
+                        <div class="case-kpi case-kpi--due">
+                            <div class="case-kpi__icon"><i class="bi bi-calendar3" aria-hidden="true"></i></div>
+                            <div class="case-kpi__content">
+                                <div class="case-kpi__label">Vencimiento ANS</div>
+                                <div class="case-kpi__value"><?= $e($case['sla_due_at'] ?: '—') ?></div>
+                                <?php if (in_array($slaStatus, ['RED', 'BREACHED'], true)): ?><div class="case-kpi__meta case-kpi__meta--danger">Vencido</div><?php endif; ?>
+                            </div>
                         </div>
-                        <div class="case-kpi">
-                            <div class="case-kpi__label"><i class="bi bi-check2-circle" aria-hidden="true"></i>Primera gestión</div>
-                            <div class="case-kpi__value"><?= $e($case['first_management_at'] ?: 'Pendiente') ?></div>
-                            <?php if (empty($case['first_management_at'])): ?><div class="case-kpi__meta">Aún no se ha registrado una gestión</div><?php endif; ?>
+                        <div class="case-kpi case-kpi--management">
+                            <div class="case-kpi__icon"><i class="bi bi-check2-circle" aria-hidden="true"></i></div>
+                            <div class="case-kpi__content">
+                                <div class="case-kpi__label">Primera gestión</div>
+                                <div class="case-kpi__value"><?= $e($case['first_management_at'] ?: 'Pendiente') ?></div>
+                                <?php if (empty($case['first_management_at'])): ?><div class="case-kpi__meta">Aún no se ha registrado una gestión</div><?php endif; ?>
+                            </div>
                         </div>
                     </div>
 
                     <div class="case-data-grid">
-                        <div class="case-datum"><div class="case-datum__label">Cola</div><div class="case-datum__value"><?= $e($case['queue_name'] ?: '—') ?></div></div>
-                        <div class="case-datum"><div class="case-datum__label">Agente asignado</div><div class="case-datum__value"><?= $e($case['assigned_user_name'] ?: 'Sin asignar') ?></div></div>
-                        <div class="case-datum"><div class="case-datum__label">Tipo de petición</div><div class="case-datum__value"><?= $e($case['petition_type'] ?: '—') ?></div></div>
-                        <div class="case-datum"><div class="case-datum__label">Regional</div><div class="case-datum__value"><?= $e($case['regional'] ?: '—') ?></div></div>
-                        <div class="case-datum"><div class="case-datum__label">Segmento</div><div class="case-datum__value"><?= $e($case['segment'] ?: '—') ?></div></div>
-                        <div class="case-datum"><div class="case-datum__label">Canal de origen</div><div class="case-datum__value"><?= $e($case['origin_channel'] ?: '—') ?></div></div>
-                        <div class="case-datum"><div class="case-datum__label">Radicación</div><div class="case-datum__value"><?= $e($case['radicated_at'] ?: '—') ?></div></div>
-                        <div class="case-datum"><div class="case-datum__label">Estado de petición</div><div class="case-datum__value"><?= $e($source['estado_peticion'] ?? '—') ?></div></div>
-                        <div class="case-datum"><div class="case-datum__label">Última gestión</div><div class="case-datum__value"><?= $e($managementLabels[(string)($case['current_management_type_code'] ?? '')] ?? ((string)($case['current_management_type_code'] ?: 'Sin gestión'))) ?></div></div>
+                        <div class="case-datum"><div class="case-datum__icon"><i class="bi bi-layers" aria-hidden="true"></i></div><div><div class="case-datum__label">Cola</div><div class="case-datum__value"><?= $e($case['queue_name'] ?: '—') ?></div></div></div>
+                        <div class="case-datum"><div class="case-datum__icon"><i class="bi bi-person" aria-hidden="true"></i></div><div><div class="case-datum__label">Agente asignado</div><div class="case-datum__value"><?= $e($case['assigned_user_name'] ?: 'Sin asignar') ?></div></div></div>
+                        <div class="case-datum"><div class="case-datum__icon"><i class="bi bi-file-earmark-text" aria-hidden="true"></i></div><div><div class="case-datum__label">Tipo de petición</div><div class="case-datum__value"><?= $e($case['petition_type'] ?: '—') ?></div></div></div>
+                        <div class="case-datum"><div class="case-datum__icon"><i class="bi bi-geo-alt" aria-hidden="true"></i></div><div><div class="case-datum__label">Regional</div><div class="case-datum__value"><?= $e($case['regional'] ?: '—') ?></div></div></div>
+                        <div class="case-datum"><div class="case-datum__icon"><i class="bi bi-tag" aria-hidden="true"></i></div><div><div class="case-datum__label">Segmento</div><div class="case-datum__value"><?= $e($case['segment'] ?: '—') ?></div></div></div>
+                        <div class="case-datum"><div class="case-datum__icon"><i class="bi bi-share" aria-hidden="true"></i></div><div><div class="case-datum__label">Canal de origen</div><div class="case-datum__value"><?= $e($case['origin_channel'] ?: '—') ?></div></div></div>
+                        <div class="case-datum"><div class="case-datum__icon"><i class="bi bi-calendar-event" aria-hidden="true"></i></div><div><div class="case-datum__label">Radicación</div><div class="case-datum__value"><?= $e($case['radicated_at'] ?: '—') ?></div></div></div>
+                        <div class="case-datum"><div class="case-datum__icon"><i class="bi bi-file-check" aria-hidden="true"></i></div><div><div class="case-datum__label">Estado de petición</div><div class="case-datum__value"><?= $e($source['estado_peticion'] ?? '—') ?></div></div></div>
+                        <div class="case-datum"><div class="case-datum__icon"><i class="bi bi-activity" aria-hidden="true"></i></div><div><div class="case-datum__label">Última gestión</div><div class="case-datum__value"><?= $e($managementLabels[(string)($case['current_management_type_code'] ?? '')] ?? ((string)($case['current_management_type_code'] ?: 'Sin gestión'))) ?></div></div></div>
                     </div>
 
                     <?php if ($source !== []): ?>
