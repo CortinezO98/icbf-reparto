@@ -109,13 +109,13 @@ try {
 
                     if ($recoveryResult['recovered'] > 0) {
                         echo sprintf(
-                            "[worker] recuperados=%d agente=%d iteraciones=%d\\n",
+                            "[worker] recuperados=%d agente=%d iteraciones=%d\n",
                             $recoveryResult['recovered'],
                             $availableAgentId,
                             $recoveryResult['iterations']
                         );
                     }
-                } catch (\\Throwable $recoveryError) {
+                } catch (\Throwable $recoveryError) {
                     error_log(
                         '[WORKER][CASE_RECOVERY] ' . $recoveryError->getMessage()
                     );
