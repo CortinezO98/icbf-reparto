@@ -97,6 +97,8 @@ final class CasesController
         $petitionTypes = $repo->catalogItems('PETITION_TYPE');
         $canManage = $repo->canManage($id, $uid);
         $canReassign = Authorization::hasPermission($this->pdo, $uid, 'CASE_REASSIGN');
+        $canViewSla = Authorization::hasPermission($this->pdo, $uid, 'SLA_VIEW')
+            && !in_array('AGENTE', Authorization::roles($this->pdo, $uid), true);
         $reassignmentCandidates = $canReassign
             ? (new AssignmentRepository($this->pdo))->reassignmentCandidates(
                 $id,
