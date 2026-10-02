@@ -743,7 +743,11 @@ final class AssignmentRepository
             return [];
         }
 
-        $this->pdo->beginTransaction();
+        $ownsTransaction = !$this->pdo->inTransaction();
+
+        if ($ownsTransaction) {
+            $this->pdo->beginTransaction();
+        }
 
         try {
             $st = $this->pdo->prepare(
@@ -783,7 +787,9 @@ final class AssignmentRepository
             $cases = $st->fetchAll() ?: [];
 
             if ($cases === []) {
-                $this->pdo->commit();
+                if ($ownsTransaction) {
+                    $this->pdo->commit();
+                }
                 return [];
             }
 
@@ -824,7 +830,7 @@ final class AssignmentRepository
                 ]);
 
                 if ($update->rowCount() !== 1) {
-                    throw new RuntimeException(
+                    throw new \RuntimeException(
                         "No fue posible recuperar el caso {$caseId}."
                     );
                 }
@@ -860,11 +866,13 @@ final class AssignmentRepository
                 $touch->execute([':user_id'=>$userId]);
             }
 
-            $this->pdo->commit();
+            if ($ownsTransaction) {
+                $this->pdo->commit();
+            }
 
             return $caseIds;
-        } catch (Throwable $e) {
-            if ($this->pdo->inTransaction()) {
+        } catch (\Throwable $e) {
+            if ($ownsTransaction && $this->pdo->inTransaction()) {
                 $this->pdo->rollBack();
             }
 
