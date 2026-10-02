@@ -177,32 +177,36 @@ usort(
 ?>
 <div class="case-detail">
     <nav class="case-breadcrumb" aria-label="Ruta de navegación">
-        <a href="/cases"><i class="bi bi-inbox me-1" aria-hidden="true"></i>Casos</a>
+        <a href="/cases"><i class="bi bi-inbox" aria-hidden="true"></i> Casos</a>
         <i class="bi bi-chevron-right" aria-hidden="true"></i>
         <span><?= $e($case['case_number']) ?></span>
     </nav>
 
     <header class="case-hero">
         <div class="case-hero-main">
-            <h1><?= $e($case['case_number']) ?></h1>
-            <div class="case-hero-sub">
-                <span>Radicado/SIM: <strong><?= $e($case['external_key']) ?></strong></span>
-                <span class="case-badge <?= $slaClass ?>">
-                    <i class="bi bi-exclamation-circle" aria-hidden="true"></i>
-                    <?= $e($slaStatus !== '' ? $slaStatus : 'ANS pendiente') ?>
-                </span>
-                <span class="case-badge case-badge--neutral">
-                    <i class="bi bi-circle-fill" aria-hidden="true"></i>
-                    <?= $e($stateLabel) ?>
-                </span>
+            <div class="case-title-row">
+                <div class="case-title-icon" aria-hidden="true"><i class="bi bi-file-earmark-text"></i></div>
+                <div>
+                    <h1><?= $e($case['case_number']) ?></h1>
+                    <div class="case-hero-sub">
+                        <span>Radicado/SIM: <strong><?= $e($case['external_key']) ?></strong></span>
+                        <span class="case-badge <?= $slaClass ?>">
+                            <i class="bi bi-exclamation-circle" aria-hidden="true"></i>
+                            <?= $e($slaStatus !== '' ? $slaStatus : 'ANS pendiente') ?>
+                        </span>
+                        <span class="case-badge case-badge--neutral"><?= $e($stateLabel) ?></span>
+                    </div>
+                </div>
             </div>
         </div>
 
         <div class="case-actions">
-            <a class="btn btn-outline-secondary btn-sm" href="/sla">
-                <i class="bi bi-speedometer2 me-1" aria-hidden="true"></i>Tablero ANS
-            </a>
-            <a class="btn btn-light btn-sm border" href="/cases">
+            <?php if ($canViewSla): ?>
+                <a class="btn btn-light border btn-sm" href="/sla">
+                    <i class="bi bi-speedometer2 me-1" aria-hidden="true"></i>Tablero ANS
+                </a>
+            <?php endif; ?>
+            <a class="btn btn-light border btn-sm" href="/cases">
                 <i class="bi bi-arrow-left me-1" aria-hidden="true"></i>Volver a casos
             </a>
         </div>
@@ -223,19 +227,18 @@ usort(
     <?php endif; ?>
 
     <div class="case-layout">
-        <main class="case-stack">
-            <section class="case-card" aria-labelledby="case-info-title">
+        <main class="case-main">
+            <section class="case-card case-info-card" aria-labelledby="case-info-title">
                 <div class="case-card__head">
                     <div class="case-card__title">
                         <div class="case-card__icon"><i class="bi bi-info-circle" aria-hidden="true"></i></div>
                         <div>
                             <h2 id="case-info-title">Información del caso</h2>
-                            <p>Resumen operativo y estado actual del caso.</p>
+                            <p>Datos generales del caso y su estado actual.</p>
                         </div>
                     </div>
                     <span class="case-badge case-badge--info">
-                        <i class="bi bi-record-circle" aria-hidden="true"></i>
-                        <?= $e($stateLabel) ?>
+                        <i class="bi bi-record-circle" aria-hidden="true"></i><?= $e($stateLabel) ?>
                     </span>
                 </div>
 
@@ -255,6 +258,7 @@ usort(
                         <div class="case-kpi">
                             <div class="case-kpi__label"><i class="bi bi-check2-circle" aria-hidden="true"></i>Primera gestión</div>
                             <div class="case-kpi__value"><?= $e($case['first_management_at'] ?: 'Pendiente') ?></div>
+                            <?php if (empty($case['first_management_at'])): ?><div class="case-kpi__meta">Aún no se ha registrado una gestión</div><?php endif; ?>
                         </div>
                     </div>
 
@@ -266,20 +270,20 @@ usort(
                         <div class="case-datum"><div class="case-datum__label">Segmento</div><div class="case-datum__value"><?= $e($case['segment'] ?: '—') ?></div></div>
                         <div class="case-datum"><div class="case-datum__label">Canal de origen</div><div class="case-datum__value"><?= $e($case['origin_channel'] ?: '—') ?></div></div>
                         <div class="case-datum"><div class="case-datum__label">Radicación</div><div class="case-datum__value"><?= $e($case['radicated_at'] ?: '—') ?></div></div>
+                        <div class="case-datum"><div class="case-datum__label">Estado de petición</div><div class="case-datum__value"><?= $e($source['estado_peticion'] ?? '—') ?></div></div>
                         <div class="case-datum"><div class="case-datum__label">Última gestión</div><div class="case-datum__value"><?= $e($managementLabels[(string)($case['current_management_type_code'] ?? '')] ?? ((string)($case['current_management_type_code'] ?: 'Sin gestión'))) ?></div></div>
-                        <?php if (!empty($case['current_escalation_category_code'])): ?>
-                            <div class="case-datum"><div class="case-datum__label">Subcategoría de escalamiento</div><div class="case-datum__value"><?= $e($escalationLabels[(string)$case['current_escalation_category_code']] ?? $case['current_escalation_category_code']) ?></div></div>
-                        <?php endif; ?>
                     </div>
 
                     <?php if ($source !== []): ?>
-                        <details class="case-source">
-                            <summary>Datos de origen <span class="text-muted fw-normal">Información recibida desde el sistema de radicación</span></summary>
+                        <details class="case-source" open>
+                            <summary>
+                                <span><strong>Datos de origen</strong><small>Información proveniente del sistema de radicación</small></span>
+                            </summary>
                             <div class="case-source-grid">
                                 <?php foreach ($source as $key => $value): ?>
-                                    <div class="case-datum">
-                                        <div class="case-datum__label"><?= $e($key) ?></div>
-                                        <div class="case-datum__value"><?= $e(is_scalar($value) ? $value : json_encode($value, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)) ?></div>
+                                    <div class="case-source-row">
+                                        <div class="case-source-key"><?= $e(ucwords(str_replace('_', ' ', (string)$key))) ?></div>
+                                        <div class="case-source-value"><?= $e(is_scalar($value) ? $value : json_encode($value, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)) ?></div>
                                     </div>
                                 <?php endforeach; ?>
                             </div>
@@ -288,62 +292,51 @@ usort(
                 </div>
             </section>
 
-            <section class="case-card" aria-labelledby="tracking-title">
+            <section class="case-card management-history-card" aria-labelledby="management-history-title">
                 <div class="case-card__head">
                     <div class="case-card__title">
-                        <div class="case-card__icon"><i class="bi bi-clock-history" aria-hidden="true"></i></div>
+                        <div class="case-card__icon case-card__icon--blue"><i class="bi bi-chat-square-text" aria-hidden="true"></i></div>
                         <div>
-                            <h2 id="tracking-title">Seguimiento y trazabilidad</h2>
-                            <p>Historial cronológico de asignaciones, gestiones y eventos del caso.</p>
+                            <h2 id="management-history-title">Historial de gestión</h2>
+                            <p>Gestiones registradas por los agentes en este caso.</p>
                         </div>
                     </div>
-                    <?php if ($tracking !== []): ?>
-                        <span class="case-badge case-badge--neutral"><?= count($tracking) ?> eventos</span>
-                    <?php endif; ?>
+                    <?php if ($managements !== []): ?><span class="case-badge case-badge--neutral"><?= count($managements) ?> <?= count($managements) === 1 ? 'gestión' : 'gestiones' ?></span><?php endif; ?>
                 </div>
-
                 <div class="case-card__body">
-                    <?php if ($tracking !== []): ?>
-                        <div class="case-tracking" aria-label="Línea de tiempo del caso">
-                            <?php foreach ($tracking as $item): ?>
-                                <article class="case-track-item case-track-item--<?= $e($item['kind']) ?>">
-                                    <div class="case-track-rail">
-                                        <span class="case-track-dot">
-                                            <i class="bi <?= $e($item['icon']) ?>" aria-hidden="true"></i>
-                                        </span>
-                                    </div>
-                                    <div class="case-track-content">
-                                        <div class="case-track-top">
-                                            <div class="case-track-title"><?= $e($item['title']) ?></div>
-                                            <time class="case-track-date" datetime="<?= $e($item['at']) ?>"><?= $e($item['at']) ?></time>
+                    <?php if ($managements !== []): ?>
+                        <div class="management-history">
+                            <?php foreach ($managements as $management): ?>
+                                <?php
+                                $mCode = (string)($management['management_type_code'] ?? '');
+                                $mTitle = $managementLabels[$mCode] ?? ($mCode !== '' ? $mCode : 'Gestión');
+                                ?>
+                                <article class="management-entry">
+                                    <div class="management-entry__icon"><i class="bi bi-check2" aria-hidden="true"></i></div>
+                                    <div class="management-entry__body">
+                                        <div class="management-entry__top">
+                                            <strong><?= $e($mTitle) ?></strong>
+                                            <time><?= $e($management['created_at'] ?? '') ?></time>
                                         </div>
-                                        <div class="case-track-meta"><?= $e($item['actor']) ?></div>
-                                        <?php if ($item['description'] !== ''): ?>
-                                            <div class="case-track-description"><?= nl2br($e($item['description'])) ?></div>
-                                        <?php endif; ?>
-                                        <?php if ($item['tags'] !== []): ?>
-                                            <div class="case-track-tags">
-                                                <?php foreach ($item['tags'] as $tag): ?>
-                                                    <span class="case-track-tag"><?= $e($tag) ?></span>
-                                                <?php endforeach; ?>
-                                            </div>
-                                        <?php endif; ?>
+                                        <div class="management-entry__actor"><?= $e($management['actor_name'] ?? 'Sistema') ?></div>
+                                        <?php if (!empty($management['observation'])): ?><p><?= nl2br($e($management['observation'])) ?></p><?php endif; ?>
+                                        <?php if (!empty($management['petition_type_selected'])): ?><span class="case-track-tag"><?= $e($management['petition_type_selected']) ?></span><?php endif; ?>
                                     </div>
                                 </article>
                             <?php endforeach; ?>
                         </div>
                     <?php else: ?>
                         <div class="case-empty">
-                            <i class="bi bi-clock-history" aria-hidden="true"></i>
-                            <strong>Aún no hay actividad registrada</strong>
-                            <span>Cuando el caso tenga una asignación, gestión o evento, aparecerá aquí.</span>
+                            <i class="bi bi-file-earmark-text" aria-hidden="true"></i>
+                            <strong>El caso aún no tiene gestiones registradas</strong>
+                            <span>Cuando registres una gestión, aparecerá aquí el historial completo.</span>
                         </div>
                     <?php endif; ?>
                 </div>
             </section>
         </main>
 
-        <aside class="case-stack">
+        <aside class="case-sidebar">
             <?php if ($canManage): ?>
                 <section class="case-card" aria-labelledby="management-title">
                     <div class="case-card__head">
@@ -351,40 +344,30 @@ usort(
                             <div class="case-card__icon"><i class="bi bi-pencil-square" aria-hidden="true"></i></div>
                             <div>
                                 <h2 id="management-title">Registrar gestión</h2>
-                                <p>Tipifica y registra la actuación realizada sobre el caso.</p>
+                                <p>Tipifica y registra la actuación realizada en este caso.</p>
                             </div>
                         </div>
                     </div>
-
                     <div class="case-card__body">
                         <form class="management-form" method="post" action="/cases/<?= (int)$case['id'] ?>/manage" enctype="multipart/form-data" id="managementForm">
                             <input type="hidden" name="_csrf" value="<?= $e(\App\Auth\Csrf::token()) ?>">
 
                             <div class="typification-intro">
                                 <i class="bi bi-ui-checks-grid" aria-hidden="true"></i>
-                                <div>
-                                    <strong>Tipificación del caso</strong>
-                                    <span>Selecciona la clasificación que corresponde a la gestión realizada.</span>
-                                </div>
+                                <div><strong>Tipificación del caso</strong><span>Selecciona la clasificación que corresponde a la gestión realizada.</span></div>
                             </div>
 
-                            <label class="form-label" for="petitionType">1. Tipo de petición <span class="text-danger">*</span></label>
+                            <label class="form-label" for="petitionType">Tipo de petición <span class="text-danger">*</span></label>
                             <select class="form-select" name="petition_type_selected" id="petitionType" required>
                                 <option value="">Seleccionar tipo de petición...</option>
                                 <?php foreach ($petitionTypes as $item): ?>
-                                    <?php
-                                    $code = (string)$item['code'];
-                                    $label = (string)$item['label'];
-                                    $isPresence = $code === 'PRESENCIA_CONVIVENCIA_VINCULOS';
-                                    ?>
-                                    <option value="<?= $e($code) ?>" <?= $currentPetitionTypeCode === $code ? 'selected' : '' ?>>
-                                        <?= $e($label) ?><?= $isPresence ? ' · Uso exclusivo de Presencia' : '' ?>
-                                    </option>
+                                    <?php $code=(string)$item['code']; $label=(string)$item['label']; $isPresence=$code==='PRESENCIA_CONVIVENCIA_VINCULOS'; ?>
+                                    <option value="<?= $e($code) ?>" <?= $currentPetitionTypeCode === $code ? 'selected' : '' ?>><?= $e($label) ?><?= $isPresence ? ' · Uso exclusivo de Presencia' : '' ?></option>
                                 <?php endforeach; ?>
                             </select>
                             <div class="field-help">La selección queda registrada en el caso y en su trazabilidad.</div>
 
-                            <label class="form-label" for="managementType">2. Tipo de gestión <span class="text-danger">*</span></label>
+                            <label class="form-label" for="managementType">Tipo de gestión <span class="text-danger">*</span></label>
                             <select class="form-select" name="management_type_code" id="managementType" required>
                                 <option value="">Seleccionar tipo de gestión...</option>
                                 <?php foreach ($managementTypes as $item): ?>
@@ -404,21 +387,22 @@ usort(
                             </div>
 
                             <div id="petitionChangeBlock" class="conditional-field" hidden>
-                                <div class="change-note">
-                                    <i class="bi bi-arrow-repeat" aria-hidden="true"></i>
-                                    <span>El tipo de petición seleccionado arriba se registrará como la nueva tipificación.</span>
+                                <div class="change-note"><i class="bi bi-arrow-repeat" aria-hidden="true"></i><span>El tipo de petición seleccionado arriba se registrará como la nueva tipificación.</span></div>
+                            </div>
+
+                            <div class="management-form-row">
+                                <div>
+                                    <label class="form-label" for="observation">Observación <span class="text-muted fw-normal">(opcional)</span></label>
+                                    <div class="form-textarea-wrap">
+                                        <textarea class="form-control" name="observation" id="observation" rows="5" maxlength="2000" placeholder="Describe brevemente la gestión realizada."></textarea>
+                                        <span class="char-counter" id="observationCounter">0 / 2000</span>
+                                    </div>
                                 </div>
                             </div>
 
-                            <label class="form-label" for="observation">Observación</label>
-                            <div class="form-textarea-wrap">
-                                <textarea class="form-control" name="observation" id="observation" rows="5" maxlength="2000" placeholder="Describe brevemente la gestión realizada."></textarea>
-                                <span class="char-counter" id="observationCounter">0 / 2000</span>
-                            </div>
-
-                            <label class="form-label" for="support">Soporte</label>
+                            <label class="form-label" for="support">Soporte <span class="text-muted fw-normal">(opcional)</span></label>
                             <input class="form-control" type="file" name="support" id="support" accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png">
-                            <div class="field-help">Opcional · PDF, Word, Excel o imagen · máximo 10 MB.</div>
+                            <div class="field-help">PDF, Word, Excel o imagen · máximo 10 MB.</div>
 
                             <button class="btn btn-primary w-100 management-submit" type="submit" id="managementSubmit">
                                 <i class="bi bi-check2-circle me-1" aria-hidden="true"></i>Guardar tipificación y gestión
@@ -428,51 +412,69 @@ usort(
                 </section>
             <?php endif; ?>
 
+            <section class="case-card tracking-card" aria-labelledby="tracking-title">
+                <div class="case-card__head">
+                    <div class="case-card__title">
+                        <div class="case-card__icon case-card__icon--blue"><i class="bi bi-clock-history" aria-hidden="true"></i></div>
+                        <div>
+                            <h2 id="tracking-title">Historial del caso</h2>
+                            <p>Seguimiento cronológico de asignaciones, gestiones y eventos del caso.</p>
+                        </div>
+                    </div>
+                    <?php if ($tracking !== []): ?><span class="case-badge case-badge--neutral"><?= count($tracking) ?> eventos</span><?php endif; ?>
+                </div>
+                <div class="case-card__body">
+                    <?php if ($tracking !== []): ?>
+                        <div class="case-tracking" aria-label="Línea de tiempo del caso">
+                            <?php foreach ($tracking as $item): ?>
+                                <article class="case-track-item case-track-item--<?= $e($item['kind']) ?>">
+                                    <div class="case-track-rail"><span class="case-track-dot"><i class="bi <?= $e($item['icon']) ?>" aria-hidden="true"></i></span></div>
+                                    <div class="case-track-content">
+                                        <div class="case-track-top">
+                                            <div class="case-track-title"><?= $e($item['title']) ?></div>
+                                            <time class="case-track-date" datetime="<?= $e($item['at']) ?>"><?= $e($item['at']) ?></time>
+                                        </div>
+                                        <div class="case-track-meta"><?= $e($item['actor']) ?></div>
+                                        <?php if ($item['description'] !== ''): ?><div class="case-track-description"><?= nl2br($e($item['description'])) ?></div><?php endif; ?>
+                                        <?php if ($item['tags'] !== []): ?><div class="case-track-tags"><?php foreach ($item['tags'] as $tag): ?><span class="case-track-tag"><?= $e($tag) ?></span><?php endforeach; ?></div><?php endif; ?>
+                                    </div>
+                                </article>
+                            <?php endforeach; ?>
+                        </div>
+                    <?php else: ?>
+                        <div class="case-empty"><i class="bi bi-clock-history" aria-hidden="true"></i><strong>Aún no hay actividad registrada</strong><span>Cuando el caso tenga una asignación, gestión o evento, aparecerá aquí.</span></div>
+                    <?php endif; ?>
+                </div>
+            </section>
+
             <?php if ($canReassign && (int)($case['assigned_user_id'] ?? 0) > 0 && $state === 'ASSIGNED' && $case['closed_at'] === null): ?>
                 <section class="case-card" aria-labelledby="reassign-title">
                     <div class="case-card__head">
                         <div class="case-card__title">
-                            <div class="case-card__icon"><i class="bi bi-arrow-left-right" aria-hidden="true"></i></div>
-                            <div>
-                                <h2 id="reassign-title">Reasignar caso</h2>
-                                <p>Acción administrativa explícita con trazabilidad.</p>
-                            </div>
+                            <div class="case-card__icon case-card__icon--amber"><i class="bi bi-arrow-left-right" aria-hidden="true"></i></div>
+                            <div><h2 id="reassign-title">Reasignar caso</h2><p>Acción administrativa explícita con trazabilidad.</p></div>
                         </div>
                     </div>
                     <div class="case-card__body">
                         <div class="reassign-box">
                             <div class="reassign-title"><i class="bi bi-shield-check" aria-hidden="true"></i>Control de reasignación</div>
-                            <div class="reassign-help">
-                                Solo se muestran agentes habilitados y elegibles con capacidad disponible.
-                            </div>
-
+                            <div class="reassign-help">Solo se muestran agentes habilitados y elegibles con capacidad disponible.</div>
                             <?php if ($reassignmentCandidates !== []): ?>
                                 <form method="post" action="/cases/<?= (int)$case['id'] ?>/reassign" id="reassignmentForm">
                                     <input type="hidden" name="_csrf" value="<?= $e(\App\Auth\Csrf::token()) ?>">
-
                                     <label class="form-label" for="newUserId">Agente destino <span class="text-danger">*</span></label>
                                     <select class="form-select" name="new_user_id" id="newUserId" required>
                                         <option value="">Seleccionar agente...</option>
                                         <?php foreach ($reassignmentCandidates as $candidate): ?>
-                                            <option value="<?= (int)$candidate['id'] ?>">
-                                                <?= $e($candidate['full_name']) ?> (<?= $e($candidate['username']) ?>)
-                                                · <?= (int)$candidate['free_capacity'] ?> cupos libres
-                                            </option>
+                                            <option value="<?= (int)$candidate['id'] ?>"><?= $e($candidate['full_name']) ?> (<?= $e($candidate['username']) ?>) · <?= (int)$candidate['free_capacity'] ?> cupos libres</option>
                                         <?php endforeach; ?>
                                     </select>
-
                                     <label class="form-label" for="reassignReason">Motivo de reasignación <span class="text-danger">*</span></label>
                                     <textarea class="form-control" name="reason" id="reassignReason" rows="4" maxlength="500" required placeholder="Indica por qué se realiza la reasignación."></textarea>
-
-                                    <button class="btn btn-outline-success w-100 mt-3" type="submit" id="reassignSubmit">
-                                        <i class="bi bi-arrow-repeat me-1" aria-hidden="true"></i>Confirmar reasignación
-                                    </button>
+                                    <button class="btn btn-outline-success w-100 mt-3" type="submit" id="reassignSubmit"><i class="bi bi-arrow-repeat me-1" aria-hidden="true"></i>Confirmar reasignación</button>
                                 </form>
                             <?php else: ?>
-                                <div class="case-alert case-alert--warning">
-                                    <i class="bi bi-info-circle-fill" aria-hidden="true"></i>
-                                    <span>No hay agentes elegibles disponibles para recibir este caso en este momento. El caso permanece con el agente actual.</span>
-                                </div>
+                                <div class="case-alert case-alert--warning"><i class="bi bi-info-circle-fill" aria-hidden="true"></i><span>No hay agentes elegibles disponibles para recibir este caso en este momento. El caso permanece con el agente actual.</span></div>
                             <?php endif; ?>
                         </div>
                     </div>
@@ -481,7 +483,6 @@ usort(
         </aside>
     </div>
 </div>
-
 <script>
 (() => {
     const type = document.getElementById('managementType');
