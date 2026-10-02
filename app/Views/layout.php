@@ -222,7 +222,7 @@ unset($_SESSION['_flash_error'], $_SESSION['_flash_success'], $_SESSION['_flash_
 </nav>
 <?php endif; ?>
 
-<main class="<?= $isAuthPage ? '' : 'container py-4 app-shell' ?>" role="main" id="mainContent">
+<main class="<?= $isAuthPage ? '' : (str_starts_with($path, '/cases/') ? 'app-shell case-page-shell' : 'container py-4 app-shell') ?>" role="main" id="mainContent">
     <?php require $view; ?>
 
     <?php if ($globalFlashError || $globalFlashSuccess || $globalFlashWarning): ?>
