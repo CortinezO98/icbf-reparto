@@ -31,7 +31,10 @@ final class ImportStructureRepository {
   $st->execute([':vid'=>$vid,':fc'=>$d['field_code'],':dn'=>$d['display_name'],':eh'=>$d['excel_header'],':ha'=>$aliases?json_encode($aliases,JSON_UNESCAPED_UNICODE):null,':dt'=>$d['data_type'],':req'=>$d['is_required'],':ext'=>$d['is_external_key'],':rep'=>$d['is_reportable'],':ml'=>$d['max_length'] ?: null,':rx'=>$d['validation_regex'] ?: null,':df'=>$d['date_format'] ?: null,':so'=>$d['sort_order']]);
   return (int)$this->pdo->lastInsertId();
  }
- /** @param array<string,mixed> $d @param list<array<string,mixed>> $fields */
+ /**
+  * @param array<string,mixed> $d
+  * @param list<array<string,mixed>> $fields
+  */
  public function createVersionFromHeaders(int $sid,array $d,array $fields,int $uid): int {
   $this->pdo->beginTransaction();
   try {
