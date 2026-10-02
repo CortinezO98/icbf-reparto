@@ -20,8 +20,7 @@ $year = date('Y');
 
             <div class="card-body">
                 <?php if (!empty($error)): ?>
-                    <div class="alert alert-danger py-2 mb-3" role="alert">
-                        <i class="bi bi-exclamation-triangle me-1"></i>
+                    <div id="loginErrorMessage" class="d-none">
                         <?= htmlspecialchars((string)$error, ENT_QUOTES, 'UTF-8') ?>
                     </div>
                 <?php endif; ?>
@@ -80,3 +79,20 @@ $year = date('Y');
         </div>
     </div>
 </div>
+<script>
+(() => {
+    const error = <?= json_encode((string)($error ?? ''), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>;
+
+    if (error && window.Swal) {
+        Swal.fire({
+            icon: 'error',
+            title: 'No fue posible iniciar sesión',
+            text: error,
+            confirmButtonText: 'Volver a iniciar sesión',
+            confirmButtonColor: '#4CAF50',
+            allowOutsideClick: false,
+            allowEscapeKey: false
+        });
+    }
+})();
+</script>
