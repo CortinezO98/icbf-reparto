@@ -124,16 +124,31 @@ final class CasesController
             $this->redirectError($id, 'Tipo de gestión no permitido.');
         }
 
+        $petitionTypeCode = trim((string)($_POST['petition_type_selected'] ?? ''));
         $escalation = trim((string)($_POST['escalation_category_code'] ?? ''));
-        $newPetition = trim((string)($_POST['new_petition_type'] ?? ''));
 
-        if (CaseManagementRules::requiresEscalationCategory($type) && $escalation === '') {
-            $this->redirectError($id, 'Selecciona una categoría de escalamiento.');
+        $caseRepo = new CaseOperationsRepository($this->pdo);
+        $petitionType = $caseRepo->catalogItem('PETITION_TYPE', $petitionTypeCode);
+
+        if ($petitionType === null) {
+            $this->redirectError($id, 'Selecciona un tipo de petición válido.');
         }
 
-        if (CaseManagementRules::requiresNewPetitionType($type) && $newPetition === '') {
-            $this->redirectError($id, 'Selecciona el nuevo tipo de petición.');
+        if (CaseManagementRules::requiresEscalationCategory($type)) {
+            if ($escalation === '') {
+                $this->redirectError($id, 'Selecciona una categoría de escalamiento.');
+            }
+
+            if ($caseRepo->catalogItem('ESCALATION_CATEGORY', $escalation) === null) {
+                $this->redirectError($id, 'La categoría de escalamiento seleccionada no es válida.');
+            }
+        } else {
+            $escalation = '';
         }
+
+        $newPetition = $type === 'PETITION_TYPE_CHANGE'
+            ? $petitionType['label']
+            : null;
 
         $supportPath = null;
 
@@ -146,8 +161,8 @@ final class CasesController
                 [
                     'management_type_code'=>$type,
                     'escalation_category_code'=>$escalation !== '' ? $escalation : null,
-                    'petition_type_selected'=>trim((string)($_POST['petition_type_selected'] ?? '')) ?: null,
-                    'new_petition_type'=>$newPetition !== '' ? $newPetition : null,
+                    'petition_type_selected'=>$petitionType['label'],
+                    'new_petition_type'=>$newPetition,
                     'observation'=>trim((string)($_POST['observation'] ?? '')) ?: null,
                     'support_path'=>$supportPath,
                 ]
@@ -166,7 +181,11 @@ final class CasesController
                 'CASE_MANAGED',
                 'CASE',
                 (string)$id,
-                ['management_type'=>$type]
+                [
+                    'management_type'=>$type,
+                    'petition_type'=>$petitionType['label'],
+                    'escalation_category'=>$escalation !== '' ? $escalation : null,
+                ]
             );
 
             $_SESSION['_flash_success'] = 'Gestión registrada correctamente.';
