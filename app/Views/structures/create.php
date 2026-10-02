@@ -38,7 +38,7 @@ $e = static fn(mixed $value): string => htmlspecialchars((string)$value, ENT_QUO
                 </div>
                 <div class="card-body p-4">
                     <form method="post" action="/admin/structures/create" id="structureCreateForm">
-                        <input type="hidden" name="_csrf" value="<?= $e(AppAuthCsrf::token()) ?>">
+                        <input type="hidden" name="_csrf" value="<?= $e(\App\Auth\Csrf::token()) ?>">
 
                         <div class="mb-3">
                             <label for="structureName" class="form-label fw-semibold">Nombre de la estructura</label>
