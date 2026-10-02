@@ -136,7 +136,6 @@ final class AuthController
                     // Cerrar sesión no libera los casos que el agente ya está gestionando.
                     // Los casos permanecen asignados hasta una reasignación explícita
                     // realizada por un supervisor o administrador.
-                    }
                 }
             } catch (\Throwable $e) {
                 error_log('[AgentPresence][LOGOUT] ' . $e->getMessage());
@@ -432,7 +431,7 @@ final class AuthController
             (new AuditRepository($this->pdo))->log(
                 $uid,
                 'PASSWORD_CHANGED',
-                'SECURITY',
+                'USER',
                 (string)$uid
             );
 
@@ -517,7 +516,8 @@ final class AuthController
             $toEmail,
             $subject,
             $body,
-            implode("\r\n", $headers)
+            implode("
+", $headers)
         );
     }
 }
