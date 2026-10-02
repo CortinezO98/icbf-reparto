@@ -31,6 +31,80 @@ final class ImportStructureRepository {
   $st->execute([':vid'=>$vid,':fc'=>$d['field_code'],':dn'=>$d['display_name'],':eh'=>$d['excel_header'],':ha'=>$aliases?json_encode($aliases,JSON_UNESCAPED_UNICODE):null,':dt'=>$d['data_type'],':req'=>$d['is_required'],':ext'=>$d['is_external_key'],':rep'=>$d['is_reportable'],':ml'=>$d['max_length'] ?: null,':rx'=>$d['validation_regex'] ?: null,':df'=>$d['date_format'] ?: null,':so'=>$d['sort_order']]);
   return (int)$this->pdo->lastInsertId();
  }
+ /** @param array<string,mixed> $d @param list<array<string,mixed>> $fields */
+ public function createVersionFromHeaders(int $sid,array $d,array $fields,int $uid): int {
+  $this->pdo->beginTransaction();
+  try {
+   $st=$this->pdo->prepare('SELECT COALESCE(MAX(version_number),0)+1 FROM import_structure_versions WHERE structure_id=:sid');
+   $st->execute([':sid'=>$sid]);
+   $number=(int)$st->fetchColumn();
+
+   $st=$this->pdo->prepare('INSERT INTO import_structure_versions(structure_id,version_number,status,target_sheet_mode,target_sheet_value,header_row,data_start_row,external_key_field_code,allow_csv,allow_xlsx,header_signature,notes,created_by) VALUES(:sid,:v,"DRAFT",:m,:tv,:hr,:dr,:ek,:csv,:xlsx,:sig,:notes,:uid)');
+   $st->execute([
+    ':sid'=>$sid, ':v'=>$number, ':m'=>$d['target_sheet_mode'], ':tv'=>$d['target_sheet_value'] ?: null,
+    ':hr'=>$d['header_row'], ':dr'=>$d['data_start_row'], ':ek'=>$d['external_key_field_code'],
+    ':csv'=>$d['allow_csv'], ':xlsx'=>$d['allow_xlsx'], ':sig'=>$d['header_signature'] ?: null,
+    ':notes'=>$d['notes'] ?: null, ':uid'=>$uid
+   ]);
+
+   $vid=(int)$this->pdo->lastInsertId();
+   $fieldSql='INSERT INTO import_structure_fields(structure_version_id,field_code,display_name,excel_header,header_aliases_json,data_type,is_required,is_external_key,is_reportable,max_length,validation_regex,date_format,sort_order) VALUES(:vid,:fc,:dn,:eh,:ha,:dt,:req,:ext,:rep,:ml,:rx,:df,:so)';
+   $fieldSt=$this->pdo->prepare($fieldSql);
+
+   foreach($fields as $field){
+    $fieldSt->execute([
+     ':vid'=>$vid, ':fc'=>$field['field_code'], ':dn'=>$field['display_name'], ':eh'=>$field['excel_header'],
+     ':ha'=>$field['header_aliases_json'] ?? null, ':dt'=>$field['data_type'] ?? 'STRING',
+     ':req'=>(int)($field['is_required'] ?? 0), ':ext'=>(int)($field['is_external_key'] ?? 0),
+     ':rep'=>(int)($field['is_reportable'] ?? 0), ':ml'=>$field['max_length'] ?? null,
+     ':rx'=>$field['validation_regex'] ?? null, ':df'=>$field['date_format'] ?? null,
+     ':so'=>(int)($field['sort_order'] ?? 0)
+    ]);
+   }
+
+   $this->pdo->commit();
+   return $vid;
+  } catch(\Throwable $e) {
+   if($this->pdo->inTransaction()) $this->pdo->rollBack();
+   throw $e;
+  }
+ }
+
+ public function versionNumber(int $vid): int {
+  $st=$this->pdo->prepare('SELECT version_number FROM import_structure_versions WHERE id=:id');
+  $st->execute([':id'=>$vid]);
+  $value=$st->fetchColumn();
+  if($value===false) throw new \RuntimeException('Versión no encontrada.');
+  return (int)$value;
+ }
+
+ public function setExternalKey(int $sid,int $vid,string $fieldCode,int $uid): void {
+  $this->pdo->beginTransaction();
+  try {
+   $st=$this->pdo->prepare('SELECT id FROM import_structure_versions WHERE id=:vid AND structure_id=:sid AND status="DRAFT" FOR UPDATE');
+   $st->execute([':vid'=>$vid,':sid'=>$sid]);
+   if(!$st->fetchColumn()) throw new \RuntimeException('Solo se puede cambiar la llave externa de una versión en borrador.');
+
+   $st=$this->pdo->prepare('SELECT id FROM import_structure_fields WHERE structure_version_id=:vid AND field_code=:fc AND is_active=1');
+   $st->execute([':vid'=>$vid,':fc'=>$fieldCode]);
+   if(!$st->fetchColumn()) throw new \RuntimeException('El campo seleccionado no pertenece a la versión.');
+
+   $this->pdo->prepare('UPDATE import_structure_fields SET is_external_key=0 WHERE structure_version_id=:vid')
+    ->execute([':vid'=>$vid]);
+
+   $this->pdo->prepare('UPDATE import_structure_fields SET is_external_key=1,is_required=1 WHERE structure_version_id=:vid AND field_code=:fc')
+    ->execute([':vid'=>$vid,':fc'=>$fieldCode]);
+
+   $this->pdo->prepare('UPDATE import_structure_versions SET external_key_field_code=:fc WHERE id=:vid')
+    ->execute([':vid'=>$vid,':fc'=>$fieldCode]);
+
+   $this->pdo->commit();
+  } catch(\Throwable $e) {
+   if($this->pdo->inTransaction()) $this->pdo->rollBack();
+   throw $e;
+  }
+ }
+
  public function activate(int $sid,int $vid,int $uid): void {
   $this->pdo->beginTransaction(); try {
    $st=$this->pdo->prepare('SELECT id FROM import_structure_versions WHERE id=:vid AND structure_id=:sid FOR UPDATE'); $st->execute([':vid'=>$vid,':sid'=>$sid]); if(!$st->fetchColumn()) throw new \RuntimeException('Versión no encontrada.');
