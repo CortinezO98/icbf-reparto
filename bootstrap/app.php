@@ -2,6 +2,7 @@
 declare(strict_types=1);
 
 use Dotenv\Dotenv;
+use App\Http\ErrorResponse;
 
 require dirname(__DIR__) . '/vendor/autoload.php';
 
@@ -26,11 +27,15 @@ set_exception_handler(static function (Throwable $e) use ($debug): void {
     ));
 
     if (PHP_SAPI !== 'cli') {
-        http_response_code(500);
-        header('Content-Type: text/html; charset=utf-8');
-        echo $debug
-            ? '<pre>' . htmlspecialchars((string)$e, ENT_QUOTES, 'UTF-8') . '</pre>'
-            : 'Ocurrió un error interno. Intenta nuevamente.';
+        ErrorResponse::render(
+            500,
+            'Ocurrió un error inesperado',
+            $debug
+                ? $e->getMessage()
+                : 'No fue posible completar la operación. El incidente fue registrado y puedes intentarlo nuevamente.',
+            '/login',
+            'Continuar'
+        );
     }
 });
 
