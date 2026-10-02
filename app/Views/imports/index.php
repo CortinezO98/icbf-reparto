@@ -145,10 +145,12 @@ $statusMeta = static function (string $status): array {
                                     accept=".xlsx,.csv"
                                     required
                                 >
-                                <span class="dropzone-icon"><i class="bi bi-cloud-arrow-up"></i></span>
-                                <strong>Arrastra tu archivo aquí</strong>
-                                <span>o haz clic para seleccionarlo</span>
-                                <small id="fileHelp">Formatos permitidos: XLSX y CSV · máximo 20 MB</small>
+                                <span class="dropzone-icon" aria-hidden="true"><i class="bi bi-cloud-arrow-up"></i></span>
+                                <span class="dropzone-copy">
+                                    <strong>Arrastra tu archivo aquí</strong>
+                                    <span>o haz clic para seleccionarlo</span>
+                                </span>
+                                <small id="fileHelp">XLSX o CSV · máximo 20 MB</small>
                             </label>
                             <div id="fileSelected" class="file-selected d-none" aria-live="polite">
                                 <span class="file-selected-icon"><i class="bi bi-file-earmark-check"></i></span>
@@ -491,7 +493,7 @@ $statusMeta = static function (string $status): array {
     color:var(--brand);font-size:.72rem;font-weight:800;text-transform:uppercase;letter-spacing:.65px;
 }
 .import-title{font-size:1.35rem;font-weight:800;margin:.2rem 0 .35rem;}
-.import-intro{font-size:.9rem;line-height:1.6;max-width:760px;}
+.import-intro{font-size:.86rem;line-height:1.55;max-width:720px;}
 .import-steps{
     display:flex;align-items:center;gap:.55rem;padding:1rem;margin:1.25rem 0 1.5rem;
     background:#f8faf9;border:1px solid #e5ebe6;border-radius:12px;
@@ -529,21 +531,26 @@ $statusMeta = static function (string $status): array {
     padding:.9rem;background:#fafcfb;border:1px solid #e1e8e2;border-radius:12px;
 }
 .dropzone{
-    min-height:190px;border:2px dashed #cfd9d1;border-radius:14px;background:#fbfcfb;
-    display:flex;flex-direction:column;align-items:center;justify-content:center;
-    text-align:center;padding:2rem 1rem;cursor:pointer;transition:.15s ease;
+    min-height:170px;border:1px dashed #cbd6cd;border-radius:14px;background:#fcfdfc;
+    display:flex!important;flex-direction:column!important;align-items:center!important;
+    justify-content:center!important;text-align:center!important;gap:0;
+    padding:1.5rem 1rem;cursor:pointer;transition:border-color .15s ease,background .15s ease;
 }
 .dropzone:hover,.dropzone-active{
     border-color:rgba(76,175,80,.7);background:#f4faf5;
 }
 .dropzone input{display:none!important;}
 .dropzone-icon{
-    width:54px;height:54px;border-radius:15px;display:grid;place-items:center;
-    background:var(--brand-soft);color:var(--brand);font-size:1.5rem;margin-bottom:.7rem;
+    width:48px;height:48px;border-radius:13px;display:grid!important;place-items:center;
+    align-self:center!important;margin:0 auto .75rem!important;
+    background:var(--brand-soft);color:var(--brand);font-size:1.35rem;
 }
-.dropzone strong{font-size:.95rem;}
-.dropzone>span:not(.dropzone-icon){font-size:.78rem;color:var(--text-soft);margin-top:.15rem;}
-.dropzone small{font-size:.7rem;color:#7b867e;margin-top:.65rem;}
+.dropzone-copy{
+    display:flex!important;flex-direction:column;align-items:center;gap:.15rem;
+}
+.dropzone-copy strong{font-size:.92rem;line-height:1.35;}
+.dropzone-copy span{font-size:.76rem;color:var(--text-soft);line-height:1.35;}
+.dropzone small{font-size:.68rem;color:#7b867e;margin-top:.55rem;}
 .file-selected{
     display:flex;align-items:center;gap:.7rem;padding:.8rem .9rem;border:1px solid #d8e5da;
     background:#f4faf5;border-radius:12px;
@@ -556,13 +563,13 @@ $statusMeta = static function (string $status): array {
 .file-selected strong{font-size:.82rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .file-selected #fileSize{font-size:.7rem;color:var(--text-soft);margin-top:.1rem;}
 .security-note{
-    display:flex;gap:.7rem;padding:.8rem .9rem;background:#f8faf9;border:1px solid #e3e9e4;
-    border-radius:11px;margin-top:1rem;
+    display:flex;gap:.65rem;padding:.7rem .85rem;background:#fafcfb;border:1px solid #e5eae6;
+    border-radius:10px;margin-top:.9rem;
 }
 .security-note>i{color:var(--brand);font-size:1.05rem;}
 .security-note strong,.security-note span{display:block;}
-.security-note strong{font-size:.76rem;}
-.security-note span{font-size:.7rem;color:var(--text-soft);margin-top:.1rem;}
+.security-note strong{font-size:.74rem;}
+.security-note span{font-size:.68rem;color:var(--text-soft);margin-top:.1rem;}
 .import-side-title{font-size:1.2rem;font-weight:800;margin:.25rem 0 .35rem;}
 .security-list{display:grid;gap:.7rem;margin:1.25rem 0;}
 .security-list>div{display:flex;gap:.65rem;align-items:flex-start;padding:.65rem .7rem;border:1px solid #edf0ee;border-radius:10px;}
