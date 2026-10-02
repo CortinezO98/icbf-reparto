@@ -31,5 +31,37 @@ final class QueuesController {
   exit;
  }
  
- public function attach(): void { Authorization::requirePermission($this->pdo,'QUEUE_ADMIN'); Csrf::validate($_POST['_csrf']??null); $q=(int)($_POST['queue_id']??0);$v=(int)($_POST['structure_version_id']??0); if($q<1||$v<1){$_SESSION['_flash_error']='Selecciona cola y estructura.';header('Location: /admin/queues');exit;} try{(new QueueRepository($this->pdo))->attach($q,$v);$_SESSION['_flash_success']='Estructura asociada.';}catch(\Throwable $e){error_log($e->getMessage());$_SESSION['_flash_error']='No fue posible asociar la estructura.';} header('Location: /admin/queues');exit; }
+ public function attach(): void {
+  Authorization::requirePermission($this->pdo,'QUEUE_ADMIN');
+  Csrf::validate($_POST['_csrf']??null);
+
+  $q=(int)($_POST['queue_id']??0);
+  $v=(int)($_POST['structure_version_id']??0);
+
+  if($q<1||$v<1){
+    $_SESSION['_flash_error']='Selecciona una cola y una estructura activa.';
+    header('Location: /admin/queues');
+    exit;
+  }
+
+  try {
+    (new QueueRepository($this->pdo))->attach($q,$v);
+    (new AuditRepository($this->pdo))->log(
+      Auth::id(),
+      'QUEUE_STRUCTURE_ATTACHED',
+      'QUEUE_STRUCTURE',
+      $q.':'.$v,
+      ['queue_id'=>$q,'structure_version_id'=>$v]
+    );
+    $_SESSION['_flash_success']='La estructura activa quedó asociada a la cola.';
+  } catch(\Throwable $e) {
+    error_log('[QueuesController::attach] '.$e->getMessage());
+    $_SESSION['_flash_error']=$e instanceof \RuntimeException
+      ? $e->getMessage()
+      : 'No fue posible asociar la estructura.';
+  }
+
+  header('Location: /admin/queues');
+  exit;
+}
 }
