@@ -34,9 +34,24 @@ $elapsedLabel = $elapsedMinutes === null || $elapsedMinutes === ''
     : ((float)$elapsedMinutes < 60
         ? number_format((float)$elapsedMinutes, 0, ',', '.') . ' min'
         : number_format((float)$elapsedMinutes / 60, 1, ',', '.') . ' h');
+$currentPetitionTypeCode = '';
+foreach ($petitionTypes as $petitionType) {
+    if ((string)$petitionType['label'] === (string)($case['petition_type'] ?? '')) {
+        $currentPetitionTypeCode = (string)$petitionType['code'];
+        break;
+    }
+}
+$managementLabels = [];
+foreach ($managementTypes as $item) {
+    $managementLabels[(string)$item['code']] = (string)$item['label'];
+}
+$escalationLabels = [];
+foreach ($escalations as $item) {
+    $escalationLabels[(string)$item['code']] = (string)$item['label'];
+}
 ?>
 <style>
-.case-head{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:flex-start}.case-head h1{margin:0;font-weight:800}.case-grid{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(300px,.75fr);gap:18px;margin-top:18px}.case-card{background:#fff;border:1px solid rgba(33,37,41,.12);border-radius:16px;padding:18px;box-shadow:0 2px 5px rgba(0,0,0,.035)}.case-card h2{font-size:1rem;font-weight:800;margin-bottom:14px}.data-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.datum{background:#f8f9fa;border:1px solid #edf0f2;border-radius:10px;padding:11px}.datum small{display:block;color:#6c757d;font-size:.75rem}.datum strong{display:block;margin-top:3px}.timeline{display:grid;gap:10px}.timeline-item{border-left:3px solid var(--color-primary);padding:10px 0 10px 13px;background:#fbfcfd;border-radius:0 8px 8px 0}.flash-ok{padding:12px;background:#d1e7dd;color:#0f5132;border:1px solid #badbcc;border-radius:10px;margin:14px 0}.flash-err{padding:12px;background:#f8d7da;color:#842029;border:1px solid #f5c2c7;border-radius:10px;margin:14px 0}.case-status-card{background:#f8f9fa;border:1px solid #edf0f2;border-radius:12px;padding:14px}.case-status-card .label{font-size:.75rem;color:#6c757d}.case-status-card .value{font-weight:800;font-size:1.1rem;margin-top:2px}.management-form .form-label{font-weight:700;font-size:.85rem}@media(max-width:850px){.case-grid,.data-grid{grid-template-columns:1fr}}
+.case-head{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:flex-start}.case-head h1{margin:0;font-weight:800}.case-grid{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(300px,.75fr);gap:18px;margin-top:18px}.case-card{background:#fff;border:1px solid rgba(33,37,41,.12);border-radius:16px;padding:18px;box-shadow:0 2px 5px rgba(0,0,0,.035)}.case-card h2{font-size:1rem;font-weight:800;margin-bottom:14px}.data-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.datum{background:#f8f9fa;border:1px solid #edf0f2;border-radius:10px;padding:11px}.datum small{display:block;color:#6c757d;font-size:.75rem}.datum strong{display:block;margin-top:3px}.timeline{display:grid;gap:10px}.timeline-item{border-left:3px solid var(--color-primary);padding:10px 0 10px 13px;background:#fbfcfd;border-radius:0 8px 8px 0}.flash-ok{padding:12px;background:#d1e7dd;color:#0f5132;border:1px solid #badbcc;border-radius:10px;margin:14px 0}.flash-err{padding:12px;background:#f8d7da;color:#842029;border:1px solid #f5c2c7;border-radius:10px;margin:14px 0}.case-status-card{background:#f8f9fa;border:1px solid #edf0f2;border-radius:12px;padding:14px}.case-status-card .label{font-size:.75rem;color:#6c757d}.case-status-card .value{font-weight:800;font-size:1.1rem;margin-top:2px}.management-form .form-label{font-weight:700;font-size:.85rem}.management-form select,.management-form textarea,.management-form input[type=file]{width:100%;padding:10px;border:1px solid #cbd5e1;border-radius:9px;background:#fff}.management-form textarea{resize:vertical}.typification-intro{display:flex;gap:10px;align-items:flex-start;padding:12px;background:#f4faf5;border:1px solid #d9ebdc;border-radius:11px;margin-bottom:14px}.typification-intro>i{color:var(--color-primary);font-size:1.15rem}.typification-intro strong,.typification-intro span{display:block}.typification-intro strong{font-size:.82rem}.typification-intro span,.field-help{font-size:.72rem;color:#6c757d;margin-top:3px}.conditional-field{margin-top:12px;padding:12px;background:#fafcfb;border:1px solid #e3e9e4;border-radius:10px}.conditional-field[hidden]{display:none!important}.change-note{display:flex;gap:8px;align-items:flex-start;color:#51605a;font-size:.75rem}.change-note i{color:var(--color-primary)}.history-tag{display:inline-flex;margin-left:5px;padding:3px 7px;border-radius:999px;background:#f1f5f2;border:1px solid #dfe7e1;color:#52645a;font-size:.68rem;font-weight:700}@media(max-width:850px){.case-grid,.data-grid{grid-template-columns:1fr}}
 </style>
 
 <div class="case-head">
@@ -93,8 +108,13 @@ $elapsedLabel = $elapsedMinutes === null || $elapsedMinutes === ''
             <div class="timeline">
                 <?php foreach ($managements as $m): ?>
                     <div class="timeline-item">
-                        <strong><?= htmlspecialchars((string)$m['management_type_code'], ENT_QUOTES, 'UTF-8') ?></strong>
-                        <?php if (!empty($m['escalation_category_code'])): ?> · <?= htmlspecialchars((string)$m['escalation_category_code'], ENT_QUOTES, 'UTF-8') ?><?php endif; ?>
+                        <strong><?= htmlspecialchars($managementLabels[(string)$m['management_type_code']] ?? (string)$m['management_type_code'], ENT_QUOTES, 'UTF-8') ?></strong>
+                        <?php if (!empty($m['petition_type_selected'])): ?>
+                            <span class="history-tag"><?= htmlspecialchars((string)$m['petition_type_selected'], ENT_QUOTES, 'UTF-8') ?></span>
+                        <?php endif; ?>
+                        <?php if (!empty($m['escalation_category_code'])): ?>
+                            <span class="history-tag"><?= htmlspecialchars($escalationLabels[(string)$m['escalation_category_code']] ?? (string)$m['escalation_category_code'], ENT_QUOTES, 'UTF-8') ?></span>
+                        <?php endif; ?>
                         <div class="muted"><?= htmlspecialchars((string)$m['actor_name'], ENT_QUOTES, 'UTF-8') ?> · <?= htmlspecialchars((string)$m['created_at'], ENT_QUOTES, 'UTF-8') ?></div>
                         <?php if (!empty($m['observation'])): ?><div><?= nl2br(htmlspecialchars((string)$m['observation'], ENT_QUOTES, 'UTF-8')) ?></div><?php endif; ?>
                     </div>
@@ -111,36 +131,73 @@ $elapsedLabel = $elapsedMinutes === null || $elapsedMinutes === ''
                 <form class="management-form" method="post" action="/cases/<?= (int)$case['id'] ?>/manage" enctype="multipart/form-data" id="managementForm">
                     <input type="hidden" name="_csrf" value="<?= htmlspecialchars(\App\Auth\Csrf::token(), ENT_QUOTES, 'UTF-8') ?>">
 
-                    <label>Tipo de gestión *</label>
+                    <div class="typification-intro">
+                        <i class="bi bi-ui-checks-grid"></i>
+                        <div>
+                            <strong>Tipificación del caso</strong>
+                            <span>Selecciona la clasificación que corresponde al caso auditado.</span>
+                        </div>
+                    </div>
+
+                    <label class="form-label" for="petitionType">1. Tipo de petición *</label>
+                    <select name="petition_type_selected" id="petitionType" required>
+                        <option value="">Seleccionar tipo de petición...</option>
+                        <?php foreach ($petitionTypes as $item): ?>
+                            <?php
+                            $code = (string)$item['code'];
+                            $label = (string)$item['label'];
+                            $isPresence = $code === 'PRESENCIA_CONVIVENCIA_VINCULOS';
+                            ?>
+                            <option
+                                value="<?= htmlspecialchars($code, ENT_QUOTES, 'UTF-8') ?>"
+                                <?= $currentPetitionTypeCode === $code ? 'selected' : '' ?>
+                            >
+                                <?= htmlspecialchars($label, ENT_QUOTES, 'UTF-8') ?><?= $isPresence ? ' · Uso exclusivo de Presencia' : '' ?>
+                            </option>
+                        <?php endforeach; ?>
+                    </select>
+                    <small class="field-help">Esta selección queda registrada en el caso y en el historial de gestión.</small>
+
+                    <label class="form-label mt-3" for="managementType">2. Tipo de gestión *</label>
                     <select name="management_type_code" id="managementType" required>
-                        <option value="">Seleccionar...</option>
-                        <?php foreach ($managementTypes as $item): ?><option value="<?= htmlspecialchars((string)$item['code'], ENT_QUOTES, 'UTF-8') ?>"><?= htmlspecialchars((string)$item['label'], ENT_QUOTES, 'UTF-8') ?></option><?php endforeach; ?>
+                        <option value="">Seleccionar tipo de gestión...</option>
+                        <?php foreach ($managementTypes as $item): ?>
+                            <option value="<?= htmlspecialchars((string)$item['code'], ENT_QUOTES, 'UTF-8') ?>">
+                                <?= htmlspecialchars((string)$item['label'], ENT_QUOTES, 'UTF-8') ?>
+                            </option>
+                        <?php endforeach; ?>
                     </select>
 
-                    <div id="escalationBlock" style="display:none">
-                        <label>Categoría de escalamiento *</label>
-                        <select name="escalation_category_code">
-                            <option value="">Seleccionar...</option>
-                            <?php foreach ($escalations as $item): ?><option value="<?= htmlspecialchars((string)$item['code'], ENT_QUOTES, 'UTF-8') ?>"><?= htmlspecialchars((string)$item['label'], ENT_QUOTES, 'UTF-8') ?></option><?php endforeach; ?>
+                    <div id="escalationBlock" class="conditional-field" hidden>
+                        <label class="form-label" for="escalationType">Subcategoría de escalamiento *</label>
+                        <select name="escalation_category_code" id="escalationType">
+                            <option value="">Seleccionar subcategoría...</option>
+                            <?php foreach ($escalations as $item): ?>
+                                <option value="<?= htmlspecialchars((string)$item['code'], ENT_QUOTES, 'UTF-8') ?>">
+                                    <?= htmlspecialchars((string)$item['label'], ENT_QUOTES, 'UTF-8') ?>
+                                </option>
+                            <?php endforeach; ?>
                         </select>
+                        <small class="field-help">Obligatoria cuando el tipo de gestión es Escalado.</small>
                     </div>
 
-                    <div id="petitionChangeBlock" style="display:none">
-                        <label>Nuevo tipo de petición *</label>
-                        <select name="new_petition_type">
-                            <option value="">Seleccionar...</option>
-                            <?php foreach ($petitionTypes as $item): ?><option value="<?= htmlspecialchars((string)$item['label'], ENT_QUOTES, 'UTF-8') ?>"><?= htmlspecialchars((string)$item['label'], ENT_QUOTES, 'UTF-8') ?></option><?php endforeach; ?>
-                        </select>
+                    <div id="petitionChangeBlock" class="conditional-field" hidden>
+                        <div class="change-note">
+                            <i class="bi bi-arrow-repeat"></i>
+                            <span>Al seleccionar <strong>Cambio de tipo de petición</strong>, el tipo de petición elegido arriba se registrará como la nueva tipificación.</span>
+                        </div>
                     </div>
 
-                    <label>Observación</label>
-                    <textarea name="observation" rows="5" style="width:100%;padding:10px;border:1px solid #cbd5e1;border-radius:8px"></textarea>
+                    <label class="form-label mt-3" for="observation">Observación</label>
+                    <textarea name="observation" id="observation" rows="4" maxlength="2000" placeholder="Describe brevemente la gestión realizada."></textarea>
 
-                    <label>Soporte</label>
-                    <input type="file" name="support" accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png">
-                    <small class="muted">Máximo 10 MB.</small>
+                    <label class="form-label mt-3" for="support">Soporte</label>
+                    <input type="file" name="support" id="support" accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png">
+                    <small class="field-help">Opcional · PDF, Word, Excel o imagen · máximo 10 MB.</small>
 
-                    <button class="btn btn-primary" type="submit" style="margin-top:14px"><i class="bi bi-check-circle me-1"></i>Guardar gestión</button>
+                    <button class="btn btn-primary w-100" type="submit" style="margin-top:16px">
+                        <i class="bi bi-check-circle me-1"></i>Guardar tipificación y gestión
+                    </button>
                 </form>
             </div>
         <?php endif; ?>
@@ -246,14 +303,30 @@ $elapsedLabel = $elapsedMinutes === null || $elapsedMinutes === ''
 
 <script>
 (() => {
-    const type=document.getElementById('managementType');
-    const escalation=document.getElementById('escalationBlock');
-    const petition=document.getElementById('petitionChangeBlock');
-    const refresh=()=>{
-        escalation.style.display=type.value==='ESCALATED'?'':'none';
-        petition.style.display=type.value==='PETITION_TYPE_CHANGE'?'':'none';
+    const type = document.getElementById('managementType');
+    const escalation = document.getElementById('escalationBlock');
+    const escalationSelect = document.getElementById('escalationType');
+    const petitionChange = document.getElementById('petitionChangeBlock');
+
+    const refresh = () => {
+        const isEscalated = type?.value === 'ESCALATED';
+        const isPetitionChange = type?.value === 'PETITION_TYPE_CHANGE';
+
+        if (escalation) {
+            escalation.hidden = !isEscalated;
+        }
+        if (escalationSelect) {
+            escalationSelect.required = isEscalated;
+            if (!isEscalated) {
+                escalationSelect.value = '';
+            }
+        }
+        if (petitionChange) {
+            petitionChange.hidden = !isPetitionChange;
+        }
     };
-    type?.addEventListener('change',refresh);
+
+    type?.addEventListener('change', refresh);
     refresh();
 })();
 </script>
