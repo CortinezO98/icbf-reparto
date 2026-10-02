@@ -725,6 +725,155 @@ final class AssignmentRepository
 
 
     /**
+     * Recupera casos que fueron asignados previamente al agente y que quedaron
+     * pendientes por una liberación automática ocurrida antes de la regla de
+     * permanencia. Solo recupera casos cuya última asignación histórica fue
+     * precisamente este agente y cuya liberación tuvo un motivo automático.
+     *
+     * @return list<int>
+     */
+    public function recoverInterruptedCasesForAgent(
+        int $queueId,
+        int $userId,
+        int $limit
+    ): array {
+        $limit = max(0, min(500, $limit));
+
+        if ($limit === 0) {
+            return [];
+        }
+
+        $this->pdo->beginTransaction();
+
+        try {
+            $st = $this->pdo->prepare(
+                "SELECT
+                    c.id,
+                    c.case_number,
+                    c.queue_id
+                 FROM cases c
+                 JOIN case_assignments ca
+                   ON ca.id=(
+                        SELECT ca2.id
+                        FROM case_assignments ca2
+                        WHERE ca2.case_id=c.id
+                        ORDER BY ca2.assigned_at DESC,ca2.id DESC
+                        LIMIT 1
+                   )
+                 WHERE c.queue_id=:queue_id
+                   AND c.assigned_user_id IS NULL
+                   AND c.closed_at IS NULL
+                   AND c.current_state='PENDING_ASSIGNMENT'
+                   AND ca.user_id=:user_id
+                   AND ca.ended_at IS NOT NULL
+                   AND ca.end_reason IN (
+                       'STALE_HEARTBEAT',
+                       'LOGOUT',
+                       'OFFLINE',
+                       'SHIFT_END'
+                   )
+                 ORDER BY ca.assigned_at ASC,c.id ASC
+                 LIMIT {$limit}
+                 FOR UPDATE"
+            );
+            $st->execute([
+                ':queue_id'=>$queueId,
+                ':user_id'=>$userId,
+            ]);
+            $cases = $st->fetchAll() ?: [];
+
+            if ($cases === []) {
+                $this->pdo->commit();
+                return [];
+            }
+
+            $caseIds = [];
+
+            $update = $this->pdo->prepare(
+                "UPDATE cases
+                 SET assigned_user_id=:user_id,
+                     assigned_at=NOW(6),
+                     current_state='ASSIGNED',
+                     updated_at=NOW(6)
+                 WHERE id=:case_id
+                   AND assigned_user_id IS NULL
+                   AND current_state='PENDING_ASSIGNMENT'
+                   AND closed_at IS NULL"
+            );
+
+            $assignment = $this->pdo->prepare(
+                "INSERT INTO case_assignments
+                 (case_id,queue_id,user_id,assignment_type,assigned_by,assigned_at)
+                 VALUES
+                 (:case_id,:queue_id,:user_id,'AUTO',NULL,NOW(6))"
+            );
+
+            $event = $this->pdo->prepare(
+                "INSERT INTO case_events
+                 (case_id,actor_user_id,event_type,from_state,to_state,details_json,created_at)
+                 VALUES
+                 (:case_id,NULL,'CASE_RECOVERED','PENDING_ASSIGNMENT','ASSIGNED',:details,NOW(6))"
+            );
+
+            foreach ($cases as $case) {
+                $caseId = (int)$case['id'];
+
+                $update->execute([
+                    ':case_id'=>$caseId,
+                    ':user_id'=>$userId,
+                ]);
+
+                if ($update->rowCount() !== 1) {
+                    throw new RuntimeException(
+                        "No fue posible recuperar el caso {$caseId}."
+                    );
+                }
+
+                $assignment->execute([
+                    ':case_id'=>$caseId,
+                    ':queue_id'=>(int)$case['queue_id'],
+                    ':user_id'=>$userId,
+                ]);
+
+                $event->execute([
+                    ':case_id'=>$caseId,
+                    ':details'=>json_encode(
+                        [
+                            'reason'=>'RECOVER_PREVIOUS_AGENT_ASSIGNMENT',
+                            'user_id'=>$userId,
+                            'queue_id'=>(int)$case['queue_id'],
+                            'case_number'=>(string)$case['case_number'],
+                        ],
+                        JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES
+                    ),
+                ]);
+
+                $caseIds[] = $caseId;
+            }
+
+            if ($caseIds !== []) {
+                $touch = $this->pdo->prepare(
+                    "UPDATE users
+                     SET last_assigned_at=NOW(6)
+                     WHERE id=:user_id"
+                );
+                $touch->execute([':user_id'=>$userId]);
+            }
+
+            $this->pdo->commit();
+
+            return $caseIds;
+        } catch (Throwable $e) {
+            if ($this->pdo->inTransaction()) {
+                $this->pdo->rollBack();
+            }
+
+            throw $e;
+        }
+    }
+
+
+    /**
      * Libera explícitamente los casos abiertos de un agente.
      *
      * No debe invocarse como consecuencia automática de logout, pérdida de
