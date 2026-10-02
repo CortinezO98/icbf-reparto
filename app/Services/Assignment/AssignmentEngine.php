@@ -119,6 +119,28 @@ final class AssignmentEngine
                         break;
                     }
 
+                    // Antes de tomar casos nuevos, recuperamos los casos que
+                    // pertenecían anteriormente a este agente y que quedaron
+                    // pendientes por una liberación automática ocurrida antes
+                    // de la regla de permanencia. Nunca recuperamos un caso
+                    // cuya última asignación histórica pertenezca a otro agente.
+                    $recoveryLimit = min(
+                        $capacity - $openCases,
+                        $maxAssignments - $assigned
+                    );
+
+                    $recoveredCaseIds = $this->repo->recoverInterruptedCasesForAgent(
+                        $queueId,
+                        $userId,
+                        $recoveryLimit
+                    );
+
+                    if ($recoveredCaseIds !== []) {
+                        $assigned += count($recoveredCaseIds);
+                        $this->pdo->commit();
+                        continue;
+                    }
+
                     $case = $this->repo->nextPendingCaseForUpdate($queueId);
 
                     if ($case === null) {
