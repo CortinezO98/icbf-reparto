@@ -158,8 +158,11 @@ final class AssignmentEngine
 
 
     /**
-     * Libera los casos abiertos de un agente desconectado y devuelve las colas
-     * que deben volver a procesarse por el motor de reparto.
+     * Libera explícitamente los casos abiertos de un agente.
+     *
+     * Esta operación no se ejecuta automáticamente por desconexión, logout,
+     * heartbeat vencido ni fin de turno. Puede utilizarse cuando una acción
+     * administrativa decide liberar/reasignar casos de forma explícita.
      *
      * @return array{case_ids:list<int>,queue_ids:list<int>}
      */
