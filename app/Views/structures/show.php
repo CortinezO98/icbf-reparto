@@ -196,7 +196,7 @@ $statusLabel = static fn(string $status): string => match ($status) {
 
                 <form method="post"
                       action="/admin/structures/<?= (int)$structure['id'] ?>/versions/<?= $vid ?>/fields/update">
-                    <input type="hidden" name="_csrf" value="<?= $e(\\App\\Auth\\Csrf::token()) ?>">
+                    <input type="hidden" name="_csrf" value="<?= $e(\App\Auth\Csrf::token()) ?>">
 
                     <div class="table-responsive">
                         <table class="table align-middle structure-fields-table">
