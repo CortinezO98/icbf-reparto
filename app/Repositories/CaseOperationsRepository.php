@@ -343,8 +343,7 @@ final class CaseOperationsRepository
             $update->execute([
                 ':type'=>$managementType,
                 ':escalation'=>$data['escalation_category_code'] ?? null,
-                ':new_petition_flag'=>$newPetitionType !== null && $newPetitionType !== '' ? 1 : 0,
-                ':new_petition'=>$newPetitionType,
+                ':petition_type'=>(string)$data['petition_type_selected'],
                 ':closed_flag'=>$closed ? 1 : 0,
                 ':closed_flag2'=>$closed ? 1 : 0,
                 ':id'=>$caseId,
