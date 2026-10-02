@@ -40,8 +40,48 @@ final class Csrf
                 exit;
             }
 
-            http_response_code(403);
-            exit('Solicitud inválida.');
+            $authenticated = Auth::check();
+
+            if ($authenticated) {
+                $_SESSION['_flash_error'] =
+                    'La solicitud expiró o ya no es válida. Vuelve a intentarlo desde la página actual.';
+                $target = self::safeRefererPath() ?? '/';
+            } else {
+                $_SESSION['_flash_error'] =
+                    'Tu sesión expiró o ya no es válida. Por favor, vuelve a iniciar sesión.';
+                $target = '/login';
+            }
+
+            header('Location: ' . $target);
+            exit;
         }
+    }
+
+    private static function safeRefererPath(): ?string
+    {
+        $referer = trim((string)($_SERVER['HTTP_REFERER'] ?? ''));
+        if ($referer === '') {
+            return null;
+        }
+
+        $parts = parse_url($referer);
+        if (!is_array($parts)) {
+            return null;
+        }
+
+        $host = (string)($parts['host'] ?? '');
+        $currentHost = (string)($_SERVER['HTTP_HOST'] ?? '');
+
+        if ($host !== '' && $currentHost !== '' && strcasecmp($host, $currentHost) !== 0) {
+            return null;
+        }
+
+        $path = (string)($parts['path'] ?? '/');
+        if ($path === '' || $path[0] !== '/') {
+            return null;
+        }
+
+        $query = isset($parts['query']) ? '?' . $parts['query'] : '';
+        return $path . $query;
     }
 }
