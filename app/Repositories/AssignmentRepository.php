@@ -890,14 +890,12 @@ final class AssignmentRepository
                 $caseIds[] = $caseId;
             }
 
-            if ($caseIds !== []) {
-                $touch = $this->pdo->prepare(
-                    "UPDATE users
-                     SET last_assigned_at=NOW(6)
-                     WHERE id=:user_id"
-                );
-                $touch->execute([':user_id'=>$userId]);
-            }
+            $touch = $this->pdo->prepare(
+                "UPDATE users
+                 SET last_assigned_at=NOW(6)
+                 WHERE id=:user_id"
+            );
+            $touch->execute([':user_id'=>$userId]);
 
             if ($ownsTransaction) {
                 $this->pdo->commit();
@@ -905,7 +903,7 @@ final class AssignmentRepository
 
             return $caseIds;
         } catch (\Throwable $e) {
-            if ($ownsTransaction && $this->pdo->inTransaction()) {
+            if ($ownsTransaction) {
                 $this->pdo->rollBack();
             }
 
