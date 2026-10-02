@@ -3,6 +3,8 @@ declare(strict_types=1);
 
 namespace App\Http;
 
+use App\Auth\Auth;
+
 final class Router
 {
     /** @var array<string, list<array{pattern:string, handler:callable}>> */
@@ -49,7 +51,12 @@ final class Router
             return;
         }
 
-        http_response_code(404);
-        echo 'Página no encontrada.';
+        ErrorResponse::render(
+            404,
+            'Página no encontrada',
+            'La dirección que intentaste abrir no existe o ya no está disponible.',
+            Auth::check() ? '/cases' : '/login',
+            Auth::check() ? 'Volver a casos' : 'Ir al inicio de sesión'
+        );
     }
 }
